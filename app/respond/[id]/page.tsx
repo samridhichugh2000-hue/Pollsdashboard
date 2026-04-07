@@ -50,7 +50,6 @@ export default function RespondPage() {
   const [loadError, setLoadError] = useState('')
   const [answers, setAnswers] = useState<Answer[]>([])
   const [email, setEmail] = useState('')
-  const [respondent, setRespondent] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -98,7 +97,7 @@ export default function RespondPage() {
       const res = await fetch(`/api/respond/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers, email: trimmedEmail, respondent: respondent.trim() || undefined }),
+        body: JSON.stringify({ answers, email: trimmedEmail }),
       })
       const data = await res.json() as { error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Submission failed.')
@@ -209,20 +208,6 @@ export default function RespondPage() {
                 )}
               </div>
             ))}
-
-            {/* Optional name */}
-            <div className="space-y-1.5 border-t border-gray-100 pt-4">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Your Name <span className="normal-case font-normal">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={respondent}
-                onChange={(e) => setRespondent(e.target.value)}
-                placeholder="Leave blank to stay anonymous"
-                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition"
-              />
-            </div>
 
             <button
               type="submit"

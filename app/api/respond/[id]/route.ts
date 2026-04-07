@@ -39,7 +39,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const body = await req.json() as {
     answers: { question: string; answer: string }[]
     email?: string
-    respondent?: string
   }
 
   // Validate email domain
@@ -57,9 +56,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const db = getDb()
 
+  const nameFromEmail = email
+    .split('@')[0]
+    .split('.')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+
   const newEntry = {
     email,
-    respondent: body.respondent?.trim() || 'Anonymous',
+    respondent: nameFromEmail,
     submitted_at: new Date().toISOString(),
     answers: body.answers,
   }
