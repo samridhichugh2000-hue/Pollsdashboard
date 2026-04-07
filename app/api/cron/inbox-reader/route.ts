@@ -69,9 +69,14 @@ export async function GET(req: Request) {
         deadline
       )
 
+      const appUrl = process.env.NEXTAUTH_URL?.replace('http://localhost:3000', 'https://pollsdashboard.vercel.app') ?? 'https://pollsdashboard.vercel.app'
+      const formLink = `${appUrl}/respond/${poll.id}`
+
       await updatePoll(poll.id, {
         draft_email_body: draft.emailBody,
         questions: JSON.stringify(draft.questions),
+        ms_form_id: poll.id,
+        ms_form_link: formLink,
         status: 'DRAFT',
       })
 

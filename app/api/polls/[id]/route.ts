@@ -119,11 +119,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break
       }
 
+      case 'CREATE_FORM': {
+        const appUrl = process.env.NEXTAUTH_URL?.replace('http://localhost:3000', 'https://pollsdashboard.vercel.app') ?? 'https://pollsdashboard.vercel.app'
+        const formLink = `${appUrl}/respond/${id}`
+        await updatePoll(id, { ms_form_id: id, ms_form_link: formLink })
+        await updatePollStatus(id, 'FORM_CREATED')
+        await createAuditLog(id, 'FORM_CREATED', userEmail)
+        break
+      }
+
       case 'UPDATE_DRAFT': {
+        const appUrl = process.env.NEXTAUTH_URL?.replace('http://localhost:3000', 'https://pollsdashboard.vercel.app') ?? 'https://pollsdashboard.vercel.app'
+        const existingFormLink = poll.ms_form_link ?? `${appUrl}/respond/${id}`
         await updatePoll(id, {
           draft_email_body: body.draft_email_body as string,
           questions: body.questions as string,
-          ms_form_link: body.ms_form_link as string,
+          ms_form_link: (body.ms_form_link as string) || existingFormLink,
+          ms_form_id: poll.ms_form_id ?? id,
         })
         await createAuditLog(id, 'DRAFT_UPDATED', userEmail)
         break

@@ -138,23 +138,13 @@ export interface MSForm {
   title: string
 }
 
-export async function createMSForm(title: string, questions: string[]): Promise<MSForm> {
-  // Note: Full Forms API requires specific beta endpoints and delegated permissions.
-  // This creates a basic form structure.
-  const form = await graphRequest<MSForm>('/me/drive/root/children', {
-    method: 'POST',
-    body: JSON.stringify({
-      name: `${title}.xlsx`,
-      file: {},
-      '@microsoft.graph.conflictBehavior': 'rename',
-    }),
-  })
-
-  // For now return a placeholder — full Forms API integration requires
-  // additional setup with Forms-specific endpoints.
+export function createMSForm(pollId: string, title: string): MSForm {
+  // MS Forms API does not support programmatic form creation with application permissions.
+  // We use a self-hosted response page at /respond/[pollId] instead.
+  const appUrl = process.env.NEXTAUTH_URL?.replace('http://localhost:3000', 'https://pollsdashboard.vercel.app') ?? 'https://pollsdashboard.vercel.app'
   return {
-    id: form.id ?? `form-${Date.now()}`,
-    webUrl: `https://forms.office.com/`,
+    id: pollId,
+    webUrl: `${appUrl}/respond/${pollId}`,
     title,
   }
 }
