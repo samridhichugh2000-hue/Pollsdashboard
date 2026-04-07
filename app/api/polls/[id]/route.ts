@@ -13,7 +13,6 @@ import {
 import { sendEmail, replyToEmail } from '@/lib/graph'
 import { buildApprovalEmailHtml, buildResultsEmailHtml, formatDate } from '@/lib/utils'
 import { generatePollDraft } from '@/lib/draft-generator'
-import { generateDraftWithClaude } from '@/lib/claude'
 import type { Poll } from '@/types'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -138,43 +137,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const useKeywords = (body.useKeywords as boolean) ?? true
         const deadline = poll.deadline ? formatDate(poll.deadline) : formatDate(new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString())
 
-        let emailBody: string | undefined
-        let questions: string | undefined
-        let subject: string | undefined
-
-        try {
-          // Try Claude API first
-          const draft = await generateDraftWithClaude({
-            topic: poll.topic,
-            department: poll.department,
-            deadline,
-            tone,
-            keywords,
-            useKeywords,
-          })
-          if (section === 'email' || section === 'all') {
-            emailBody = draft.emailBody
-            subject = draft.subject
-          }
-          if (section === 'questions' || section === 'all') {
-            questions = JSON.stringify(draft.questions)
-          }
-        } catch (claudeErr) {
-          // Fallback to rule-based generator
-          console.warn('Claude API failed, using rule-based fallback:', claudeErr)
-          const draft = generatePollDraft(poll.topic, poll.department, poll.requested_by, deadline, undefined, keywords, tone as 'professional' | 'friendly' | 'formal' | 'urgent')
-          if (section === 'email' || section === 'all') {
-            emailBody = draft.emailBody
-            subject = draft.subject
-          }
-          if (section === 'questions' || section === 'all') {
-            questions = JSON.stringify(draft.questions)
-          }
-        }
+        const draft = generatePollDraft(
+          poll.topic, poll.department, poll.requested_by, deadline,
+          undefined,
+          useKeywords ? keywords : '',
+          tone as 'professional' | 'friendly' | 'formal' | 'urgent'
+        )
 
         const updates: Partial<Poll> = {}
-        if (emailBody !== undefined) { updates.draft_email_body = emailBody; updates.subject = subject }
-        if (questions !== undefined) updates.questions = questions
+        if (section === 'email' || section === 'all') {
+          updates.draft_email_body = draft.emailBody
+          updates.subject = draft.subject
+        }
+        if (section === 'questions' || section === 'all') {
+          updates.questions = JSON.stringify(draft.questions)
+        }
 
         await updatePoll(id, updates)
         await createAuditLog(id, 'DRAFT_REGENERATED', userEmail, { section, tone, keywords, useKeywords })
