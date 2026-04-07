@@ -155,25 +155,33 @@ export function generateSubject(topic: string): string {
 
 // ─── Email body templates ─────────────────────────────────────────────────────
 
-function buildEmailBodyProfessional(topic: string, department: string, deadlineDate: string): string {
+function keywordsLine(keywords?: string): string {
+  if (!keywords?.trim()) return ''
+  const kws = keywords.split(',').map(k => k.trim()).filter(Boolean)
+  if (kws.length === 0) return ''
+  return ` We are particularly interested in your thoughts around: ${kws.join(', ')}.`
+}
+
+function buildEmailBodyProfessional(topic: string, department: string, deadlineDate: string, keywords?: string): string {
   const audience = department === 'All Departments' ? 'all team members' : `the ${department} team`
 
   return `Dear ${audience},
 
-We invite you to participate in a brief poll on "${topic}". Your honest feedback is valuable and will help us make informed decisions that benefit the entire team.
+We invite you to participate in a brief poll on "${topic}".${keywordsLine(keywords)} Your honest feedback is valuable and will help us make informed decisions that benefit the entire team.
 
-Please take a few minutes to share your thoughts before ${deadlineDate}. The poll is anonymous and takes less than 2 minutes to complete.
+Please take a few minutes to share your thoughts before ${deadlineDate}. The poll takes less than 2 minutes to complete.
 
 Regards,
 HR Team, Koenig Solutions`
 }
 
-function buildEmailBodyFriendly(topic: string, department: string, deadlineDate: string): string {
+function buildEmailBodyFriendly(topic: string, department: string, deadlineDate: string, keywords?: string): string {
   const audience = department === 'All Departments' ? 'everyone' : `the ${department} team`
+  const kwNote = keywords?.trim() ? ` — especially around ${keywords.split(',').map(k => k.trim()).filter(Boolean).join(', ')}` : ''
 
   return `Hi ${audience}! 👋
 
-We'd love to hear from you! We're running a quick poll on "${topic}" and your thoughts mean a lot to us.
+We'd love to hear from you! We're running a quick poll on "${topic}"${kwNote} and your thoughts mean a lot to us.
 
 It'll only take a couple of minutes — please share your honest feedback before ${deadlineDate}. Every response helps us make things better for the whole team!
 
@@ -181,12 +189,13 @@ Thanks a bunch,
 HR Team, Koenig Solutions`
 }
 
-function buildEmailBodyFormal(topic: string, department: string, deadlineDate: string): string {
+function buildEmailBodyFormal(topic: string, department: string, deadlineDate: string, keywords?: string): string {
   const audience = department === 'All Departments' ? 'all members of staff' : `members of the ${department} department`
+  const kwNote = keywords?.trim() ? ` The survey specifically covers the following areas: ${keywords.split(',').map(k => k.trim()).filter(Boolean).join(', ')}.` : ''
 
   return `Dear ${audience},
 
-Koenig Solutions HR Department hereby invites you to participate in an official survey pertaining to "${topic}".
+Koenig Solutions HR Department hereby invites you to participate in an official survey pertaining to "${topic}".${kwNote}
 
 Your participation is essential to enable the organisation to gather comprehensive insights and make evidence-based decisions. Please ensure your response is submitted no later than ${deadlineDate}.
 
@@ -197,26 +206,27 @@ Human Resources Department
 Koenig Solutions`
 }
 
-function buildEmailBodyUrgent(topic: string, department: string, deadlineDate: string): string {
+function buildEmailBodyUrgent(topic: string, department: string, deadlineDate: string, keywords?: string): string {
   const audience = department === 'All Departments' ? 'all team members' : `the ${department} team`
+  const kwNote = keywords?.trim() ? ` Key focus areas: ${keywords.split(',').map(k => k.trim()).filter(Boolean).join(', ')}.` : ''
 
   return `Dear ${audience},
 
 ⚡ Action Required: Your response is needed urgently.
 
-We are conducting a time-sensitive poll on "${topic}" and require your input before ${deadlineDate}. Please prioritise completing this poll as your feedback is critical to our decision-making process.
+We are conducting a time-sensitive poll on "${topic}" and require your input before ${deadlineDate}.${kwNote} Please prioritise completing this poll as your feedback is critical to our decision-making process.
 
 The poll takes less than 2 minutes. Do not delay — responses submitted after the deadline cannot be accepted.
 
 HR Team, Koenig Solutions`
 }
 
-function buildEmailBody(topic: string, department: string, deadlineDate: string, tone: string = 'professional'): string {
+function buildEmailBody(topic: string, department: string, deadlineDate: string, tone: string = 'professional', keywords?: string): string {
   switch (tone) {
-    case 'friendly': return buildEmailBodyFriendly(topic, department, deadlineDate)
-    case 'formal': return buildEmailBodyFormal(topic, department, deadlineDate)
-    case 'urgent': return buildEmailBodyUrgent(topic, department, deadlineDate)
-    default: return buildEmailBodyProfessional(topic, department, deadlineDate)
+    case 'friendly': return buildEmailBodyFriendly(topic, department, deadlineDate, keywords)
+    case 'formal': return buildEmailBodyFormal(topic, department, deadlineDate, keywords)
+    case 'urgent': return buildEmailBodyUrgent(topic, department, deadlineDate, keywords)
+    default: return buildEmailBodyProfessional(topic, department, deadlineDate, keywords)
   }
 }
 
@@ -231,7 +241,7 @@ export function generatePollDraft(
   keywords?: string,
   tone: 'professional' | 'friendly' | 'formal' | 'urgent' = 'professional'
 ): DraftPollContent {
-  const emailBody = buildEmailBody(topic, department, deadlineDate, tone)
+  const emailBody = buildEmailBody(topic, department, deadlineDate, tone, keywords)
   const subject = generateSubject(topic)
 
   if (providedQuestions && providedQuestions.length > 0) {
