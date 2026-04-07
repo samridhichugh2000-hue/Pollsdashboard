@@ -67,7 +67,7 @@ export function buildApprovalEmailHtml(params: {
   <h3>Poll Questions</h3>
   <ul>${questionsHtml}</ul>
 
-  <h3>Microsoft Form Preview</h3>
+  <h3>Poll Form</h3>
   <p><a href="${params.msFormLink}">${params.msFormLink}</a></p>
 
   <hr>
@@ -97,7 +97,7 @@ export function buildResultsEmailHtml(topic: string): string {
 <div style="font-family: Arial, sans-serif; max-width: 600px;">
   <p>Hi Team,</p>
   <p>PFA the results for the poll — <strong>${topic}</strong></p>
-  <p>Please find the Microsoft Form response export attached.</p>
+  <p>Please find the poll response export attached.</p>
   <br>
   <p>Regards,<br>polls@koenig-solutions.com</p>
 </div>

@@ -74,7 +74,7 @@ export default async function SettingsPage() {
             {[
               { rule: 'Never modify requester-provided questions', enforced: true },
               { rule: 'Never skip approval step', enforced: true },
-              { rule: 'Never send without MS Form link', enforced: true },
+              { rule: 'Never send without Poll Form link', enforced: true },
               { rule: 'Never exceed 4 questions', enforced: true },
               { rule: 'Always create RMS Task (blocking)', enforced: true },
               { rule: 'Always publish on RMS News Panel (blocking)', enforced: true },

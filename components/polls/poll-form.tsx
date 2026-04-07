@@ -18,7 +18,7 @@ interface PollFormProps {
 const TIMELINE_STEPS = [
   { label: 'Request Created', desc: 'Poll is logged and AI drafts the email & questions' },
   { label: 'Sent for Approval', desc: 'Draft shared with requester for sign-off' },
-  { label: 'Poll Released', desc: 'Email + MS Form sent to target audience' },
+  { label: 'Poll Released', desc: 'Email + Poll Form sent to target audience' },
   { label: 'Reminder Sent', desc: 'Follow-up reminder on next working day' },
   { label: 'Results Collected', desc: 'Responses fetched and shared with EA' },
 ]

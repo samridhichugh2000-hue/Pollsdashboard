@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: 'No draft email body. Generate draft first.' }, { status: 400 })
         }
         if (!poll.ms_form_link) {
-          return NextResponse.json({ error: 'MS Form not created yet.' }, { status: 400 })
+          return NextResponse.json({ error: 'Poll form not created yet.' }, { status: 400 })
         }
 
         const questions: string[] = poll.questions ? JSON.parse(poll.questions) : []

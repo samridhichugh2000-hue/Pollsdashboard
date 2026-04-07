@@ -189,7 +189,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 </div>
                 {poll.ms_form_link && (
                   <div className="col-span-2">
-                    <dt className="text-gray-500">MS Form</dt>
+                    <dt className="text-gray-500">Poll Form</dt>
                     <dd>
                       <a href={poll.ms_form_link} target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">

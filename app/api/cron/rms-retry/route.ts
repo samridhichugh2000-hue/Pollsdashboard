@@ -21,7 +21,7 @@ async function createRMSTask(poll: { id: string; topic: string; department: stri
       reporter: 'Priya Upadhyay',
       category: 'Medium',
       project_name: 'Poll Action Point',
-      description: `Poll Creation & RMS Publishing Task\n\nSteps:\n1. Poll creation via MS Forms\n2. Email circulation\n3. Reminder scheduling\n4. RMS publishing on Koenig News panel\n5. Result upload post closure\n\nPanel: Koenig News Panel`,
+      description: `Poll Creation & RMS Publishing Task\n\nSteps:\n1. Poll creation via Poll Form\n2. Email circulation\n3. Reminder scheduling\n4. RMS publishing on Koenig News panel\n5. Result upload post closure\n\nPanel: Koenig News Panel`,
       estimated_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       metadata: { poll_id: poll.id, topic: poll.topic, department: poll.department },
     }),
