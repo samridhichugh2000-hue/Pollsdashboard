@@ -74,11 +74,8 @@ export async function getInboxMessages(userEmail: string, filter?: string): Prom
 }
 
 export async function getUnreadPollEmails(userEmail: string): Promise<GraphMessage[]> {
-  const messages = await getInboxMessages(
-    userEmail,
-    `isRead eq false and contains(subject, 'poll')`
-  )
-  return messages
+  const messages = await getInboxMessages(userEmail, `isRead eq false`)
+  return messages.filter((m) => m.subject.toLowerCase().includes('poll'))
 }
 
 // ─── Email Sending ─────────────────────────────────────────────────────────────
