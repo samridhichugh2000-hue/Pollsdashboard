@@ -7,6 +7,7 @@ import { CheckCircle2, ClipboardList, Loader2, Star } from 'lucide-react'
 interface PollData {
   id: string
   topic: string
+  subject?: string | null
   department: string
   deadline: string | null
   questions: string[]
@@ -157,7 +158,7 @@ export default function RespondPage() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
             <ClipboardList className="h-7 w-7 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">{poll.topic}</h1>
+          <h1 className="text-2xl font-bold text-white">{poll.subject || poll.topic}</h1>
           <p className="mt-1.5 text-sm text-white/60">
             {poll.department} · {poll.deadline
               ? `Due ${new Date(poll.deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`

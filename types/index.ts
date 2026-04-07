@@ -31,6 +31,7 @@ export interface Poll {
   source: PollSource
   email_thread_id?: string | null
   draft_email_body?: string | null
+  subject?: string | null
   questions?: string | null // JSON array string
   deadline?: string | null
   ms_form_id?: string | null

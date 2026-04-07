@@ -99,7 +99,7 @@ export async function updatePollStatus(id: string, status: PollStatus, extra?: R
 export async function updatePoll(id: string, fields: Partial<Poll>): Promise<void> {
   const now = new Date().toISOString()
   const allowed = [
-    'topic', 'department', 'requested_by', 'draft_email_body', 'questions',
+    'topic', 'department', 'requested_by', 'draft_email_body', 'subject', 'questions',
     'deadline', 'ms_form_id', 'ms_form_link', 'rms_task_id', 'rms_news_id',
     'status', 'sent_at', 'reminder_at', 'reminder_sent_at', 'approved_at',
     'closed_at', 'results_uploaded_at', 'remarks',

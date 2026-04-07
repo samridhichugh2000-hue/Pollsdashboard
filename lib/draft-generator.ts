@@ -7,6 +7,7 @@
 export interface DraftPollContent {
   emailBody: string
   questions: string[]
+  subject: string
 }
 
 // ─── Question bank keyed by topic category ────────────────────────────────────
@@ -125,19 +126,36 @@ const KEYWORD_MAP: Array<{ keywords: string[]; category: QuestionCategory }> = [
   { keywords: ['exit', 'resign', 'leaving', 'attrition', 'turnover', 'farewell'], category: 'exit' },
 ]
 
-function detectCategory(topic: string): QuestionCategory | null {
+function detectCategory(topic: string, keywords?: string): QuestionCategory | null {
   const lower = topic.toLowerCase()
-  for (const { keywords, category } of KEYWORD_MAP) {
-    if (keywords.some((kw) => lower.includes(kw))) {
+  for (const { keywords: kws, category } of KEYWORD_MAP) {
+    if (kws.some((kw) => lower.includes(kw))) {
       return category
     }
   }
+
+  // Also check provided keywords
+  if (keywords) {
+    const kwLower = keywords.toLowerCase()
+    for (const { keywords: kws, category } of KEYWORD_MAP) {
+      if (kws.some((kw) => kwLower.includes(kw))) {
+        return category
+      }
+    }
+  }
+
   return null
+}
+
+// ─── Subject generation ───────────────────────────────────────────────────────
+
+export function generateSubject(topic: string): string {
+  return `Poll: ${topic}`
 }
 
 // ─── Email body templates ─────────────────────────────────────────────────────
 
-function buildEmailBody(topic: string, department: string, deadlineDate: string): string {
+function buildEmailBodyProfessional(topic: string, department: string, deadlineDate: string): string {
   const audience = department === 'All Departments' ? 'all team members' : `the ${department} team`
 
   return `Dear ${audience},
@@ -150,6 +168,58 @@ Regards,
 HR Team, Koenig Solutions`
 }
 
+function buildEmailBodyFriendly(topic: string, department: string, deadlineDate: string): string {
+  const audience = department === 'All Departments' ? 'everyone' : `the ${department} team`
+
+  return `Hi ${audience}! 👋
+
+We'd love to hear from you! We're running a quick poll on "${topic}" and your thoughts mean a lot to us.
+
+It'll only take a couple of minutes — please share your honest feedback before ${deadlineDate}. Every response helps us make things better for the whole team!
+
+Thanks a bunch,
+HR Team, Koenig Solutions`
+}
+
+function buildEmailBodyFormal(topic: string, department: string, deadlineDate: string): string {
+  const audience = department === 'All Departments' ? 'all members of staff' : `members of the ${department} department`
+
+  return `Dear ${audience},
+
+Koenig Solutions HR Department hereby invites you to participate in an official survey pertaining to "${topic}".
+
+Your participation is essential to enable the organisation to gather comprehensive insights and make evidence-based decisions. Please ensure your response is submitted no later than ${deadlineDate}.
+
+This survey is strictly confidential and your responses will be handled in accordance with company policy.
+
+Yours sincerely,
+Human Resources Department
+Koenig Solutions`
+}
+
+function buildEmailBodyUrgent(topic: string, department: string, deadlineDate: string): string {
+  const audience = department === 'All Departments' ? 'all team members' : `the ${department} team`
+
+  return `Dear ${audience},
+
+⚡ Action Required: Your response is needed urgently.
+
+We are conducting a time-sensitive poll on "${topic}" and require your input before ${deadlineDate}. Please prioritise completing this poll as your feedback is critical to our decision-making process.
+
+The poll takes less than 2 minutes. Do not delay — responses submitted after the deadline cannot be accepted.
+
+HR Team, Koenig Solutions`
+}
+
+function buildEmailBody(topic: string, department: string, deadlineDate: string, tone: string = 'professional'): string {
+  switch (tone) {
+    case 'friendly': return buildEmailBodyFriendly(topic, department, deadlineDate)
+    case 'formal': return buildEmailBodyFormal(topic, department, deadlineDate)
+    case 'urgent': return buildEmailBodyUrgent(topic, department, deadlineDate)
+    default: return buildEmailBodyProfessional(topic, department, deadlineDate)
+  }
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export function generatePollDraft(
@@ -157,21 +227,24 @@ export function generatePollDraft(
   department: string,
   _requestedBy: string,
   deadlineDate: string,
-  providedQuestions?: string[]
+  providedQuestions?: string[],
+  keywords?: string,
+  tone: 'professional' | 'friendly' | 'formal' | 'urgent' = 'professional'
 ): DraftPollContent {
-  const emailBody = buildEmailBody(topic, department, deadlineDate)
+  const emailBody = buildEmailBody(topic, department, deadlineDate, tone)
+  const subject = generateSubject(topic)
 
   if (providedQuestions && providedQuestions.length > 0) {
     // Requester provided questions — use them as-is, never modify
-    return { emailBody, questions: providedQuestions.slice(0, 4) }
+    return { emailBody, questions: providedQuestions.slice(0, 4), subject }
   }
 
-  // Auto-generate questions based on topic
-  const category = detectCategory(topic)
+  // Auto-generate questions based on topic (and optional keywords)
+  const category = detectCategory(topic, keywords)
   const pool = category ? QUESTION_BANK[category] : GENERIC_QUESTIONS
 
   // Pick 3 most relevant questions (first 3 from the matched pool)
   const questions = pool.slice(0, 3)
 
-  return { emailBody, questions }
+  return { emailBody, questions, subject }
 }

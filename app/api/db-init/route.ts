@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { initializeDatabase } from '@/lib/db/schema'
+import { initializeDatabase, runMigrations } from '@/lib/db/schema'
 
 // One-time setup endpoint — call this after deployment to initialize tables
 export async function POST(req: Request) {
@@ -10,6 +10,7 @@ export async function POST(req: Request) {
 
   try {
     await initializeDatabase()
+    await runMigrations()
     return NextResponse.json({ message: 'Database initialized successfully' })
   } catch (err) {
     return NextResponse.json(

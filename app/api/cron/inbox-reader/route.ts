@@ -74,6 +74,7 @@ export async function GET(req: Request) {
 
       await updatePoll(poll.id, {
         draft_email_body: draft.emailBody,
+        subject: draft.subject,
         questions: JSON.stringify(draft.questions),
         ms_form_id: poll.id,
         ms_form_link: formLink,

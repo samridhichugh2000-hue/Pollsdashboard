@@ -20,6 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({
     id: poll.id,
     topic: poll.topic,
+    subject: poll.subject,
     department: poll.department,
     deadline: poll.deadline,
     questions,

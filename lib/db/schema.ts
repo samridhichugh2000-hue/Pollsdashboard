@@ -1,5 +1,15 @@
 import { getDb } from './client'
 
+export async function runMigrations() {
+  const db = getDb()
+  // Add subject column if not exists (safe to run multiple times)
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN subject TEXT`)
+  } catch {
+    // Column already exists — ignore
+  }
+}
+
 export async function initializeDatabase() {
   await getDb().executeMultiple(`
     CREATE TABLE IF NOT EXISTS polls (

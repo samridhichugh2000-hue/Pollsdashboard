@@ -12,6 +12,8 @@ import {
 } from '@/lib/db/queries'
 import { sendEmail, replyToEmail } from '@/lib/graph'
 import { buildApprovalEmailHtml, buildResultsEmailHtml, formatDate } from '@/lib/utils'
+import { generatePollDraft } from '@/lib/draft-generator'
+import type { Poll } from '@/types'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -70,7 +72,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           await sendEmail({
             from: process.env.PRIYA_EMAIL!,
             to: poll.requested_by,
-            subject: `Poll Approval Required: ${poll.topic}`,
+            subject: poll.subject ?? `Poll Approval Required: ${poll.topic}`,
             htmlBody: approvalHtml,
           })
         }
@@ -128,10 +130,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break
       }
 
+      case 'REGENERATE_DRAFT': {
+        const section = (body.section as string) ?? 'all'
+        const keywords = (body.keywords as string) ?? ''
+        const tone = (body.tone as string) ?? 'professional'
+        const deadline = poll.deadline ? formatDate(poll.deadline) : formatDate(new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString())
+
+        const draft = generatePollDraft(poll.topic, poll.department, poll.requested_by, deadline, undefined, keywords, tone as 'professional' | 'friendly' | 'formal' | 'urgent')
+
+        const updates: Partial<Poll> = {}
+        if (section === 'email' || section === 'all') {
+          updates.draft_email_body = draft.emailBody
+          updates.subject = draft.subject
+        }
+        if (section === 'questions' || section === 'all') {
+          updates.questions = JSON.stringify(draft.questions)
+        }
+
+        await updatePoll(id, updates)
+        await createAuditLog(id, 'DRAFT_REGENERATED', userEmail, { section, tone, keywords })
+        break
+      }
+
       case 'UPDATE_DRAFT': {
         const appUrl = process.env.NEXTAUTH_URL?.replace('http://localhost:3000', 'https://pollsdashboard.vercel.app') ?? 'https://pollsdashboard.vercel.app'
         const existingFormLink = poll.ms_form_link ?? `${appUrl}/respond/${id}`
         await updatePoll(id, {
+          subject: (body.subject as string) || poll.subject || undefined,
           draft_email_body: body.draft_email_body as string,
           questions: body.questions as string,
           ms_form_link: (body.ms_form_link as string) || existingFormLink,
