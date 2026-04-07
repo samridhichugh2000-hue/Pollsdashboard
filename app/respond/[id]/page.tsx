@@ -14,6 +14,8 @@ interface PollData {
 
 type Answer = { question: string; answer: string }
 
+const ALLOWED_DOMAIN = 'koenig-solutions.com'
+
 function isRatingQuestion(q: string): boolean {
   return /\(1\s*[=-]\s*\d|rate|rating|scale|satisfaction|satisfied|would you recommend/i.test(q)
 }
@@ -47,13 +49,13 @@ export default function RespondPage() {
   const [poll, setPoll] = useState<PollData | null>(null)
   const [loadError, setLoadError] = useState('')
   const [answers, setAnswers] = useState<Answer[]>([])
+  const [email, setEmail] = useState('')
   const [respondent, setRespondent] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
-    // Check localStorage to prevent duplicate submissions
     if (typeof window !== 'undefined' && localStorage.getItem(`poll_responded_${id}`)) {
       setSubmitted(true)
       return
@@ -77,8 +79,16 @@ export default function RespondPage() {
     e.preventDefault()
     setSubmitError('')
 
-    const unanswered = answers.filter((a) => !a.answer.trim())
-    if (unanswered.length > 0) {
+    const trimmedEmail = email.trim().toLowerCase()
+    if (!trimmedEmail) {
+      setSubmitError('Please enter your Koenig Solutions email address.')
+      return
+    }
+    if (!trimmedEmail.endsWith(`@${ALLOWED_DOMAIN}`)) {
+      setSubmitError(`Only @${ALLOWED_DOMAIN} email addresses are allowed.`)
+      return
+    }
+    if (answers.some((a) => !a.answer.trim())) {
       setSubmitError('Please answer all questions before submitting.')
       return
     }
@@ -88,7 +98,7 @@ export default function RespondPage() {
       const res = await fetch(`/api/respond/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers, respondent: respondent.trim() || undefined }),
+        body: JSON.stringify({ answers, email: trimmedEmail, respondent: respondent.trim() || undefined }),
       })
       const data = await res.json() as { error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Submission failed.')
@@ -104,7 +114,6 @@ export default function RespondPage() {
 
   const gradient = 'linear-gradient(135deg, #0e7490 0%, #0c6478 50%, #0a5568 100%)'
 
-  // Thank you state
   if (submitted) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4" style={{ background: gradient }}>
@@ -114,7 +123,7 @@ export default function RespondPage() {
           </div>
           <h2 className="text-2xl font-bold text-gray-900">Thank You!</h2>
           <p className="mt-3 text-sm text-gray-500 leading-relaxed">
-            Your response has been recorded. We appreciate your feedback — it helps us make better decisions for the team.
+            Your response has been recorded. We appreciate your feedback.
           </p>
           <p className="mt-6 text-xs text-gray-400">Koenig Solutions HR · Poll Management System</p>
         </div>
@@ -122,7 +131,6 @@ export default function RespondPage() {
     )
   }
 
-  // Error / closed state
   if (loadError) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4" style={{ background: gradient }}>
@@ -134,7 +142,6 @@ export default function RespondPage() {
     )
   }
 
-  // Loading state
   if (!poll) {
     return (
       <div className="flex min-h-screen items-center justify-center" style={{ background: gradient }}>
@@ -147,24 +154,40 @@ export default function RespondPage() {
     <div className="min-h-screen px-4 py-10" style={{ background: gradient }}>
       <div className="mx-auto w-full max-w-lg">
 
-        {/* Header */}
         <div className="mb-6 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
             <ClipboardList className="h-7 w-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white">{poll.topic}</h1>
           <p className="mt-1.5 text-sm text-white/60">
-            {poll.department} · {poll.deadline ? `Due ${new Date(poll.deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Open poll'}
+            {poll.department} · {poll.deadline
+              ? `Due ${new Date(poll.deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+              : 'Open poll'}
           </p>
         </div>
 
-        {/* Form card */}
         <div className="rounded-3xl bg-white shadow-2xl px-7 py-7">
           <form onSubmit={handleSubmit} className="space-y-6">
 
             {submitError && (
               <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{submitError}</div>
             )}
+
+            {/* Email — required, domain locked */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Your Koenig Solutions Email <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={`yourname@${ALLOWED_DOMAIN}`}
+                required
+                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition"
+              />
+              <p className="text-xs text-gray-400">Only @{ALLOWED_DOMAIN} addresses are accepted.</p>
+            </div>
 
             {/* Questions */}
             {answers.map((a, i) => (
@@ -190,13 +213,13 @@ export default function RespondPage() {
             {/* Optional name */}
             <div className="space-y-1.5 border-t border-gray-100 pt-4">
               <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Your Name <span className="normal-case font-normal">(optional — leave blank to stay anonymous)</span>
+                Your Name <span className="normal-case font-normal">(optional)</span>
               </label>
               <input
                 type="text"
                 value={respondent}
                 onChange={(e) => setRespondent(e.target.value)}
-                placeholder="Anonymous"
+                placeholder="Leave blank to stay anonymous"
                 className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition"
               />
             </div>

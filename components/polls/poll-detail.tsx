@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2 } from 'lucide-react'
+import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -52,6 +52,10 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   }
 
   const overdue = poll.status === 'AWAITING_APPROVAL' && isApprovalOverdue(poll.updated_at)
+
+  const downloadResponses = () => {
+    window.open(`/api/polls/${poll.id}/download`, '_blank')
+  }
 
   return (
     <div className="space-y-5">
@@ -257,6 +261,14 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   <Button
                     className="w-full"
                     size="sm"
+                    onClick={downloadResponses}
+                  >
+                    <Download className="mr-1.5 h-3.5 w-3.5" /> Download Responses (Excel)
+                  </Button>
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    variant="outline"
                     onClick={() => runAction('SHARE_RESULTS')}
                     disabled={!!loading}
                   >
@@ -281,13 +293,14 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   size="sm"
                   variant="destructive"
                   onClick={() => {
-                    if (confirm('Mark this poll as closed? This cannot be undone easily.')) {
+                    if (confirm('Close this poll? Employees will no longer be able to submit responses.')) {
                       void runAction('MARK_CLOSED')
                     }
                   }}
                   disabled={!!loading}
                 >
-                  <XCircle className="mr-1.5 h-3.5 w-3.5" /> Mark as Closed
+                  {loading === 'MARK_CLOSED' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                  <XCircle className="mr-1.5 h-3.5 w-3.5" /> Close Responses
                 </Button>
               )}
             </CardContent>
