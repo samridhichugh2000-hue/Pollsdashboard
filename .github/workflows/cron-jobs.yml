@@ -1,0 +1,85 @@
+name: Poll Dashboard Cron Jobs
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # inbox-reader: every 15 min
+    - cron: '*/30 * * * *'   # rms-retry: every 30 min
+    - cron: '0 * * * *'      # poll-closure: every hour
+    - cron: '30 3 * * 1-5'   # reminder-scheduler: 9 AM IST (3:30 UTC) weekdays
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Which cron to trigger manually'
+        required: true
+        default: 'inbox-reader'
+        type: choice
+        options:
+          - inbox-reader
+          - reminder-scheduler
+          - poll-closure
+          - rms-retry
+
+env:
+  APP_URL: ${{ secrets.APP_URL }}
+  CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+jobs:
+  inbox-reader:
+    name: Inbox Reader (every 15 min)
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'inbox-reader' ||
+      github.event_name == 'schedule' && github.event.schedule == '*/15 * * * *'
+    steps:
+      - name: Call inbox-reader endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/inbox-reader")
+          echo "Response: $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
+
+  reminder-scheduler:
+    name: Reminder Scheduler (9 AM IST weekdays)
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'reminder-scheduler' ||
+      github.event_name == 'schedule' && github.event.schedule == '30 3 * * 1-5'
+    steps:
+      - name: Call reminder-scheduler endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/reminder-scheduler")
+          echo "Response: $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
+
+  poll-closure:
+    name: Poll Closure (every hour)
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'poll-closure' ||
+      github.event_name == 'schedule' && github.event.schedule == '0 * * * *'
+    steps:
+      - name: Call poll-closure endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/poll-closure")
+          echo "Response: $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
+
+  rms-retry:
+    name: RMS Retry (every 30 min)
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'rms-retry' ||
+      github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *'
+    steps:
+      - name: Call rms-retry endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/rms-retry")
+          echo "Response: $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
