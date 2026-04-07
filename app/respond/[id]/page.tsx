@@ -10,15 +10,17 @@ interface PollData {
   subject?: string | null
   department: string
   deadline: string | null
-  questions: string[]
+  questions: Array<string | { text: string; type: string }>
 }
 
 type Answer = { question: string; answer: string }
 
 const ALLOWED_DOMAIN = 'koenig-solutions.com'
 
-function isRatingQuestion(q: string): boolean {
-  return /\(1\s*[=-]\s*\d|rate|rating|scale|satisfaction|satisfied|would you recommend/i.test(q)
+function normalizeQuestion(q: string | { text: string; type: string }): { text: string; type: string } {
+  return typeof q === 'string'
+    ? { text: q, type: /rate|rating|scale|satisfied|satisfaction|recommend|\(1\s*[=-]/i.test(q) ? 'rating' : 'open_ended' }
+    : q
 }
 
 function RatingInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -50,6 +52,7 @@ export default function RespondPage() {
   const [poll, setPoll] = useState<PollData | null>(null)
   const [loadError, setLoadError] = useState('')
   const [answers, setAnswers] = useState<Answer[]>([])
+  const [pollQuestions, setPollQuestions] = useState<{ text: string; type: string }[]>([])
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -66,7 +69,9 @@ export default function RespondPage() {
         const data = await r.json() as PollData & { error?: string }
         if (!r.ok) { setLoadError(data.error ?? 'Failed to load poll.'); return }
         setPoll(data)
-        setAnswers(data.questions.map((q) => ({ question: q, answer: '' })))
+        const normalized = data.questions.map(normalizeQuestion)
+        setPollQuestions(normalized)
+        setAnswers(normalized.map((q) => ({ question: q.text, answer: '' })))
       })
       .catch(() => setLoadError('Failed to load poll.'))
   }, [id])
@@ -196,7 +201,7 @@ export default function RespondPage() {
                   <span className="mr-2 text-cyan-600 font-bold">{i + 1}.</span>
                   {a.question}
                 </label>
-                {isRatingQuestion(a.question) ? (
+                {pollQuestions[i]?.type === 'rating' ? (
                   <RatingInput value={a.answer} onChange={(v) => setAnswer(i, v)} />
                 ) : (
                   <textarea

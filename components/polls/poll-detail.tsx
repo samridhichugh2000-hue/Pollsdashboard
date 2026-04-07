@@ -13,6 +13,23 @@ import { StatusBadge } from './status-badge'
 import { formatDateTime, formatRelative, isApprovalOverdue } from '@/lib/utils'
 import type { Poll, PollApproval, AuditLog, PollResponse } from '@/types'
 
+interface PollQuestion {
+  text: string
+  type: 'rating' | 'open_ended'
+}
+
+function parseQuestions(raw: string | null | undefined): PollQuestion[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as Array<string | PollQuestion>
+    return parsed.map((q) =>
+      typeof q === 'string'
+        ? { text: q, type: /rate|rating|scale|satisfied|satisfaction|recommend|\(1\s*[=-]/i.test(q) ? 'rating' : 'open_ended' as 'rating' | 'open_ended' }
+        : q
+    )
+  } catch { return [] }
+}
+
 interface PollDetailProps {
   poll: Poll
   approvals: PollApproval[]
@@ -30,11 +47,10 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   // Draft edit state
   const [editSubject, setEditSubject] = useState(initialPoll.subject || `Poll: ${initialPoll.topic}`)
   const [editEmailBody, setEditEmailBody] = useState(initialPoll.draft_email_body || '')
-  const [editQuestions, setEditQuestions] = useState<string[]>(
-    initialPoll.questions ? (JSON.parse(initialPoll.questions) as string[]) : []
-  )
+  const [editQuestions, setEditQuestions] = useState<PollQuestion[]>(parseQuestions(initialPoll.questions))
   const [keywords, setKeywords] = useState('')
   const [tone, setTone] = useState('professional')
+  const [useKeywords, setUseKeywords] = useState(true)
 
   const router = useRouter()
 
@@ -43,14 +59,14 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     if (poll.status === 'DRAFT') {
       setEditSubject(poll.subject || `Poll: ${poll.topic}`)
       setEditEmailBody(poll.draft_email_body || '')
-      setEditQuestions(poll.questions ? (JSON.parse(poll.questions) as string[]) : [])
+      setEditQuestions(parseQuestions(poll.questions))
     }
   }, [poll])
 
   const hasChanges =
     editSubject !== (poll.subject || `Poll: ${poll.topic}`) ||
     editEmailBody !== (poll.draft_email_body || '') ||
-    JSON.stringify(editQuestions) !== JSON.stringify(poll.questions ? JSON.parse(poll.questions) : [])
+    JSON.stringify(editQuestions) !== JSON.stringify(parseQuestions(poll.questions))
 
   const runAction = async (action: string, extra?: Record<string, unknown>) => {
     setLoading(action)
@@ -81,7 +97,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
       const res = await fetch(`/api/polls/${poll.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'REGENERATE_DRAFT', section, keywords, tone }),
+        body: JSON.stringify({ action: 'REGENERATE_DRAFT', section, keywords, tone, useKeywords }),
       })
       if (!res.ok) {
         const data = await res.json() as { error: string }
@@ -131,7 +147,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     window.open(`/api/polls/${poll.id}/download`, '_blank')
   }
 
-  const questions: string[] = poll.questions ? JSON.parse(poll.questions) : []
+  const questions: PollQuestion[] = parseQuestions(poll.questions)
 
   return (
     <div className="space-y-5">
@@ -244,7 +260,21 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                         value={keywords}
                         onChange={(e) => setKeywords(e.target.value)}
                         placeholder="e.g. engagement, Q2, performance"
+                        disabled={!useKeywords}
+                        className={!useKeywords ? 'opacity-40' : ''}
                       />
+                    </div>
+                    <div className="flex items-end gap-1 pb-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setUseKeywords(u => !u)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${useKeywords ? 'bg-cyan-600' : 'bg-gray-200'}`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${useKeywords ? 'translate-x-4' : 'translate-x-1'}`} />
+                      </button>
+                      <Label className="text-xs cursor-pointer" onClick={() => setUseKeywords(u => !u)}>
+                        Use Keywords
+                      </Label>
                     </div>
                     <div className="w-36">
                       <Label className="text-xs mb-1 block">Tone</Label>
@@ -259,17 +289,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                         <option value="urgent">Urgent</option>
                       </select>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => runRegenerate('email')}
-                      disabled={!!loading}
-                    >
-                      {loading === 'REGENERATE_DRAFT_EMAIL' ? (
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                      ) : (
-                        <RefreshCw className="mr-1 h-3 w-3" />
-                      )}
+                    <Button size="sm" variant="outline" onClick={() => runRegenerate('email')} disabled={!!loading}>
+                      {loading?.startsWith('REGENERATE_DRAFT_EMAIL') ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
                       Redraft Email
                     </Button>
                   </div>
@@ -288,33 +309,36 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Poll Questions</CardTitle>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => runRegenerate('questions')}
-                      disabled={!!loading}
-                    >
-                      {loading === 'REGENERATE_DRAFT_QUESTIONS' ? (
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                      ) : (
-                        <RefreshCw className="mr-1 h-3 w-3" />
-                      )}
+                    <Button size="sm" variant="outline" onClick={() => runRegenerate('questions')} disabled={!!loading}>
+                      {loading?.startsWith('REGENERATE_DRAFT_QUESTIONS') ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
                       Redraft Questions
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-3">
                   {editQuestions.map((q, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-400 w-5 shrink-0">{i + 1}.</span>
-                      <Input
-                        value={q}
+                    <div key={i} className="flex items-start gap-2">
+                      <select
+                        value={q.type}
                         onChange={(e) => {
                           const updated = [...editQuestions]
-                          updated[i] = e.target.value
+                          updated[i] = { ...updated[i], type: e.target.value as 'rating' | 'open_ended' }
+                          setEditQuestions(updated)
+                        }}
+                        className="w-32 shrink-0 rounded-md border border-input bg-background px-2 py-2 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        <option value="rating">⭐ Rating</option>
+                        <option value="open_ended">📝 Open-ended</option>
+                      </select>
+                      <Input
+                        value={q.text}
+                        onChange={(e) => {
+                          const updated = [...editQuestions]
+                          updated[i] = { ...updated[i], text: e.target.value }
                           setEditQuestions(updated)
                         }}
                         className="flex-1"
+                        placeholder={`Question ${i + 1}`}
                       />
                       <Button
                         size="icon"
@@ -330,12 +354,13 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                     <Button
                       size="sm"
                       variant="outline"
-                      className="mt-1"
-                      onClick={() => setEditQuestions([...editQuestions, ''])}
+                      className="w-full"
+                      onClick={() => setEditQuestions([...editQuestions, { text: '', type: 'open_ended' }])}
                     >
                       <Plus className="mr-1 h-3.5 w-3.5" /> Add Question
                     </Button>
                   )}
+                  <p className="text-xs text-gray-400">⭐ Rating = 1–5 scale &nbsp;·&nbsp; 📝 Open-ended = text answer</p>
                 </CardContent>
               </Card>
 
@@ -379,7 +404,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                       {questions.map((q, i) => (
                         <li key={i} className="flex gap-2">
                           <span className="font-medium text-gray-500">{i + 1}.</span>
-                          <span className="text-gray-900">{q}</span>
+                          <span className="text-gray-900">{q.text}</span>
                         </li>
                       ))}
                     </ol>

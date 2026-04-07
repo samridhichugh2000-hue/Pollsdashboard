@@ -16,7 +16,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'This poll is no longer accepting responses.' }, { status: 410 })
   }
 
-  const questions: string[] = poll.questions ? JSON.parse(poll.questions) : []
+  const rawQuestions = poll.questions ? JSON.parse(poll.questions) as Array<string | { text: string; type: string }> : []
+  const questions = rawQuestions.map((q) =>
+    typeof q === 'string'
+      ? { text: q, type: /rate|rating|scale|satisfied|satisfaction|recommend|\(1\s*[=-]/i.test(q) ? 'rating' : 'open_ended' }
+      : q
+  )
   return NextResponse.json({
     id: poll.id,
     topic: poll.topic,
