@@ -3,6 +3,7 @@ import { getUnreadPollEmails, markEmailAsRead } from '@/lib/graph'
 import { createPoll, updatePoll, pollEmailAlreadyProcessed, createAuditLog } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { generatePollDraft } from '@/lib/draft-generator'
+import { generateDraftWithGemini } from '@/lib/gemini'
 import { formatDate } from '@/lib/utils'
 
 async function getAuthorizedEmails(): Promise<Set<string>> {
@@ -62,12 +63,12 @@ export async function GET(req: Request) {
 
       // Generate AI draft
       const deadline = formatDate(new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString())
-      const draft = generatePollDraft(
-        topic,
-        department,
-        msg.from.emailAddress.name,
-        deadline
-      )
+      let draft
+      try {
+        draft = await generateDraftWithGemini({ topic, department, deadline })
+      } catch {
+        draft = generatePollDraft(topic, department, msg.from.emailAddress.name, deadline)
+      }
 
       const appUrl = process.env.NEXTAUTH_URL?.replace('http://localhost:3000', 'https://pollsdashboard.vercel.app') ?? 'https://pollsdashboard.vercel.app'
       const formLink = `${appUrl}/respond/${poll.id}`

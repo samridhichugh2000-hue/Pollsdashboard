@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createPoll, updatePoll } from '@/lib/db/queries'
 import { generatePollDraft } from '@/lib/draft-generator'
+import { generateDraftWithGemini } from '@/lib/gemini'
 import { formatDate } from '@/lib/utils'
 
 export async function POST(req: NextRequest) {
@@ -33,13 +34,18 @@ export async function POST(req: NextRequest) {
       single_response: body.single_response !== false,
     })
 
-    const draft = generatePollDraft(
-      poll.topic,
-      poll.department,
-      requester_name,
-      deadline,
-      body.questions?.filter(q => q.trim())
-    )
+    let draft
+    try {
+      draft = await generateDraftWithGemini({ topic: poll.topic, department: poll.department, deadline })
+    } catch {
+      draft = generatePollDraft(
+        poll.topic,
+        poll.department,
+        requester_name,
+        deadline,
+        body.questions?.filter(q => q.trim())
+      )
+    }
 
     const appUrl = process.env.NEXTAUTH_URL?.replace('http://localhost:3000', 'https://pollsdashboard.vercel.app') ?? 'https://pollsdashboard.vercel.app'
     const formLink = `${appUrl}/respond/${poll.id}`
