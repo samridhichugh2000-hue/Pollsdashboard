@@ -5,14 +5,17 @@ import {
   updatePollStatus,
   createApproval,
   createAuditLog,
+  createApprovalToken,
   getApprovalsByPoll,
   getAuditLogsByPoll,
   getPollResponse,
   updateResponseActionable,
 } from '@/lib/db/queries'
-import { sendEmail, replyToEmail } from '@/lib/graph'
-import { buildApprovalEmailHtml, buildResultsEmailHtml, formatDate } from '@/lib/utils'
+import { sendEmail } from '@/lib/graph'
+import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, formatDate } from '@/lib/utils'
 import { generatePollDraft } from '@/lib/draft-generator'
+import { generateDraftWithGemini } from '@/lib/gemini'
+import * as XLSX from 'xlsx'
 import type { Poll } from '@/types'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -48,8 +51,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: 'Poll form not created yet.' }, { status: 400 })
         }
 
-        const questions: string[] = poll.questions ? JSON.parse(poll.questions) : []
+        const rawQuestions = poll.questions ? JSON.parse(poll.questions) as Array<string | { text: string }> : []
+        const questions: string[] = rawQuestions.map((q) => (typeof q === 'string' ? q : q.text))
         const deadline = poll.deadline ? formatDate(poll.deadline) : 'TBD'
+
+        // Generate a single-use token for this approval round
+        const approvalToken = await createApprovalToken(id)
+        const appUrl = process.env.NEXTAUTH_URL?.replace('http://localhost:3000', 'https://pollsdashboard.vercel.app') ?? 'https://pollsdashboard.vercel.app'
+        const approveUrl = `${appUrl}/approve/${approvalToken}`
+        const editUrl = `${appUrl}/approve/${approvalToken}?mode=edit`
 
         const approvalHtml = buildApprovalEmailHtml({
           topic: poll.topic,
@@ -58,27 +68,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           questions,
           msFormLink: poll.ms_form_link,
           deadline,
+          approveUrl,
+          editUrl,
         })
 
-        if (poll.email_thread_id) {
-          // Reply in same thread
-          await replyToEmail(
-            process.env.PRIYA_EMAIL!,
-            poll.email_thread_id,
-            approvalHtml
-          )
-        } else {
-          // Email the requester
+        const recipients = Array.isArray(body.recipients) && (body.recipients as string[]).length > 0
+          ? (body.recipients as string[])
+          : [poll.requested_by]
+
+        for (const recipient of recipients) {
           await sendEmail({
             from: process.env.PRIYA_EMAIL!,
-            to: poll.requested_by,
+            to: recipient,
             subject: poll.subject ?? `Poll Approval Required: ${poll.topic}`,
             htmlBody: approvalHtml,
           })
         }
 
         await updatePollStatus(id, 'AWAITING_APPROVAL')
-        await createAuditLog(id, 'SENT_FOR_APPROVAL', userEmail)
+        await createAuditLog(id, 'SENT_FOR_APPROVAL', userEmail, { token: approvalToken })
         break
       }
 
@@ -86,6 +94,42 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await createApproval(id, 'approved', body.notes as string, userEmail)
         await updatePollStatus(id, 'APPROVED', { approved_at: new Date().toISOString() })
         await createAuditLog(id, 'POLL_APPROVED', userEmail, { notes: body.notes })
+        break
+      }
+
+      case 'RELEASE_POLL': {
+        const allEmails = body.allEmails as string[]
+        if (!allEmails?.length) {
+          return NextResponse.json({ error: 'Select at least one recipient.' }, { status: 400 })
+        }
+        if (!poll.ms_form_link) {
+          return NextResponse.json({ error: 'Poll form not created yet.' }, { status: 400 })
+        }
+        if (!poll.draft_email_body) {
+          return NextResponse.json({ error: 'No draft email body.' }, { status: 400 })
+        }
+
+        const pollDeadline = poll.deadline ? formatDate(poll.deadline) : 'TBD'
+        const pollHtml = buildPollEmailHtml({
+          emailBody: poll.draft_email_body,
+          msFormLink: poll.ms_form_link,
+          deadline: pollDeadline,
+        })
+
+        for (const email of allEmails) {
+          await sendEmail({
+            from: process.env.PRIYA_EMAIL!,
+            to: email,
+            subject: poll.subject ?? `Poll: ${poll.topic}`,
+            htmlBody: pollHtml,
+          })
+        }
+
+        await updatePollStatus(id, 'SENT', {
+          sent_at: new Date().toISOString(),
+          release_emails: JSON.stringify(allEmails),
+        })
+        await createAuditLog(id, 'POLL_RELEASED', userEmail, { emails: allEmails })
         break
       }
 
@@ -137,12 +181,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const useKeywords = (body.useKeywords as boolean) ?? true
         const deadline = poll.deadline ? formatDate(poll.deadline) : formatDate(new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString())
 
-        const draft = generatePollDraft(
-          poll.topic, poll.department, poll.requested_by, deadline,
-          undefined,
-          useKeywords ? keywords : '',
-          tone as 'professional' | 'friendly' | 'formal' | 'urgent'
-        )
+        let draft
+        try {
+          draft = await generateDraftWithGemini({
+            topic: poll.topic, department: poll.department, deadline,
+            tone, keywords, useKeywords,
+          })
+        } catch {
+          draft = generatePollDraft(
+            poll.topic, poll.department, poll.requested_by, deadline,
+            undefined, useKeywords ? keywords : '',
+            tone as 'professional' | 'friendly' | 'formal' | 'urgent'
+          )
+        }
 
         const updates: Partial<Poll> = {}
         if (section === 'email' || section === 'all') {
@@ -185,15 +236,52 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'SHARE_RESULTS': {
-        const emailHtml = buildResultsEmailHtml(poll.topic)
-        await sendEmail({
-          from: process.env.POLLS_MAILBOX!,
-          to: process.env.RESULTS_RECIPIENT_EMAIL ?? 'ea@koenig-solutions.com',
-          subject: `Poll Results: ${poll.topic}`,
-          htmlBody: emailHtml,
+        const shareRecipients = Array.isArray(body.recipients) && (body.recipients as string[]).length > 0
+          ? (body.recipients as string[])
+          : [process.env.RESULTS_RECIPIENT_EMAIL ?? 'ea@koenig-solutions.com']
+
+        const pollResponse = await getPollResponse(id)
+        if (!pollResponse?.response_data) {
+          return NextResponse.json({ error: 'No responses available to share.' }, { status: 400 })
+        }
+
+        // Build Excel attachment from stored responses
+        interface ResponseEntry { respondent?: string; email?: string; submitted_at: string; answers: { question: string; answer: string }[] }
+        const entries: ResponseEntry[] = JSON.parse(pollResponse.response_data)
+        const rows = entries.map((entry, i) => {
+          const row: Record<string, string> = {
+            '#': String(i + 1),
+            Email: entry.email ?? 'Not provided',
+            Name: entry.respondent ?? 'Anonymous',
+            'Submitted At': new Date(entry.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+          }
+          entry.answers.forEach((a, qi) => {
+            row[`Q${qi + 1}: ${a.question.slice(0, 60)}${a.question.length > 60 ? '...' : ''}`] = a.answer
+          })
+          return row
         })
+        const ws = XLSX.utils.json_to_sheet(rows)
+        ws['!cols'] = Object.keys(rows[0] ?? {}).map((key) => ({
+          wch: Math.max(key.length, ...rows.map((r) => String(r[key] ?? '').length)) + 2,
+        }))
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Responses')
+        const xlsxBase64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }) as string
+        const filename = `poll-responses-${poll.topic.slice(0, 30).replace(/\s+/g, '-').toLowerCase()}.xlsx`
+
+        const emailHtml = buildResultsEmailHtml(poll.topic)
+        for (const recipient of shareRecipients) {
+          await sendEmail({
+            from: process.env.POLLS_MAILBOX!,
+            to: recipient,
+            subject: `Poll Results: ${poll.topic}`,
+            htmlBody: emailHtml,
+            attachments: [{ name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }],
+          })
+        }
+
         await updatePollStatus(id, 'RESULTS_UPLOADED', { results_uploaded_at: new Date().toISOString() })
-        await createAuditLog(id, 'RESULTS_SHARED', userEmail)
+        await createAuditLog(id, 'RESULTS_SHARED', userEmail, { recipients: shareRecipients })
         break
       }
 

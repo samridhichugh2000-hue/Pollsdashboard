@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@auth/core": "^0.41.0",
+    "@google/generative-ai": "^0.24.1",
     "@libsql/client": "^0.17.2",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@radix-ui/react-avatar": "^1.1.11",

@@ -2,12 +2,29 @@ import { getDb } from './client'
 
 export async function runMigrations() {
   const db = getDb()
+
   // Add subject column if not exists (safe to run multiple times)
   try {
     await db.execute(`ALTER TABLE polls ADD COLUMN subject TEXT`)
-  } catch {
-    // Column already exists — ignore
-  }
+  } catch { /* already exists */ }
+
+  // Store the email addresses a poll was released to (JSON array string)
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN release_emails TEXT`)
+  } catch { /* already exists */ }
+
+  // One-time approval tokens sent via email
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS poll_approval_tokens (
+        id TEXT PRIMARY KEY,
+        poll_id TEXT NOT NULL REFERENCES polls(id),
+        token TEXT UNIQUE NOT NULL,
+        expires_at DATETIME NOT NULL,
+        used_at DATETIME
+      )
+    `)
+  } catch { /* already exists */ }
 }
 
 export async function initializeDatabase() {
@@ -74,6 +91,14 @@ export async function initializeDatabase() {
       performed_by TEXT,
       metadata TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS poll_approval_tokens (
+      id TEXT PRIMARY KEY,
+      poll_id TEXT NOT NULL REFERENCES polls(id),
+      token TEXT UNIQUE NOT NULL,
+      expires_at DATETIME NOT NULL,
+      used_at DATETIME
     );
   `)
 }

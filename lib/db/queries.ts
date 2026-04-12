@@ -102,7 +102,7 @@ export async function updatePoll(id: string, fields: Partial<Poll>): Promise<voi
     'topic', 'department', 'requested_by', 'draft_email_body', 'subject', 'questions',
     'deadline', 'ms_form_id', 'ms_form_link', 'rms_task_id', 'rms_news_id',
     'status', 'sent_at', 'reminder_at', 'reminder_sent_at', 'approved_at',
-    'closed_at', 'results_uploaded_at', 'remarks',
+    'closed_at', 'results_uploaded_at', 'remarks', 'release_emails',
   ]
   const setClauses: string[] = ['updated_at = ?']
   const args: (string | null | boolean)[] = [now]
@@ -239,6 +239,36 @@ export async function getAuditLogsByPoll(pollId: string): Promise<AuditLog[]> {
     args: [pollId],
   })
   return result.rows as unknown as AuditLog[]
+}
+
+// ─── Approval Tokens ──────────────────────────────────────────────────────────
+
+export async function createApprovalToken(pollId: string): Promise<string> {
+  const id = uuidv4()
+  const token = uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '') // 64-char hex token
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+  await getDb().execute({
+    sql: 'INSERT INTO poll_approval_tokens (id, poll_id, token, expires_at) VALUES (?, ?, ?, ?)',
+    args: [id, pollId, token, expiresAt],
+  })
+  return token
+}
+
+export async function getApprovalToken(
+  token: string
+): Promise<{ poll_id: string; used_at: string | null; expires_at: string } | null> {
+  const result = await getDb().execute({
+    sql: 'SELECT poll_id, used_at, expires_at FROM poll_approval_tokens WHERE token = ?',
+    args: [token],
+  })
+  return (result.rows[0] as unknown as { poll_id: string; used_at: string | null; expires_at: string }) ?? null
+}
+
+export async function consumeApprovalToken(token: string): Promise<void> {
+  await getDb().execute({
+    sql: 'UPDATE poll_approval_tokens SET used_at = ? WHERE token = ?',
+    args: [new Date().toISOString(), token],
+  })
 }
 
 // ─── Email dedup ──────────────────────────────────────────────────────────────

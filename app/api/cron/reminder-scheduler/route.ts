@@ -27,6 +27,13 @@ export async function GET(req: Request) {
 
     if (today < reminderDate) continue
 
+    // Must have stored release recipients — skip polls released before this feature
+    const releaseEmails: string[] = poll.release_emails ? JSON.parse(poll.release_emails) : []
+    if (!releaseEmails.length) {
+      console.warn(`Poll ${poll.id} has no stored release_emails — skipping reminder`)
+      continue
+    }
+
     try {
       const deadline = poll.deadline ? formatDate(poll.deadline) : 'today'
       const htmlBody = buildPollEmailHtml({
@@ -35,18 +42,20 @@ export async function GET(req: Request) {
         deadline,
       })
 
-      await sendEmail({
-        from: process.env.POLLS_MAILBOX!,
-        to: poll.department, // In production, this should be the distribution list
-        subject: `Reminder: ${poll.topic} — Poll Closing Soon`,
-        htmlBody,
-      })
+      for (const email of releaseEmails) {
+        await sendEmail({
+          from: process.env.POLLS_MAILBOX!,
+          to: email,
+          subject: `Reminder: ${poll.topic} — Poll Closing Soon`,
+          htmlBody,
+        })
+      }
 
       await updatePollStatus(poll.id, 'REMINDER_SENT', {
         reminder_sent_at: new Date().toISOString(),
       })
 
-      await createAuditLog(poll.id, 'REMINDER_SENT', 'cron')
+      await createAuditLog(poll.id, 'REMINDER_SENT', 'cron', { emails: releaseEmails })
       sent++
     } catch (err) {
       console.error(`Failed to send reminder for poll ${poll.id}:`, err)

@@ -47,8 +47,9 @@ async function graphRequest<T>(path: string, options: RequestInit = {}): Promise
     throw new Error(`Graph API error ${res.status}: ${body}`)
   }
 
-  if (res.status === 204) return {} as T
-  return res.json() as Promise<T>
+  const text = await res.text()
+  if (!text) return {} as T
+  return JSON.parse(text) as T
 }
 
 // ─── Inbox Reading ─────────────────────────────────────────────────────────────
@@ -80,6 +81,12 @@ export async function getUnreadPollEmails(userEmail: string): Promise<GraphMessa
 
 // ─── Email Sending ─────────────────────────────────────────────────────────────
 
+export interface EmailAttachment {
+  name: string
+  contentType: string
+  contentBytes: string // base64
+}
+
 export interface SendEmailOptions {
   from: string
   to: string | string[]
@@ -87,23 +94,37 @@ export interface SendEmailOptions {
   htmlBody: string
   replyToMessageId?: string
   conversationId?: string
+  attachments?: EmailAttachment[]
+}
+
+function extractEmail(addr: string): string {
+  const match = addr.match(/<([^>]+)>/)
+  return match ? match[1].trim() : addr.trim()
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<void> {
   const toRecipients = Array.isArray(options.to)
-    ? options.to.map((addr) => ({ emailAddress: { address: addr } }))
-    : [{ emailAddress: { address: options.to } }]
+    ? options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
+    : [{ emailAddress: { address: extractEmail(options.to) } }]
+
+  const message: Record<string, unknown> = {
+    subject: options.subject,
+    body: { contentType: 'HTML', content: options.htmlBody },
+    toRecipients,
+  }
+
+  if (options.attachments?.length) {
+    message.attachments = options.attachments.map((a) => ({
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: a.name,
+      contentType: a.contentType,
+      contentBytes: a.contentBytes,
+    }))
+  }
 
   await graphRequest(`/users/${options.from}/sendMail`, {
     method: 'POST',
-    body: JSON.stringify({
-      message: {
-        subject: options.subject,
-        body: { contentType: 'HTML', content: options.htmlBody },
-        toRecipients,
-      },
-      saveToSentItems: true,
-    }),
+    body: JSON.stringify({ message, saveToSentItems: true }),
   })
 }
 

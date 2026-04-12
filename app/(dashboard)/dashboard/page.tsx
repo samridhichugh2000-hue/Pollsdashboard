@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { KPICards } from '@/components/dashboard/kpi-cards'
-import { AlertTriangle, Clock, ExternalLink } from 'lucide-react'
+import { AlertTriangle, Clock, ExternalLink, Bell } from 'lucide-react'
 import { formatRelative, formatDateTime, isApprovalOverdue } from '@/lib/utils'
 import { StatusBadge } from '@/components/polls/status-badge'
 import type { Poll, KPIData } from '@/types'
@@ -46,6 +46,19 @@ export default function DashboardPage() {
     (p) => p.status === 'AWAITING_APPROVAL' && isApprovalOverdue(p.updated_at)
   )
   const activePolls = polls.filter((p) => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
+
+  // Polls ready for result collection: reminder sent > 24h ago OR sent > 48h ago with no reminder
+  const now = Date.now()
+  const readyToCollect = polls.filter((p) => {
+    if (!['SENT', 'REMINDER_SENT'].includes(p.status)) return false
+    if (p.reminder_sent_at) {
+      return (now - new Date(p.reminder_sent_at).getTime()) / 3_600_000 > 24
+    }
+    if (p.sent_at) {
+      return (now - new Date(p.sent_at).getTime()) / 3_600_000 > 48
+    }
+    return false
+  })
 
   if (loading) {
     return (
@@ -98,6 +111,34 @@ export default function DashboardPage() {
 
         {/* Right column */}
         <div className="space-y-4">
+
+          {/* Ready to collect — 48h since release */}
+          {readyToCollect.length > 0 && (
+            <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+              <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-4">
+                <Bell className="h-4 w-4 text-violet-500" />
+                <h2 className="font-semibold text-gray-900">Ready to Collect Results</h2>
+                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">
+                  {readyToCollect.length}
+                </span>
+              </div>
+              <ul className="divide-y divide-gray-50">
+                {readyToCollect.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`/polls/${p.id}`} className="flex flex-col px-5 py-3 hover:bg-gray-50 transition-colors">
+                      <span className="truncate text-sm font-medium text-gray-900">{p.topic}</span>
+                      <span className="text-xs text-violet-600">
+                        {p.reminder_sent_at
+                          ? `Reminder sent ${formatRelative(p.reminder_sent_at)}`
+                          : `Released ${formatRelative(p.sent_at)}`}
+                        {' · Close & share results'}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Overdue approvals */}
           {overdueApprovals.length > 0 && (

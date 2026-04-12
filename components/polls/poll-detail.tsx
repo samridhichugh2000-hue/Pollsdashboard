@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download, RefreshCw, Plus, Trash2, Save } from 'lucide-react'
+import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download, RefreshCw, Plus, Trash2, Save, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { StatusBadge } from './status-badge'
-import { formatDateTime, formatRelative, isApprovalOverdue } from '@/lib/utils'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { formatDate, formatDateTime, formatRelative, isApprovalOverdue } from '@/lib/utils'
 import type { Poll, PollApproval, AuditLog, PollResponse } from '@/types'
 
 interface PollQuestion {
@@ -51,6 +52,24 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const [keywords, setKeywords] = useState('')
   const [tone, setTone] = useState('professional')
   const [useKeywords, setUseKeywords] = useState(true)
+
+  // Approval preview state
+  const [showApprovalPreview, setShowApprovalPreview] = useState(false)
+  const [approvalRecipients, setApprovalRecipients] = useState<string[]>([])
+  const [recipientInput, setRecipientInput] = useState('')
+
+  // Release poll state
+  const [showReleaseDialog, setShowReleaseDialog] = useState(false)
+  const [huntGroups, setHuntGroups] = useState<{ id: string; name: string; email: string }[]>([])
+  const [selectedHuntGroupIds, setSelectedHuntGroupIds] = useState<string[]>([])
+  const [huntGroupsLoading, setHuntGroupsLoading] = useState(false)
+  const [customReleaseEmails, setCustomReleaseEmails] = useState<string[]>([])
+  const [customReleaseInput, setCustomReleaseInput] = useState('')
+
+  // Share results state
+  const [showShareDialog, setShowShareDialog] = useState(false)
+  const [shareRecipients, setShareRecipients] = useState<string[]>([])
+  const [shareRecipientInput, setShareRecipientInput] = useState('')
 
   const router = useRouter()
 
@@ -139,6 +158,46 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     } finally {
       setLoading(null)
     }
+  }
+
+  const openReleaseDialog = async () => {
+    setShowReleaseDialog(true)
+    setSelectedHuntGroupIds([])
+    setCustomReleaseEmails([])
+    setCustomReleaseInput('')
+    setHuntGroupsLoading(true)
+    try {
+      const res = await fetch('/api/hunt-groups')
+      const data = await res.json() as { id: string; name: string; email: string }[]
+      setHuntGroups(data)
+    } catch {
+      toast.error('Failed to load hunt groups')
+    } finally {
+      setHuntGroupsLoading(false)
+    }
+  }
+
+  const releasePoll = async () => {
+    const huntGroupSelected = huntGroups.filter(g => selectedHuntGroupIds.includes(g.id))
+    const allEmails = [...huntGroupSelected.map(g => g.email), ...customReleaseEmails]
+    setShowReleaseDialog(false)
+    void runAction('RELEASE_POLL', { allEmails })
+  }
+
+  const addCustomReleaseEmail = () => {
+    const email = customReleaseInput.trim()
+    if (email && !customReleaseEmails.includes(email)) {
+      setCustomReleaseEmails(prev => [...prev, email])
+    }
+    setCustomReleaseInput('')
+  }
+
+  const addShareRecipient = () => {
+    const email = shareRecipientInput.trim()
+    if (email && !shareRecipients.includes(email)) {
+      setShareRecipients(prev => [...prev, email])
+    }
+    setShareRecipientInput('')
   }
 
   const overdue = poll.status === 'AWAITING_APPROVAL' && isApprovalOverdue(poll.updated_at)
@@ -466,12 +525,25 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                     if (hasChanges) {
                       if (!confirm('You have unsaved changes. Send for approval anyway?')) return
                     }
-                    void runAction('SEND_FOR_APPROVAL')
+                    setApprovalRecipients(poll.requested_by ? [poll.requested_by] : [])
+                    setRecipientInput('')
+                    setShowApprovalPreview(true)
                   }}
                   disabled={!!loading}
                 >
-                  {loading === 'SEND_FOR_APPROVAL' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                   <Send className="mr-1.5 h-3.5 w-3.5" /> Send for Approval
+                </Button>
+              )}
+
+              {poll.status === 'APPROVED' && (
+                <Button
+                  className="w-full"
+                  size="sm"
+                  onClick={openReleaseDialog}
+                  disabled={!!loading}
+                >
+                  {loading === 'RELEASE_POLL' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                  <Send className="mr-1.5 h-3.5 w-3.5" /> Release Poll
                 </Button>
               )}
 
@@ -521,10 +593,13 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                     className="w-full"
                     size="sm"
                     variant="outline"
-                    onClick={() => runAction('SHARE_RESULTS')}
+                    onClick={() => {
+                      setShareRecipients([])
+                      setShareRecipientInput('')
+                      setShowShareDialog(true)
+                    }}
                     disabled={!!loading}
                   >
-                    {loading === 'SHARE_RESULTS' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                     Share Results via Email
                   </Button>
                   <Button
@@ -607,6 +682,271 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
           )}
         </div>
       </div>
+
+      {/* Release Poll Dialog */}
+      <Dialog open={showReleaseDialog} onOpenChange={setShowReleaseDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Release Poll</DialogTitle>
+            <DialogDescription>
+              Select the hunt groups to send this poll to.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {huntGroupsLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+              </div>
+            ) : huntGroups.length === 0 ? (
+              <p className="text-sm text-gray-500 py-4 text-center">No hunt groups configured. Add them in Settings.</p>
+            ) : (
+              huntGroups.map((group) => (
+                <label key={group.id} className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"
+                    checked={selectedHuntGroupIds.includes(group.id)}
+                    onChange={(e) => {
+                      setSelectedHuntGroupIds(prev =>
+                        e.target.checked ? [...prev, group.id] : prev.filter(id => id !== group.id)
+                      )
+                    }}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{group.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{group.email}</p>
+                  </div>
+                </label>
+              ))
+            )}
+          </div>
+
+          {/* Manual individual email addresses */}
+          <div className="space-y-2 pt-1">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add Individual Emails</p>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={customReleaseInput}
+                onChange={(e) => setCustomReleaseInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addCustomReleaseEmail() } }}
+                placeholder="name@koenig-solutions.com"
+                className="flex-1 rounded-md border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+              />
+              <Button type="button" size="sm" variant="outline" onClick={addCustomReleaseEmail}>Add</Button>
+            </div>
+            {customReleaseEmails.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {customReleaseEmails.map((email) => (
+                  <span key={email} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs text-blue-700">
+                    {email}
+                    <button type="button" onClick={() => setCustomReleaseEmails(prev => prev.filter(e => e !== email))} className="hover:text-red-600 ml-0.5">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReleaseDialog(false)}>
+              Cancel
+            </Button>
+            {(() => {
+              const total = selectedHuntGroupIds.length + customReleaseEmails.length
+              return (
+                <Button onClick={releasePoll} disabled={total === 0 || huntGroupsLoading}>
+                  <Send className="mr-1.5 h-3.5 w-3.5" />
+                  Release to {total > 0 ? `${total} recipient${total > 1 ? 's' : ''}` : 'recipients'}
+                </Button>
+              )
+            })()}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Results Dialog */}
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Poll Results</DialogTitle>
+            <DialogDescription>
+              Select recipients. The Excel response file will be attached to the email.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={shareRecipientInput}
+                onChange={(e) => setShareRecipientInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addShareRecipient() } }}
+                placeholder="recipient@koenig-solutions.com"
+                className="flex-1 rounded-md border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+              />
+              <Button type="button" size="sm" variant="outline" onClick={addShareRecipient}>Add</Button>
+            </div>
+
+            {shareRecipients.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {shareRecipients.map((email) => (
+                  <span key={email} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs text-blue-700">
+                    {email}
+                    <button type="button" onClick={() => setShareRecipients(prev => prev.filter(e => e !== email))} className="hover:text-red-600 ml-0.5">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-gray-400">Press Enter or comma to add multiple recipients.</p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowShareDialog(false)}>Cancel</Button>
+            <Button
+              disabled={shareRecipients.length === 0 || !!loading}
+              onClick={() => {
+                setShowShareDialog(false)
+                void runAction('SHARE_RESULTS', { recipients: shareRecipients })
+              }}
+            >
+              {loading === 'SHARE_RESULTS' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+              Send Results ({shareRecipients.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval Preview Dialog */}
+      <Dialog open={showApprovalPreview} onOpenChange={setShowApprovalPreview}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Send for Approval — Preview</DialogTitle>
+            <DialogDescription>
+              Review the approval email and select recipients before sending.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Email Preview */}
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+              <h3 className="font-semibold text-gray-900">Poll Approval Request: {poll.topic}</h3>
+              <div className="text-sm space-y-1 text-gray-700">
+                <p><span className="font-medium">Department:</span> {poll.department}</p>
+                <p><span className="font-medium">Deadline:</span> {formatDate(poll.deadline)}</p>
+              </div>
+
+              {poll.draft_email_body && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Draft Email Body</p>
+                  <div className="rounded bg-white border border-gray-200 p-3 text-sm text-gray-700 whitespace-pre-wrap">
+                    {poll.draft_email_body}
+                  </div>
+                </div>
+              )}
+
+              {questions.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Poll Questions</p>
+                  <ol className="text-sm space-y-1">
+                    {questions.map((q, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="font-medium text-gray-400">{i + 1}.</span>
+                        <span className="text-gray-800">{q.text}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {poll.ms_form_link && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Poll Form Link</p>
+                  <a href={poll.ms_form_link} target="_blank" rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:underline break-all">
+                    {poll.ms_form_link}
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* Recipient Selector */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Send To</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={recipientInput}
+                  onChange={(e) => setRecipientInput(e.target.value)}
+                  placeholder="Enter email address and press Enter"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault()
+                      const email = recipientInput.trim().replace(/,$/, '')
+                      if (email && !approvalRecipients.includes(email)) {
+                        setApprovalRecipients(prev => [...prev, email])
+                      }
+                      setRecipientInput('')
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const email = recipientInput.trim()
+                    if (email && !approvalRecipients.includes(email)) {
+                      setApprovalRecipients(prev => [...prev, email])
+                    }
+                    setRecipientInput('')
+                  }}
+                >
+                  Add
+                </Button>
+              </div>
+
+              {approvalRecipients.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {approvalRecipients.map((email) => (
+                    <span key={email} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs text-blue-700">
+                      {email}
+                      <button
+                        type="button"
+                        onClick={() => setApprovalRecipients(prev => prev.filter(e => e !== email))}
+                        className="hover:text-red-600 transition-colors ml-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-xs text-gray-400">Press Enter or comma to add multiple recipients.</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowApprovalPreview(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setShowApprovalPreview(false)
+                void runAction('SEND_FOR_APPROVAL', { recipients: approvalRecipients })
+              }}
+              disabled={approvalRecipients.length === 0 || !!loading}
+            >
+              {loading === 'SEND_FOR_APPROVAL' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+              <Send className="mr-1.5 h-3.5 w-3.5" /> Send for Approval
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

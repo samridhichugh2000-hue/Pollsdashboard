@@ -48,32 +48,53 @@ export function buildApprovalEmailHtml(params: {
   questions: string[]
   msFormLink: string
   deadline: string
+  approveUrl: string
+  editUrl: string
 }): string {
   const questionsHtml = params.questions
-    .map((q, i) => `<li>${i + 1}. ${q}</li>`)
+    .map((q, i) => `<li style="margin-bottom:6px;">${i + 1}. ${q}</li>`)
     .join('')
 
   return `
-<div style="font-family: Arial, sans-serif; max-width: 600px;">
-  <h2 style="color: #1e40af;">Poll Approval Request: ${params.topic}</h2>
-  <p><strong>Department:</strong> ${params.department}</p>
-  <p><strong>Deadline:</strong> ${params.deadline}</p>
+<div style="font-family: Arial, sans-serif; max-width: 620px; color: #1a1a1a;">
+  <h2 style="color: #1e40af; margin-bottom: 4px;">Poll Approval Request</h2>
+  <p style="margin:0 0 16px; color:#6b7280; font-size:14px;">${params.topic}</p>
 
-  <h3>Draft Email Body</h3>
-  <div style="background: #f8fafc; padding: 12px; border-left: 4px solid #3b82f6;">
+  <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:14px;">
+    <tr>
+      <td style="padding:6px 12px 6px 0; color:#6b7280; width:120px;">Department</td>
+      <td style="padding:6px 0; font-weight:600;">${params.department}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 12px 6px 0; color:#6b7280;">Deadline</td>
+      <td style="padding:6px 0; font-weight:600;">${params.deadline}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 12px 6px 0; color:#6b7280;">Poll Link</td>
+      <td style="padding:6px 0;"><a href="${params.msFormLink}" style="color:#2563eb;">${params.msFormLink}</a></td>
+    </tr>
+  </table>
+
+  <h3 style="font-size:14px; color:#374151; margin-bottom:8px; text-transform:uppercase; letter-spacing:.05em;">Draft Email Body</h3>
+  <div style="background:#f8fafc; padding:14px; border-left:4px solid #3b82f6; border-radius:4px; font-size:14px; line-height:1.6; margin-bottom:16px;">
     ${params.emailBody.replace(/\n/g, '<br>')}
   </div>
 
-  <h3>Poll Questions</h3>
-  <ul>${questionsHtml}</ul>
+  <h3 style="font-size:14px; color:#374151; margin-bottom:8px; text-transform:uppercase; letter-spacing:.05em;">Poll Questions</h3>
+  <ul style="padding-left:18px; font-size:14px; line-height:1.7; margin-bottom:24px;">${questionsHtml}</ul>
 
-  <h3>Poll Form</h3>
-  <p><a href="${params.msFormLink}">${params.msFormLink}</a></p>
+  <div style="display:flex; gap:12px; margin-bottom:24px;">
+    <a href="${params.approveUrl}"
+       style="display:inline-block; background:#16a34a; color:#fff; padding:12px 28px; border-radius:6px; text-decoration:none; font-weight:600; font-size:15px;">
+      ✓ Approve
+    </a>
+    <a href="${params.editUrl}"
+       style="display:inline-block; background:#ffffff; color:#1d4ed8; padding:12px 28px; border-radius:6px; text-decoration:none; font-weight:600; font-size:15px; border:2px solid #1d4ed8;">
+      ✏ Edit &amp; Approve
+    </a>
+  </div>
 
-  <hr>
-  <p>To approve, reply with <strong>APPROVED</strong>.</p>
-  <p>To request edits, reply with your suggested changes.</p>
-  <p>For clarification, reply with <strong>CLARIFICATION NEEDED</strong> and your question.</p>
+  <p style="font-size:12px; color:#9ca3af;">This link expires in 7 days and can only be used once. — Koenig Solutions HR</p>
 </div>
 `
 }
