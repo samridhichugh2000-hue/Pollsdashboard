@@ -10,6 +10,7 @@ import {
   getAuditLogsByPoll,
   getPollResponse,
   updateResponseActionable,
+  upsertPollResponse,
 } from '@/lib/db/queries'
 import { sendEmail, sendEmailGetId, replyToMessageWithHtml } from '@/lib/graph'
 import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, formatDate } from '@/lib/utils'
@@ -156,6 +157,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           body.email_response as string | undefined
         )
         await createAuditLog(id, 'RESPONSE_UPDATED', userEmail)
+        break
+      }
+
+      case 'UPDATE_ENTRY_ACTIONABLE': {
+        const entryIndex = body.entryIndex as number
+        const actionable = body.actionable as boolean | null
+        const pollResp = await getPollResponse(id)
+        if (!pollResp?.response_data) {
+          return NextResponse.json({ error: 'No responses found.' }, { status: 400 })
+        }
+        const entries = JSON.parse(pollResp.response_data) as Record<string, unknown>[]
+        if (entryIndex < 0 || entryIndex >= entries.length) {
+          return NextResponse.json({ error: 'Invalid entry index.' }, { status: 400 })
+        }
+        entries[entryIndex] = { ...entries[entryIndex], actionable }
+        await upsertPollResponse(id, JSON.stringify(entries))
+        await createAuditLog(id, 'ENTRY_ACTIONABLE_UPDATED', userEmail, { entryIndex, actionable })
         break
       }
 
