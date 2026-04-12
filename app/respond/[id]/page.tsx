@@ -10,14 +10,14 @@ interface PollData {
   subject?: string | null
   department: string
   deadline: string | null
-  questions: Array<string | { text: string; type: string }>
+  questions: Array<string | { text: string; type: string; options?: string[] }>
 }
 
 type Answer = { question: string; answer: string }
 
 const ALLOWED_DOMAIN = 'koenig-solutions.com'
 
-function normalizeQuestion(q: string | { text: string; type: string }): { text: string; type: string } {
+function normalizeQuestion(q: string | { text: string; type: string; options?: string[] }): { text: string; type: string; options?: string[] } {
   return typeof q === 'string'
     ? { text: q, type: /rate|rating|scale|satisfied|satisfaction|recommend|\(1\s*[=-]/i.test(q) ? 'rating' : 'open_ended' }
     : q
@@ -47,12 +47,48 @@ function RatingInput({ value, onChange }: { value: string; onChange: (v: string)
   )
 }
 
+function YesNoInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex gap-3">
+      {['Yes', 'No'].map(opt => (
+        <button key={opt} type="button" onClick={() => onChange(opt)}
+          className={`rounded-xl border-2 px-8 py-2.5 text-sm font-semibold transition-all ${
+            value === opt
+              ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+              : 'border-gray-200 bg-white text-gray-500 hover:border-emerald-300'
+          }`}>
+          {opt}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function MultipleChoiceInput({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-2">
+      {options.filter(Boolean).map(opt => (
+        <label key={opt} className="flex items-center gap-3 cursor-pointer rounded-xl border-2 px-4 py-2.5 transition-all hover:border-purple-300"
+          style={{ borderColor: value === opt ? '#9333ea' : '#e5e7eb', backgroundColor: value === opt ? '#faf5ff' : 'white' }}>
+          <div className={`h-4 w-4 flex-shrink-0 rounded-full border-2 flex items-center justify-center transition-colors ${
+            value === opt ? 'border-purple-600 bg-purple-600' : 'border-gray-300'
+          }`}>
+            {value === opt && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+          </div>
+          <input type="radio" name="mc" value={opt} checked={value === opt} onChange={() => onChange(opt)} className="sr-only" />
+          <span className={`text-sm font-medium ${value === opt ? 'text-purple-700' : 'text-gray-700'}`}>{opt}</span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
 export default function RespondPage() {
   const { id } = useParams<{ id: string }>()
   const [poll, setPoll] = useState<PollData | null>(null)
   const [loadError, setLoadError] = useState('')
   const [answers, setAnswers] = useState<Answer[]>([])
-  const [pollQuestions, setPollQuestions] = useState<{ text: string; type: string }[]>([])
+  const [pollQuestions, setPollQuestions] = useState<{ text: string; type: string; options?: string[] }[]>([])
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -203,6 +239,10 @@ export default function RespondPage() {
                 </label>
                 {pollQuestions[i]?.type === 'rating' ? (
                   <RatingInput value={a.answer} onChange={(v) => setAnswer(i, v)} />
+                ) : pollQuestions[i]?.type === 'yes_no' ? (
+                  <YesNoInput value={a.answer} onChange={(v) => setAnswer(i, v)} />
+                ) : pollQuestions[i]?.type === 'multiple_choice' && pollQuestions[i]?.options?.length ? (
+                  <MultipleChoiceInput options={pollQuestions[i].options!} value={a.answer} onChange={(v) => setAnswer(i, v)} />
                 ) : (
                   <textarea
                     value={a.answer}

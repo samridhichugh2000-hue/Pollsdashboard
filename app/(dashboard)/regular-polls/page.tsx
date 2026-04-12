@@ -7,6 +7,8 @@ import { Plus, RefreshCw, CalendarClock, Edit2, Trash2, Play, Power, ChevronDown
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { QuestionBuilder, parseQuestions } from '@/components/polls/question-builder'
+import type { Question } from '@/components/polls/question-builder'
 import type { RegularPoll } from '@/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -42,13 +44,15 @@ interface FormState {
   department: string
   subject: string
   draft_email_body: string
-  questions: string
+  questions: Question[]
   recipients: string
 }
 
 const emptyForm: FormState = {
   name: '', description: '', frequency: 'monthly', scheduled_day: '1',
-  department: '', subject: '', draft_email_body: '', questions: '', recipients: '',
+  department: '', subject: '', draft_email_body: '',
+  questions: [{ text: '', type: 'open_ended' }],
+  recipients: '',
 }
 
 function formFromTemplate(t: RegularPoll): FormState {
@@ -60,7 +64,7 @@ function formFromTemplate(t: RegularPoll): FormState {
     department: t.department,
     subject: t.subject,
     draft_email_body: t.draft_email_body,
-    questions: (JSON.parse(t.questions) as string[]).join('\n'),
+    questions: parseQuestions(t.questions),
     recipients: (JSON.parse(t.recipients) as string[]).join('\n'),
   }
 }
@@ -91,8 +95,8 @@ export default function RegularPollsPage() {
 
   // Release dialog
   const [releaseId, setReleaseId] = useState<string | null>(null)
-  const [releaseForm, setReleaseForm] = useState<{ subject: string; draft_email_body: string; questions: string }>({
-    subject: '', draft_email_body: '', questions: '',
+  const [releaseForm, setReleaseForm] = useState<{ subject: string; draft_email_body: string; questions: Question[] }>({
+    subject: '', draft_email_body: '', questions: [],
   })
   const [releasing, setReleasing] = useState(false)
 
@@ -115,7 +119,7 @@ export default function RegularPollsPage() {
   const openEdit = (t: RegularPoll) => { setEditingId(t.id); setForm(formFromTemplate(t)); setFormOpen(true) }
 
   const saveForm = async () => {
-    if (!form.name || !form.department || !form.subject || !form.draft_email_body || !form.questions || !form.recipients) {
+    if (!form.name || !form.department || !form.subject || !form.draft_email_body || !form.questions.length || !form.recipients) {
       toast.error('Please fill in all required fields'); return
     }
     setSaving(true)
@@ -123,7 +127,7 @@ export default function RegularPollsPage() {
       const payload = {
         ...form,
         scheduled_day: Number(form.scheduled_day),
-        questions: JSON.stringify(form.questions.split('\n').map(s => s.trim()).filter(Boolean)),
+        questions: JSON.stringify(form.questions.filter(q => q.text.trim())),
         recipients: JSON.stringify(parseRecipients(form.recipients)),
         next_run_date: computeNextRunDate(form.frequency, Number(form.scheduled_day)),
       }
@@ -176,7 +180,7 @@ export default function RegularPollsPage() {
     setReleaseForm({
       subject: t.subject,
       draft_email_body: t.draft_email_body,
-      questions: (JSON.parse(t.questions) as string[]).join('\n'),
+      questions: parseQuestions(t.questions),
     })
   }
 
@@ -193,7 +197,7 @@ export default function RegularPollsPage() {
           action: 'RELEASE',
           subject: releaseForm.subject,
           draft_email_body: releaseForm.draft_email_body,
-          questions: JSON.stringify(releaseForm.questions.split('\n').map(s => s.trim()).filter(Boolean)),
+          questions: JSON.stringify(releaseForm.questions.filter(q => q.text.trim())),
         }),
       })
       if (!res.ok) {
@@ -270,7 +274,7 @@ export default function RegularPollsPage() {
               const due = t.is_active && isDue(t.next_run_date)
               const isExpanded = expanded === t.id
               const recipientList: string[] = JSON.parse(t.recipients)
-              const questionList: string[] = JSON.parse(t.questions)
+              const questionList = parseQuestions(t.questions)
 
               return (
                 <div key={t.id} className={`transition-colors ${due ? 'bg-amber-50/50' : ''}`}>
@@ -342,9 +346,22 @@ export default function RegularPollsPage() {
                       </div>
                       <div className="pt-4">
                         <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Questions</p>
-                        <ol className="space-y-1 list-decimal list-inside">
+                        <ol className="space-y-2">
                           {questionList.map((q, i) => (
-                            <li key={i} className="text-xs text-gray-600">{q}</li>
+                            <li key={i} className="flex items-start gap-2">
+                              <span className="text-xs font-bold text-gray-400 flex-shrink-0 mt-0.5">{i+1}.</span>
+                              <div className="min-w-0">
+                                <p className="text-xs text-gray-700">{q.text}</p>
+                                <span className={`inline-block mt-0.5 rounded-full px-1.5 py-px text-[10px] font-medium ${
+                                  q.type === 'rating' ? 'bg-amber-100 text-amber-700' :
+                                  q.type === 'yes_no' ? 'bg-emerald-100 text-emerald-700' :
+                                  q.type === 'multiple_choice' ? 'bg-purple-100 text-purple-700' :
+                                  'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {q.type === 'open_ended' ? 'Open Ended' : q.type === 'rating' ? 'Rating' : q.type === 'yes_no' ? 'Yes/No' : 'Multiple Choice'}
+                                </span>
+                              </div>
+                            </li>
                           ))}
                         </ol>
                       </div>
@@ -420,10 +437,11 @@ export default function RegularPollsPage() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-700">Poll Questions * <span className="font-normal text-gray-400">(one per line)</span></label>
-              <textarea rows={4} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-y font-mono"
-                placeholder="How satisfied are you with your work this month?&#10;What can we improve?&#10;Rate your team collaboration (1–10)" value={form.questions}
-                onChange={e => setForm(f => ({ ...f, questions: e.target.value }))} />
+              <label className="text-xs font-medium text-gray-700 mb-2 block">Poll Questions *</label>
+              <QuestionBuilder
+                questions={form.questions}
+                onChange={qs => setForm(f => ({ ...f, questions: qs }))}
+              />
             </div>
 
             <div>
@@ -471,10 +489,11 @@ export default function RegularPollsPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-700">Poll Questions <span className="font-normal text-gray-400">(one per line)</span></label>
-                <textarea rows={4} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-y font-mono"
-                  value={releaseForm.questions}
-                  onChange={e => setReleaseForm(f => ({ ...f, questions: e.target.value }))} />
+                <label className="text-xs font-medium text-gray-700 mb-2 block">Poll Questions</label>
+                <QuestionBuilder
+                  questions={releaseForm.questions}
+                  onChange={qs => setReleaseForm(f => ({ ...f, questions: qs }))}
+                />
               </div>
 
               <div className="rounded-lg bg-gray-50 px-4 py-3">
