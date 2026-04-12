@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Users, X, Search } from 'lucide-react'
+import { Users, X, Search, ChevronDown, Check } from 'lucide-react'
 import type { HuntGroup } from '@/components/settings/hunt-groups-manager'
 
 interface RecipientPickerProps {
@@ -25,10 +25,12 @@ export function RecipientPicker({ value, onChange }: RecipientPickerProps) {
   const [knownEmails, setKnownEmails] = useState<KnownEmail[]>([])
   const [inputText, setInputText] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [showGroupDropdown, setShowGroupDropdown] = useState(false)
   const [initialized, setInitialized] = useState(false)
 
   const inputRef = useRef<HTMLInputElement>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
+  const groupDropdownRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
 
@@ -76,12 +78,15 @@ export function RecipientPicker({ value, onChange }: RecipientPickerProps) {
     onChangeRef.current(dedup([...groupEmails, ...individualEmails]))
   }, [selectedGroupIds, individualEmails, huntGroups, initialized])
 
-  // Click-outside to close dropdown
+  // Click-outside to close dropdowns
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
           inputRef.current && !inputRef.current.contains(e.target as Node)) {
         setShowSuggestions(false)
+      }
+      if (groupDropdownRef.current && !groupDropdownRef.current.contains(e.target as Node)) {
+        setShowGroupDropdown(false)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -151,37 +156,57 @@ export function RecipientPicker({ value, onChange }: RecipientPickerProps) {
   return (
     <div className="space-y-4">
 
-      {/* ── Hunt Groups ──────────────────────────────────────────────── */}
+      {/* ── Hunt Groups dropdown ─────────────────────────────────────── */}
       {huntGroups.length > 0 && (
-        <div>
-          <div className="flex items-center gap-1.5 mb-2">
-            <Users className="h-3.5 w-3.5 text-gray-400" />
-            <span className="text-xs font-medium text-gray-600">Hunt Groups</span>
-            <span className="text-xs text-gray-400">(click to select)</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {huntGroups.map(g => {
-              const selected = selectedGroupIds.includes(g.id)
-              return (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => toggleGroup(g)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-                    selected
-                      ? 'border-cyan-500 bg-cyan-50 text-cyan-700 shadow-sm'
-                      : 'border-gray-200 bg-white text-gray-600 hover:border-cyan-300 hover:bg-cyan-50/50'
-                  }`}
-                >
-                  <Users className={`h-3 w-3 ${selected ? 'text-cyan-500' : 'text-gray-400'}`} />
-                  <span>{g.name}</span>
-                  {selected && (
-                    <span className="ml-0.5 rounded-full bg-cyan-500 text-white text-[10px] px-1 font-bold">✓</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
+        <div className="relative" ref={groupDropdownRef}>
+          {/* Trigger button */}
+          <button
+            type="button"
+            onClick={() => setShowGroupDropdown(p => !p)}
+            className="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-left hover:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
+          >
+            <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <span className={`flex-1 ${selectedGroupIds.length === 0 ? 'text-gray-400' : 'text-gray-700 font-medium'}`}>
+              {selectedGroupIds.length === 0
+                ? 'Select hunt groups...'
+                : huntGroups.filter(g => selectedGroupIds.includes(g.id)).map(g => g.name).join(', ')}
+            </span>
+            {selectedGroupIds.length > 0 && (
+              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-white">
+                {selectedGroupIds.length}
+              </span>
+            )}
+            <ChevronDown className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform ${showGroupDropdown ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Dropdown panel */}
+          {showGroupDropdown && (
+            <div className="absolute z-30 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden">
+              {huntGroups.map(g => {
+                const selected = selectedGroupIds.includes(g.id)
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); toggleGroup(g) }}
+                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                      selected ? 'bg-cyan-50' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border-2 transition-colors ${
+                      selected ? 'border-cyan-500 bg-cyan-500' : 'border-gray-300'
+                    }`}>
+                      {selected && <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${selected ? 'text-cyan-700' : 'text-gray-700'}`}>{g.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{g.email}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -206,7 +231,7 @@ export function RecipientPicker({ value, onChange }: RecipientPickerProps) {
 
           {/* Autocomplete dropdown */}
           {showSuggestions && suggestions.length > 0 && (
-            <div ref={dropdownRef}
+            <div ref={suggestionsRef}
               className="absolute z-30 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden">
               {suggestions.map(s => (
                 <button
