@@ -51,15 +51,17 @@ export default function PollsPage() {
     void fetchPolls()
   }
 
+  const active = (p: Poll) => p.status !== 'ARCHIVED'
+
   const filterByTab = (tab: string): Poll[] => {
     switch (tab) {
-      case 'inbox':    return polls.filter(p => p.source === 'email')
-      case 'manual':   return polls.filter(p => p.source === 'dashboard')
-      case 'external': return polls.filter(p => p.source === 'external')
-      case 'pending':  return polls.filter(p => p.status === 'AWAITING_APPROVAL')
-      case 'active':   return polls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
+      case 'inbox':    return polls.filter(p => active(p) && p.source === 'email')
+      case 'manual':   return polls.filter(p => active(p) && p.source === 'dashboard')
+      case 'external': return polls.filter(p => active(p) && p.source === 'external')
+      case 'pending':  return polls.filter(p => active(p) && p.status === 'AWAITING_APPROVAL')
+      case 'active':   return polls.filter(p => active(p) && ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
       case 'archived': return polls.filter(p => p.status === 'ARCHIVED')
-      default:         return polls.filter(p => p.status !== 'ARCHIVED')
+      default:         return polls.filter(p => active(p))
     }
   }
 

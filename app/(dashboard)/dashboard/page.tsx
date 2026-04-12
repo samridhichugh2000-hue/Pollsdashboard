@@ -49,7 +49,7 @@ export default function DashboardPage() {
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const dueRegularPolls = regularPolls.filter(p => p.is_active && new Date(p.next_run_date) <= today)
-  const recentPolls = polls.slice(0, 6)
+  const recentPolls = polls.filter(p => p.status !== 'ARCHIVED').slice(0, 6)
   const overdueApprovals = polls.filter(
     (p) => p.status === 'AWAITING_APPROVAL' && isApprovalOverdue(p.updated_at)
   )
