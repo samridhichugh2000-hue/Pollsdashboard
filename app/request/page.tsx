@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Loader2, CheckCircle2, ClipboardList, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, Loader2, CheckCircle2, ClipboardList, ChevronDown, Users } from 'lucide-react'
 
 interface HuntGroup { id: string; name: string; email: string }
 interface Sender { id: string; name: string; email: string }
@@ -23,13 +23,15 @@ export default function PublicRequestPage() {
   const [questions, setQuestions] = useState<string[]>([])
   const [showTimeline, setShowTimeline] = useState(false)
 
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
+  const [showOther, setShowOther] = useState(false)
+  const [customDepartment, setCustomDepartment] = useState('')
+
   const [form, setForm] = useState({
     requester_name: '',
     requester_email: '',
     custom_email: '',
     topic: '',
-    department: '',
-    custom_department: '',
     context: '',
   })
 
@@ -43,7 +45,7 @@ export default function PublicRequestPage() {
     }).catch(() => {})
   }, [])
 
-  const set = (field: string, value: string) => setForm(p => ({ ...p, [field]: value }))
+  const set = (field: string, value: string) => setForm(p => ({ ...p, [field]: value } as typeof p))
 
   const addQuestion = () => { if (questions.length < 4) setQuestions(p => [...p, '']) }
   const updateQuestion = (i: number, v: string) => setQuestions(p => p.map((q, idx) => idx === i ? v : q))
@@ -54,9 +56,16 @@ export default function PublicRequestPage() {
     setError('')
 
     const email = form.requester_email === '__other__' ? form.custom_email : form.requester_email
-    const department = form.department === '__custom__' ? form.custom_department : form.department
+
+    const selectedGroupNames = huntGroups
+      .filter(g => selectedGroupIds.includes(g.id))
+      .map(g => g.name)
+    const department = selectedGroupNames.length > 0
+      ? selectedGroupNames.join(', ') + (showOther && customDepartment.trim() ? `, ${customDepartment.trim()}` : '')
+      : customDepartment.trim()
 
     if (!email) { setError('Please select or enter your email.'); return }
+    if (!department) { setError('Please select at least one target audience.'); return }
 
     setLoading(true)
     try {
@@ -107,7 +116,7 @@ export default function PublicRequestPage() {
             </ol>
           </div>
           <button
-            onClick={() => { setSubmitted(false); setForm({ requester_name: '', requester_email: '', custom_email: '', topic: '', department: '', custom_department: '', context: '' }); setQuestions([]) }}
+            onClick={() => { setSubmitted(false); setForm({ requester_name: '', requester_email: '', custom_email: '', topic: '', context: '' }); setSelectedGroupIds([]); setShowOther(false); setCustomDepartment(''); setQuestions([]) }}
             className="mt-6 w-full rounded-xl bg-cyan-600 py-2.5 text-sm font-semibold text-white hover:bg-cyan-700 transition-colors"
           >
             Submit Another Request
@@ -202,19 +211,68 @@ export default function PublicRequestPage() {
                 className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition" />
             </div>
 
-            {/* Target Audience */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">Target Audience *</label>
-              <select value={form.department} onChange={e => set('department', e.target.value)} required
-                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition bg-white">
-                <option value="">Select a group...</option>
-                {huntGroups.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
-                <option value="__custom__">Other (specify below)</option>
-              </select>
-              {form.department === '__custom__' && (
-                <input type="text" placeholder="Describe the target audience" value={form.custom_department}
-                  onChange={e => set('custom_department', e.target.value)} required
-                  className="mt-2 w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition" />
+            {/* Target Audience — multi-select */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Target Audience * <span className="normal-case font-normal text-gray-400">(select one or more)</span>
+              </label>
+
+              {huntGroups.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {huntGroups.map(g => {
+                    const selected = selectedGroupIds.includes(g.id)
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setSelectedGroupIds(prev =>
+                          prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id]
+                        )}
+                        className={`inline-flex items-center gap-1.5 rounded-xl border-2 px-4 py-2 text-sm font-medium transition-all ${
+                          selected
+                            ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
+                            : 'border-gray-200 bg-white text-gray-600 hover:border-cyan-300 hover:bg-cyan-50/50'
+                        }`}
+                      >
+                        <Users className={`h-3.5 w-3.5 ${selected ? 'text-cyan-500' : 'text-gray-400'}`} />
+                        {g.name}
+                        {selected && <span className="ml-0.5 text-cyan-500 font-bold">✓</span>}
+                      </button>
+                    )
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setShowOther(p => !p)}
+                    className={`inline-flex items-center gap-1.5 rounded-xl border-2 px-4 py-2 text-sm font-medium transition-all ${
+                      showOther
+                        ? 'border-gray-400 bg-gray-50 text-gray-700'
+                        : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                    }`}
+                  >
+                    + Other
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400">Loading groups...</p>
+              )}
+
+              {(showOther || selectedGroupIds.length === 0) && (
+                <input
+                  type="text"
+                  placeholder={selectedGroupIds.length > 0 ? 'Specify additional audience (optional)' : 'Describe your target audience'}
+                  value={customDepartment}
+                  onChange={e => setCustomDepartment(e.target.value)}
+                  required={selectedGroupIds.length === 0}
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition"
+                />
+              )}
+
+              {selectedGroupIds.length > 0 && (
+                <p className="text-xs text-gray-400">
+                  Selected: <span className="font-medium text-gray-600">
+                    {huntGroups.filter(g => selectedGroupIds.includes(g.id)).map(g => g.name).join(', ')}
+                  </span>
+                </p>
               )}
             </div>
 
