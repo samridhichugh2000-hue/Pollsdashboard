@@ -26,14 +26,20 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="flex h-full w-16 flex-col items-center bg-cyan-800/40 py-4 backdrop-blur-sm">
+    <aside className="flex h-full w-52 flex-col bg-cyan-800/40 py-4 backdrop-blur-sm">
       {/* Logo */}
-      <div className="mb-8 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
-        <CheckSquare className="h-5 w-5 text-white" />
+      <div className="mb-8 flex items-center gap-3 px-4">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/20">
+          <CheckSquare className="h-5 w-5 text-white" />
+        </div>
+        <div>
+          <p className="text-sm font-bold text-white leading-tight">Polls</p>
+          <p className="text-xs text-white/50 leading-tight">Dashboard</p>
+        </div>
       </div>
 
-      {/* Nav icons */}
-      <nav className="flex flex-1 flex-col items-center gap-2">
+      {/* Nav items */}
+      <nav className="flex flex-1 flex-col gap-1 px-2">
         {navItems.map((item) => {
           const Icon = item.icon
           const isActive = item.href === '/dashboard'
@@ -44,26 +50,25 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              title={item.label}
               className={cn(
-                'group relative flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200',
+                'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
                 isActive
-                  ? 'bg-white/25 shadow-lg'
-                  : 'hover:bg-white/15'
+                  ? 'bg-white/25 text-white shadow-lg'
+                  : 'text-white/60 hover:bg-white/15 hover:text-white'
               )}
             >
-              <Icon className={cn('h-5 w-5', isActive ? 'text-white' : 'text-white/60 group-hover:text-white')} />
-              {/* Tooltip */}
-              <span className="absolute left-14 z-50 hidden whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-xl group-hover:block">
-                {item.label}
-              </span>
+              <Icon className="h-4.5 w-4.5 flex-shrink-0 h-[18px] w-[18px]" />
+              <span>{item.label}</span>
             </Link>
           )
         })}
       </nav>
 
-      {/* Bottom dot */}
-      <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_2px_rgba(52,211,153,0.5)]" title="Connected" />
+      {/* Bottom status */}
+      <div className="flex items-center gap-2 px-4 pt-4 border-t border-white/10">
+        <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_2px_rgba(52,211,153,0.5)]" />
+        <span className="text-xs text-white/40">Connected</span>
+      </div>
     </aside>
   )
 }
