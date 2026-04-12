@@ -125,6 +125,25 @@ export interface AuthorizedSender {
   name: string
 }
 
+export interface RegularPoll {
+  id: string
+  name: string
+  description?: string | null
+  frequency: 'monthly' | 'quarterly'
+  scheduled_day: number
+  department: string
+  subject: string
+  draft_email_body: string
+  questions: string // JSON array
+  recipients: string // JSON array of email strings
+  ms_form_link?: string | null
+  next_run_date: string // YYYY-MM-DD
+  last_run_date?: string | null
+  is_active: number // 1 or 0 (SQLite boolean)
+  created_at: string
+  updated_at: string
+}
+
 export const AUTHORIZED_SENDERS: AuthorizedSender[] = [
   { email: 'rohit.a@koenig-solutions.com', name: 'Rohit A' },
   { email: 'nupur.munjal@koenig-solutions.com', name: 'Nupur Munjal' },

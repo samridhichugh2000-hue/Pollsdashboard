@@ -5,10 +5,10 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { KPICards } from '@/components/dashboard/kpi-cards'
-import { AlertTriangle, Clock, ExternalLink, Bell } from 'lucide-react'
+import { AlertTriangle, Clock, ExternalLink, Bell, CalendarClock } from 'lucide-react'
 import { formatRelative, formatDateTime, isApprovalOverdue } from '@/lib/utils'
 import { StatusBadge } from '@/components/polls/status-badge'
-import type { Poll, KPIData } from '@/types'
+import type { Poll, KPIData, RegularPoll } from '@/types'
 
 const defaultKPI: KPIData = {
   totalThisMonth: 0,
@@ -26,15 +26,18 @@ function SkeletonCard({ className = '' }: { className?: string }) {
 export default function DashboardPage() {
   const [kpi, setKpi] = useState<KPIData>(defaultKPI)
   const [polls, setPolls] = useState<Poll[]>([])
+  const [regularPolls, setRegularPolls] = useState<RegularPoll[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchData = () =>
     Promise.all([
       fetch('/api/kpi').then((r) => r.json()),
       fetch('/api/polls').then((r) => r.json()),
-    ]).then(([kpiData, pollsData]: [KPIData, Poll[]]) => {
+      fetch('/api/regular-polls').then((r) => r.json()),
+    ]).then(([kpiData, pollsData, regularData]: [KPIData, Poll[], RegularPoll[]]) => {
       setKpi(kpiData)
       setPolls(pollsData)
+      setRegularPolls(regularData)
     }).catch(console.error)
 
   useEffect(() => {
@@ -44,6 +47,8 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const dueRegularPolls = regularPolls.filter(p => p.is_active && new Date(p.next_run_date) <= today)
   const recentPolls = polls.slice(0, 6)
   const overdueApprovals = polls.filter(
     (p) => p.status === 'AWAITING_APPROVAL' && isApprovalOverdue(p.updated_at)
@@ -81,6 +86,30 @@ export default function DashboardPage() {
     <div className="space-y-5">
       {/* KPI row */}
       <KPICards data={kpi} />
+
+      {/* Due regular polls alert */}
+      {dueRegularPolls.length > 0 && (
+        <div className="rounded-2xl bg-amber-500/20 border border-amber-400/30 px-5 py-4 backdrop-blur-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <CalendarClock className="h-4 w-4 text-amber-300" />
+            <span className="font-semibold text-amber-100">
+              {dueRegularPolls.length} regular poll{dueRegularPolls.length > 1 ? 's' : ''} due for release
+            </span>
+            <Link href="/regular-polls" className="ml-auto text-xs text-amber-200 hover:text-white underline">
+              Go to Regular Polls →
+            </Link>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {dueRegularPolls.map(p => (
+              <Link key={p.id} href="/regular-polls"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/30 px-3 py-1.5 text-sm font-medium text-amber-100 transition-colors">
+                <CalendarClock className="h-3 w-3" /> {p.name}
+                <span className="text-amber-300/70 text-xs">({p.frequency})</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Main grid */}
       <div className="grid gap-4 lg:grid-cols-3">

@@ -9,12 +9,14 @@ import {
   Archive,
   Settings,
   CheckSquare,
+  CalendarClock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { href: '/polls', label: 'Polls', icon: ClipboardList },
+  { href: '/regular-polls', label: 'Regular Polls', icon: CalendarClock },
   { href: '/results', label: 'Results & Follow-up', icon: BarChart3 },
   { href: '/archived', label: 'Archived', icon: Archive },
   { href: '/settings', label: 'Settings', icon: Settings },

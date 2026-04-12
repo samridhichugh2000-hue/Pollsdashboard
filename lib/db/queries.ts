@@ -271,6 +271,61 @@ export async function consumeApprovalToken(token: string): Promise<void> {
   })
 }
 
+// ─── Regular Polls ────────────────────────────────────────────────────────────
+
+import type { RegularPoll } from '@/types'
+
+export async function getAllRegularPolls(): Promise<RegularPoll[]> {
+  const result = await getDb().execute('SELECT * FROM regular_polls ORDER BY next_run_date ASC')
+  return result.rows as unknown as RegularPoll[]
+}
+
+export async function getRegularPollById(id: string): Promise<RegularPoll | null> {
+  const result = await getDb().execute({ sql: 'SELECT * FROM regular_polls WHERE id = ?', args: [id] })
+  return (result.rows[0] as unknown as RegularPoll) ?? null
+}
+
+export async function getDueRegularPolls(): Promise<RegularPoll[]> {
+  const today = new Date().toISOString().split('T')[0]
+  const result = await getDb().execute({
+    sql: "SELECT * FROM regular_polls WHERE is_active = 1 AND next_run_date <= ? ORDER BY next_run_date ASC",
+    args: [today],
+  })
+  return result.rows as unknown as RegularPoll[]
+}
+
+export async function createRegularPoll(fields: Omit<RegularPoll, 'id' | 'created_at' | 'updated_at'>): Promise<RegularPoll> {
+  const id = uuidv4()
+  const now = new Date().toISOString()
+  await getDb().execute({
+    sql: `INSERT INTO regular_polls (id, name, description, frequency, scheduled_day, department, subject, draft_email_body, questions, recipients, ms_form_link, next_run_date, last_run_date, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      id, fields.name, fields.description ?? null, fields.frequency, fields.scheduled_day,
+      fields.department, fields.subject, fields.draft_email_body, fields.questions,
+      fields.recipients, fields.ms_form_link ?? null, fields.next_run_date,
+      fields.last_run_date ?? null, fields.is_active ? 1 : 0, now, now,
+    ],
+  })
+  return (await getRegularPollById(id))!
+}
+
+export async function updateRegularPoll(id: string, fields: Partial<Omit<RegularPoll, 'id' | 'created_at'>>): Promise<void> {
+  const now = new Date().toISOString()
+  const allowed = ['name', 'description', 'frequency', 'scheduled_day', 'department', 'subject',
+    'draft_email_body', 'questions', 'recipients', 'ms_form_link', 'next_run_date', 'last_run_date', 'is_active']
+  const setClauses: string[] = ['updated_at = ?']
+  const args: (string | number | null)[] = [now]
+  for (const [key, value] of Object.entries(fields)) {
+    if (allowed.includes(key)) {
+      setClauses.push(`${key} = ?`)
+      args.push(value as string | number | null)
+    }
+  }
+  args.push(id)
+  await getDb().execute({ sql: `UPDATE regular_polls SET ${setClauses.join(', ')} WHERE id = ?`, args })
+}
+
 // ─── Email dedup ──────────────────────────────────────────────────────────────
 
 export async function pollEmailAlreadyProcessed(emailThreadId: string): Promise<boolean> {

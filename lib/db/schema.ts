@@ -3,6 +3,30 @@ import { getDb } from './client'
 export async function runMigrations() {
   const db = getDb()
 
+  // Regular poll templates (recurring polls with pre-approved drafts)
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS regular_polls (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        frequency TEXT NOT NULL DEFAULT 'monthly',
+        scheduled_day INTEGER NOT NULL DEFAULT 1,
+        department TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        draft_email_body TEXT NOT NULL,
+        questions TEXT NOT NULL,
+        recipients TEXT NOT NULL,
+        ms_form_link TEXT,
+        next_run_date DATE NOT NULL,
+        last_run_date DATE,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+
   // Add subject column if not exists (safe to run multiple times)
   try {
     await db.execute(`ALTER TABLE polls ADD COLUMN subject TEXT`)
