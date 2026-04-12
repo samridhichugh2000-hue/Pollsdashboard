@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Loader2, CheckCircle2, ClipboardList, ChevronDown, Users } from 'lucide-react'
+import { Plus, Trash2, Loader2, CheckCircle2, ClipboardList, ChevronDown } from 'lucide-react'
+import { RecipientPicker } from '@/components/polls/recipient-picker'
 
 interface HuntGroup { id: string; name: string; email: string }
 interface Sender { id: string; name: string; email: string }
@@ -22,10 +23,7 @@ export default function PublicRequestPage() {
   const [error, setError] = useState('')
   const [questions, setQuestions] = useState<string[]>([])
   const [showTimeline, setShowTimeline] = useState(false)
-
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
-  const [showOther, setShowOther] = useState(false)
-  const [customDepartment, setCustomDepartment] = useState('')
+  const [audienceEmails, setAudienceEmails] = useState<string[]>([])
 
   const [form, setForm] = useState({
     requester_name: '',
@@ -56,16 +54,13 @@ export default function PublicRequestPage() {
     setError('')
 
     const email = form.requester_email === '__other__' ? form.custom_email : form.requester_email
-
-    const selectedGroupNames = huntGroups
-      .filter(g => selectedGroupIds.includes(g.id))
-      .map(g => g.name)
-    const department = selectedGroupNames.length > 0
-      ? selectedGroupNames.join(', ') + (showOther && customDepartment.trim() ? `, ${customDepartment.trim()}` : '')
-      : customDepartment.trim()
-
     if (!email) { setError('Please select or enter your email.'); return }
-    if (!department) { setError('Please select at least one target audience.'); return }
+    if (!audienceEmails.length) { setError('Please select at least one target audience.'); return }
+
+    // Derive a human-readable department label from selected emails
+    const groupByEmail = new Map(huntGroups.map(g => [g.email.toLowerCase(), g.name]))
+    const labels = audienceEmails.map(e => groupByEmail.get(e.toLowerCase()) ?? e)
+    const department = labels.join(', ')
 
     setLoading(true)
     try {
@@ -91,6 +86,13 @@ export default function PublicRequestPage() {
     }
   }
 
+  const resetForm = () => {
+    setSubmitted(false)
+    setForm({ requester_name: '', requester_email: '', custom_email: '', topic: '', context: '' })
+    setAudienceEmails([])
+    setQuestions([])
+  }
+
   if (submitted) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4"
@@ -103,7 +105,6 @@ export default function PublicRequestPage() {
           <p className="mt-3 text-sm text-gray-500 leading-relaxed">
             Your poll request has been received by the HR team at Koenig Solutions. You will be contacted for approval before the poll goes live.
           </p>
-          {/* Mini timeline */}
           <div className="mt-6 rounded-xl bg-gray-50 px-4 py-4 text-left">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">What happens next</p>
             <ol className="space-y-2">
@@ -115,10 +116,8 @@ export default function PublicRequestPage() {
               ))}
             </ol>
           </div>
-          <button
-            onClick={() => { setSubmitted(false); setForm({ requester_name: '', requester_email: '', custom_email: '', topic: '', context: '' }); setSelectedGroupIds([]); setShowOther(false); setCustomDepartment(''); setQuestions([]) }}
-            className="mt-6 w-full rounded-xl bg-cyan-600 py-2.5 text-sm font-semibold text-white hover:bg-cyan-700 transition-colors"
-          >
+          <button onClick={resetForm}
+            className="mt-6 w-full rounded-xl bg-cyan-600 py-2.5 text-sm font-semibold text-white hover:bg-cyan-700 transition-colors">
             Submit Another Request
           </button>
         </div>
@@ -141,11 +140,8 @@ export default function PublicRequestPage() {
         </div>
 
         {/* Collapsible Timeline */}
-        <button
-          type="button"
-          onClick={() => setShowTimeline(p => !p)}
-          className="mb-4 flex w-full items-center justify-between rounded-2xl bg-white/10 px-5 py-3 text-left backdrop-blur-sm hover:bg-white/15 transition-colors"
-        >
+        <button type="button" onClick={() => setShowTimeline(p => !p)}
+          className="mb-4 flex w-full items-center justify-between rounded-2xl bg-white/10 px-5 py-3 text-left backdrop-blur-sm hover:bg-white/15 transition-colors">
           <span className="text-sm font-semibold text-white">How does this work?</span>
           <ChevronDown className={`h-4 w-4 text-white/70 transition-transform ${showTimeline ? 'rotate-180' : ''}`} />
         </button>
@@ -185,7 +181,7 @@ export default function PublicRequestPage() {
                 className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition" />
             </div>
 
-            {/* Email — dropdown from senders */}
+            {/* Email */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">Your Email *</label>
               <select value={form.requester_email} onChange={e => set('requester_email', e.target.value)} required
@@ -211,69 +207,14 @@ export default function PublicRequestPage() {
                 className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition" />
             </div>
 
-            {/* Target Audience — multi-select */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Target Audience * <span className="normal-case font-normal text-gray-400">(select one or more)</span>
-              </label>
-
-              {huntGroups.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {huntGroups.map(g => {
-                    const selected = selectedGroupIds.includes(g.id)
-                    return (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => setSelectedGroupIds(prev =>
-                          prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id]
-                        )}
-                        className={`inline-flex items-center gap-1.5 rounded-xl border-2 px-4 py-2 text-sm font-medium transition-all ${
-                          selected
-                            ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
-                            : 'border-gray-200 bg-white text-gray-600 hover:border-cyan-300 hover:bg-cyan-50/50'
-                        }`}
-                      >
-                        <Users className={`h-3.5 w-3.5 ${selected ? 'text-cyan-500' : 'text-gray-400'}`} />
-                        {g.name}
-                        {selected && <span className="ml-0.5 text-cyan-500 font-bold">✓</span>}
-                      </button>
-                    )
-                  })}
-                  <button
-                    type="button"
-                    onClick={() => setShowOther(p => !p)}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border-2 px-4 py-2 text-sm font-medium transition-all ${
-                      showOther
-                        ? 'border-gray-400 bg-gray-50 text-gray-700'
-                        : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
-                    }`}
-                  >
-                    + Other
-                  </button>
-                </div>
-              ) : (
-                <p className="text-xs text-gray-400">Loading groups...</p>
-              )}
-
-              {(showOther || selectedGroupIds.length === 0) && (
-                <input
-                  type="text"
-                  placeholder={selectedGroupIds.length > 0 ? 'Specify additional audience (optional)' : 'Describe your target audience'}
-                  value={customDepartment}
-                  onChange={e => setCustomDepartment(e.target.value)}
-                  required={selectedGroupIds.length === 0}
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition"
-                />
-              )}
-
-              {selectedGroupIds.length > 0 && (
-                <p className="text-xs text-gray-400">
-                  Selected: <span className="font-medium text-gray-600">
-                    {huntGroups.filter(g => selectedGroupIds.includes(g.id)).map(g => g.name).join(', ')}
-                  </span>
-                </p>
-              )}
+            {/* Target Audience — RecipientPicker */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">Target Audience *</label>
+              <RecipientPicker
+                key="request-audience"
+                value={audienceEmails}
+                onChange={setAudienceEmails}
+              />
             </div>
 
             {/* Questions */}
