@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ExternalLink, Eye, XCircle } from 'lucide-react'
+import { ExternalLink, Eye, XCircle, Trash2 } from 'lucide-react'
 import { StatusBadge } from './status-badge'
 import { Button } from '@/components/ui/button'
 import { formatDateTime, formatRelative, isApprovalOverdue } from '@/lib/utils'
@@ -11,10 +11,12 @@ import type { Poll } from '@/types'
 interface PollsTableProps {
   polls: Poll[]
   onMarkClosed?: (pollId: string) => void
+  onArchive?: (pollId: string) => void
 }
 
-export function PollsTable({ polls, onMarkClosed }: PollsTableProps) {
+export function PollsTable({ polls, onMarkClosed, onArchive }: PollsTableProps) {
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
+  const [confirmArchive, setConfirmArchive] = useState<string | null>(null)
 
   if (polls.length === 0) {
     return (
@@ -91,6 +93,25 @@ export function PollsTable({ polls, onMarkClosed }: PollsTableProps) {
                         <Button variant="ghost" size="icon" className="h-7 w-7"
                           onClick={() => setConfirmClose(poll.id)}>
                           <XCircle className="h-3.5 w-3.5 text-rose-400" />
+                        </Button>
+                      )
+                    )}
+                    {onArchive && poll.status !== 'ARCHIVED' && (
+                      confirmArchive === poll.id ? (
+                        <div className="flex items-center gap-1">
+                          <Button variant="destructive" size="sm" className="h-6 text-xs"
+                            onClick={() => { onArchive(poll.id); setConfirmArchive(null) }}>
+                            Archive
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-6 text-xs"
+                            onClick={() => setConfirmArchive(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button variant="ghost" size="icon" className="h-7 w-7"
+                          onClick={() => setConfirmArchive(poll.id)}>
+                          <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-rose-500" />
                         </Button>
                       )
                     )}

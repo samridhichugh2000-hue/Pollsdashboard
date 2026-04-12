@@ -144,9 +144,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'ARCHIVE': {
-        if (!['CLOSED', 'RESULTS_UPLOADED'].includes(poll.status)) {
-          return NextResponse.json({ error: 'Poll must be CLOSED before archiving.' }, { status: 400 })
-        }
         await updatePollStatus(id, 'ARCHIVED')
         await createAuditLog(id, 'POLL_ARCHIVED', userEmail)
         break

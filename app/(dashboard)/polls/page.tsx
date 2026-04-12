@@ -36,6 +36,21 @@ export default function PollsPage() {
     void fetchPolls()
   }
 
+  const handleArchive = async (pollId: string) => {
+    const res = await fetch(`/api/polls/${pollId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'ARCHIVE' }),
+    })
+    if (res.ok) {
+      toast.success('Poll archived')
+    } else {
+      const data = await res.json() as { error?: string }
+      toast.error(data.error ?? 'Failed to archive poll')
+    }
+    void fetchPolls()
+  }
+
   const filterByTab = (tab: string): Poll[] => {
     switch (tab) {
       case 'inbox':    return polls.filter(p => p.source === 'email')
@@ -43,7 +58,8 @@ export default function PollsPage() {
       case 'external': return polls.filter(p => p.source === 'external')
       case 'pending':  return polls.filter(p => p.status === 'AWAITING_APPROVAL')
       case 'active':   return polls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
-      default:         return polls
+      case 'archived': return polls.filter(p => p.status === 'ARCHIVED')
+      default:         return polls.filter(p => p.status !== 'ARCHIVED')
     }
   }
 
@@ -96,7 +112,7 @@ export default function PollsPage() {
           <Tabs defaultValue="all">
             <div className="border-b border-gray-100 px-5 pt-4">
               <TabsList className="bg-gray-100 mb-0 flex-wrap h-auto gap-1">
-                <TabsTrigger value="all">All ({polls.length})</TabsTrigger>
+                <TabsTrigger value="all">All ({filterByTab('all').length})</TabsTrigger>
                 <TabsTrigger value="inbox">Inbox ({filterByTab('inbox').length})</TabsTrigger>
                 <TabsTrigger value="manual">Manual ({filterByTab('manual').length})</TabsTrigger>
                 <TabsTrigger value="external" className="relative">
@@ -109,13 +125,17 @@ export default function PollsPage() {
                 </TabsTrigger>
                 <TabsTrigger value="pending">Pending ({filterByTab('pending').length})</TabsTrigger>
                 <TabsTrigger value="active">Active ({filterByTab('active').length})</TabsTrigger>
+                <TabsTrigger value="archived">Archived ({filterByTab('archived').length})</TabsTrigger>
               </TabsList>
             </div>
             {(['all', 'inbox', 'manual', 'external', 'pending', 'active'] as const).map((tab) => (
               <TabsContent key={tab} value={tab} className="mt-0">
-                <PollsTable polls={filterByTab(tab)} onMarkClosed={handleMarkClosed} />
+                <PollsTable polls={filterByTab(tab)} onMarkClosed={handleMarkClosed} onArchive={handleArchive} />
               </TabsContent>
             ))}
+            <TabsContent value="archived" className="mt-0">
+              <PollsTable polls={filterByTab('archived')} />
+            </TabsContent>
           </Tabs>
         )}
       </div>
