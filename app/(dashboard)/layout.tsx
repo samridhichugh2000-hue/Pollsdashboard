@@ -4,7 +4,7 @@ import { Toaster } from 'sonner'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 40%, #1d4ed8 100%)' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: 'linear-gradient(135deg, #0e7490 0%, #0c6478 40%, #0a5568 100%)' }}>
       <Sidebar />
 
       <div className="flex flex-1 flex-col overflow-hidden">
