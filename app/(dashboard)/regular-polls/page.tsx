@@ -47,7 +47,7 @@ interface FormState {
 
 const emptyForm: FormState = {
   name: '', description: '', frequency: 'monthly', scheduled_day: '1',
-  department: '', subject: '', draft_email_body: '',
+  department: 'General', subject: '', draft_email_body: '',
   questions: [{ text: '', type: 'open_ended' }],
   recipients: [],
 }
@@ -116,7 +116,7 @@ export default function RegularPollsPage() {
   const openEdit = (t: RegularPoll) => { setEditingId(t.id); setForm(formFromTemplate(t)); setFormOpen(true) }
 
   const saveForm = async () => {
-    if (!form.name || !form.department || !form.subject || !form.draft_email_body || !form.questions.length || !form.recipients.length) {
+    if (!form.name || !form.subject || !form.draft_email_body || !form.questions.length || !form.recipients.length) {
       toast.error('Please fill in all required fields'); return
     }
     setSaving(true)
@@ -404,12 +404,6 @@ export default function RegularPollsPage() {
                   placeholder="1–28" value={form.scheduled_day}
                   onChange={e => setForm(f => ({ ...f, scheduled_day: e.target.value }))} />
                 <p className="mt-1 text-xs text-gray-400">Alert fires on this day each {form.frequency === 'monthly' ? 'month' : 'quarter'}</p>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-700">Department *</label>
-                <input className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  placeholder="HR, Sales, etc." value={form.department}
-                  onChange={e => setForm(f => ({ ...f, department: e.target.value }))} />
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-700">Description</label>
