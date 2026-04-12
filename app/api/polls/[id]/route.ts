@@ -267,7 +267,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         const emailHtml = buildResultsEmailHtml(poll.topic)
         await sendEmail({
-          from: process.env.POLLS_MAILBOX!,
+          from: process.env.PRIYA_EMAIL!,
           to: shareRecipients,
           subject: `Poll Results: ${poll.topic}`,
           htmlBody: emailHtml,

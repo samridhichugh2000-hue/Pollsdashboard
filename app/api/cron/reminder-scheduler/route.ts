@@ -43,7 +43,7 @@ export async function GET(req: Request) {
       })
 
       await sendEmail({
-        from: process.env.POLLS_MAILBOX!,
+        from: process.env.PRIYA_EMAIL!,
         to: releaseEmails,
         subject: `Reminder: ${poll.topic} — Poll Closing Soon`,
         htmlBody,

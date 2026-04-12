@@ -34,7 +34,7 @@ export async function GET(req: Request) {
       // Send results email to EA
       const htmlBody = buildResultsEmailHtml(poll.topic)
       await sendEmail({
-        from: process.env.POLLS_MAILBOX!,
+        from: process.env.PRIYA_EMAIL!,
         to: process.env.RESULTS_RECIPIENT_EMAIL ?? 'ea@koenig-solutions.com',
         subject: `Poll Results: ${poll.topic}`,
         htmlBody,
