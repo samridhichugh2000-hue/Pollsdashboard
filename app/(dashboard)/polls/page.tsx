@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, RefreshCw, Link2, Copy } from 'lucide-react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { Plus, RefreshCw, Copy, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,10 @@ export default function PollsPage() {
   const [polls, setPolls] = useState<Poll[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const searchQuery = searchParams.get('q')?.toLowerCase().trim() ?? ''
 
   const fetchPolls = useCallback(async () => {
     setLoading(true)
@@ -53,16 +58,29 @@ export default function PollsPage() {
 
   const active = (p: Poll) => p.status !== 'ARCHIVED'
 
+  // Apply search filter on top of all tab filters
+  const applySearch = (list: Poll[]): Poll[] => {
+    if (!searchQuery) return list
+    return list.filter(p =>
+      p.topic.toLowerCase().includes(searchQuery) ||
+      (p.department ?? '').toLowerCase().includes(searchQuery) ||
+      p.status.toLowerCase().includes(searchQuery) ||
+      (p.requested_by ?? '').toLowerCase().includes(searchQuery)
+    )
+  }
+
   const filterByTab = (tab: string): Poll[] => {
+    let base: Poll[]
     switch (tab) {
-      case 'inbox':    return polls.filter(p => active(p) && p.source === 'email')
-      case 'manual':   return polls.filter(p => active(p) && p.source === 'dashboard')
-      case 'external': return polls.filter(p => active(p) && p.source === 'external')
-      case 'pending':  return polls.filter(p => active(p) && p.status === 'AWAITING_APPROVAL')
-      case 'active':   return polls.filter(p => active(p) && ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
-      case 'archived': return polls.filter(p => p.status === 'ARCHIVED')
-      default:         return polls.filter(p => active(p))
+      case 'inbox':    base = polls.filter(p => active(p) && p.source === 'email'); break
+      case 'manual':   base = polls.filter(p => active(p) && p.source === 'dashboard'); break
+      case 'external': base = polls.filter(p => active(p) && p.source === 'external'); break
+      case 'pending':  base = polls.filter(p => active(p) && p.status === 'AWAITING_APPROVAL'); break
+      case 'active':   base = polls.filter(p => active(p) && ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)); break
+      case 'archived': base = polls.filter(p => p.status === 'ARCHIVED'); break
+      default:         base = polls.filter(p => active(p))
     }
+    return applySearch(base)
   }
 
   const copyRequestLink = () => {
@@ -71,15 +89,30 @@ export default function PollsPage() {
     toast.success('Request link copied to clipboard')
   }
 
+  const clearSearch = () => router.push('/polls')
+
   return (
     <div className="space-y-4">
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-white">Polls</h2>
-          <p className="text-sm text-white/50">{polls.length} total polls</p>
+          {searchQuery ? (
+            <p className="text-sm text-white/50">
+              Results for &quot;{searchQuery}&quot; — {filterByTab('all').length} found
+            </p>
+          ) : (
+            <p className="text-sm text-white/50">{polls.filter(p => active(p)).length} total polls</p>
+          )}
         </div>
         <div className="flex gap-2">
+          {searchQuery && (
+            <Button variant="outline" size="sm"
+              className="border-white/20 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+              onClick={clearSearch}>
+              <X className="mr-1.5 h-3.5 w-3.5" /> Clear Search
+            </Button>
+          )}
           <Button variant="outline" size="sm"
             className="border-white/20 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
             onClick={copyRequestLink}>
@@ -103,6 +136,16 @@ export default function PollsPage() {
           </Dialog>
         </div>
       </div>
+
+      {/* Search active banner */}
+      {searchQuery && (
+        <div className="flex items-center gap-2 rounded-xl bg-white/10 backdrop-blur-sm px-4 py-2.5 text-sm text-white/80">
+          Showing results across all tabs for &quot;{searchQuery}&quot;
+          <button onClick={clearSearch} className="ml-auto text-white/50 hover:text-white transition-colors">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* White card with tabs */}
       <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]">

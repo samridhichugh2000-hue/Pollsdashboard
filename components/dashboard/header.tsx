@@ -1,4 +1,8 @@
-import { Bell, User, Search } from 'lucide-react'
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import { User, Search } from 'lucide-react'
 
 interface HeaderProps {
   title: string
@@ -9,6 +13,15 @@ interface HeaderProps {
 export function Header({ title, userName, userRole }: HeaderProps) {
   const now = new Date()
   const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening'
+  const [query, setQuery] = useState('')
+  const router = useRouter()
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    const q = query.trim()
+    if (q) router.push(`/polls?q=${encodeURIComponent(q)}`)
+    else router.push('/polls')
+  }
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between px-6">
@@ -19,16 +32,16 @@ export function Header({ title, userName, userRole }: HeaderProps) {
 
       <div className="flex items-center gap-3">
         {/* Search */}
-        <div className="flex h-9 items-center gap-2 rounded-xl bg-white/10 px-3 backdrop-blur-sm">
-          <Search className="h-3.5 w-3.5 text-white/50" />
-          <span className="text-xs text-white/40 hidden sm:block">Search polls...</span>
-        </div>
-
-        {/* Bell */}
-        <button className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-colors">
-          <Bell className="h-4 w-4 text-white/70" />
-          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-rose-400" />
-        </button>
+        <form onSubmit={handleSearch} className="flex h-9 items-center gap-2 rounded-xl bg-white/10 px-3 backdrop-blur-sm focus-within:bg-white/20 transition-colors">
+          <Search className="h-3.5 w-3.5 text-white/50 flex-shrink-0" />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search polls..."
+            className="bg-transparent text-xs text-white placeholder-white/40 outline-none w-36 sm:w-48"
+          />
+        </form>
 
         {/* Avatar */}
         <div className="flex h-9 items-center gap-2 rounded-xl bg-white/10 px-3 backdrop-blur-sm">
