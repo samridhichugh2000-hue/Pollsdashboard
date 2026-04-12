@@ -28,18 +28,21 @@ export default function DashboardPage() {
   const [polls, setPolls] = useState<Poll[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const fetchData = () =>
     Promise.all([
       fetch('/api/kpi').then((r) => r.json()),
       fetch('/api/polls').then((r) => r.json()),
-    ])
-      .then(([kpiData, pollsData]: [KPIData, Poll[]]) => {
-        setKpi(kpiData)
-        setPolls(pollsData)
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [])
+    ]).then(([kpiData, pollsData]: [KPIData, Poll[]]) => {
+      setKpi(kpiData)
+      setPolls(pollsData)
+    }).catch(console.error)
+
+  useEffect(() => {
+    fetchData().finally(() => setLoading(false))
+    // Auto-refresh every 60s so email approvals and status changes appear without manual reload
+    const interval = setInterval(fetchData, 60_000)
+    return () => clearInterval(interval)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const recentPolls = polls.slice(0, 6)
   const overdueApprovals = polls.filter(

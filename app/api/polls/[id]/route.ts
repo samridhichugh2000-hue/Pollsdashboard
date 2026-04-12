@@ -76,14 +76,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           ? (body.recipients as string[])
           : [poll.requested_by]
 
-        for (const recipient of recipients) {
-          await sendEmail({
-            from: process.env.PRIYA_EMAIL!,
-            to: recipient,
-            subject: poll.subject ?? `Poll Approval Required: ${poll.topic}`,
-            htmlBody: approvalHtml,
-          })
-        }
+        await sendEmail({
+          from: process.env.PRIYA_EMAIL!,
+          to: recipients,
+          subject: poll.subject ?? `Poll Approval Required: ${poll.topic}`,
+          htmlBody: approvalHtml,
+        })
 
         await updatePollStatus(id, 'AWAITING_APPROVAL')
         await createAuditLog(id, 'SENT_FOR_APPROVAL', userEmail, { token: approvalToken })
@@ -116,14 +114,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           deadline: pollDeadline,
         })
 
-        for (const email of allEmails) {
-          await sendEmail({
-            from: process.env.PRIYA_EMAIL!,
-            to: email,
-            subject: poll.subject ?? `Poll: ${poll.topic}`,
-            htmlBody: pollHtml,
-          })
-        }
+        await sendEmail({
+          from: process.env.PRIYA_EMAIL!,
+          to: allEmails,
+          subject: poll.subject ?? `Poll: ${poll.topic}`,
+          htmlBody: pollHtml,
+        })
 
         await updatePollStatus(id, 'SENT', {
           sent_at: new Date().toISOString(),
@@ -270,15 +266,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const filename = `poll-responses-${poll.topic.slice(0, 30).replace(/\s+/g, '-').toLowerCase()}.xlsx`
 
         const emailHtml = buildResultsEmailHtml(poll.topic)
-        for (const recipient of shareRecipients) {
-          await sendEmail({
-            from: process.env.POLLS_MAILBOX!,
-            to: recipient,
-            subject: `Poll Results: ${poll.topic}`,
-            htmlBody: emailHtml,
-            attachments: [{ name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }],
-          })
-        }
+        await sendEmail({
+          from: process.env.POLLS_MAILBOX!,
+          to: shareRecipients,
+          subject: `Poll Results: ${poll.topic}`,
+          htmlBody: emailHtml,
+          attachments: [{ name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }],
+        })
 
         await updatePollStatus(id, 'RESULTS_UPLOADED', { results_uploaded_at: new Date().toISOString() })
         await createAuditLog(id, 'RESULTS_SHARED', userEmail, { recipients: shareRecipients })

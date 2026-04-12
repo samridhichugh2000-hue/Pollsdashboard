@@ -42,14 +42,12 @@ export async function GET(req: Request) {
         deadline,
       })
 
-      for (const email of releaseEmails) {
-        await sendEmail({
-          from: process.env.POLLS_MAILBOX!,
-          to: email,
-          subject: `Reminder: ${poll.topic} — Poll Closing Soon`,
-          htmlBody,
-        })
-      }
+      await sendEmail({
+        from: process.env.POLLS_MAILBOX!,
+        to: releaseEmails,
+        subject: `Reminder: ${poll.topic} — Poll Closing Soon`,
+        htmlBody,
+      })
 
       await updatePollStatus(poll.id, 'REMINDER_SENT', {
         reminder_sent_at: new Date().toISOString(),

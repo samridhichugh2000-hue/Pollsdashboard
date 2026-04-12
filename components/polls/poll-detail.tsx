@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download, RefreshCw, Plus, Trash2, Save, X } from 'lucide-react'
+import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download, RefreshCw, Plus, Trash2, Save, X, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -38,6 +38,10 @@ interface PollDetailProps {
   response: PollResponse | null
 }
 
+function parseEmails(text: string): string[] {
+  return text.split(/[\n,;]+/).map(e => e.trim()).filter(e => e.includes('@'))
+}
+
 export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: initialResponse }: PollDetailProps) {
   const [poll, setPoll] = useState(initialPoll)
   const [response, setResponse] = useState(initialResponse)
@@ -63,8 +67,9 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const [huntGroups, setHuntGroups] = useState<{ id: string; name: string; email: string }[]>([])
   const [selectedHuntGroupIds, setSelectedHuntGroupIds] = useState<string[]>([])
   const [huntGroupsLoading, setHuntGroupsLoading] = useState(false)
-  const [customReleaseEmails, setCustomReleaseEmails] = useState<string[]>([])
-  const [customReleaseInput, setCustomReleaseInput] = useState('')
+  const [customReleaseText, setCustomReleaseText] = useState('')
+  const [huntGroupDropdownOpen, setHuntGroupDropdownOpen] = useState(false)
+  const huntGroupDropdownRef = useRef<HTMLDivElement>(null)
 
   // Share results state
   const [showShareDialog, setShowShareDialog] = useState(false)
@@ -81,6 +86,31 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
       setEditQuestions(parseQuestions(poll.questions))
     }
   }, [poll])
+
+  // Close hunt group dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (huntGroupDropdownRef.current && !huntGroupDropdownRef.current.contains(e.target as Node)) {
+        setHuntGroupDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Auto-refresh every 30s while awaiting approval so email approvals reflect immediately
+  useEffect(() => {
+    if (poll.status !== 'AWAITING_APPROVAL') return
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/polls/${poll.id}`)
+        if (!res.ok) return
+        const data = await res.json() as { poll: Poll }
+        if (data.poll.status !== poll.status) setPoll(data.poll)
+      } catch { /* silent */ }
+    }, 30_000)
+    return () => clearInterval(interval)
+  }, [poll.id, poll.status])
 
   const hasChanges =
     editSubject !== (poll.subject || `Poll: ${poll.topic}`) ||
@@ -163,8 +193,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const openReleaseDialog = async () => {
     setShowReleaseDialog(true)
     setSelectedHuntGroupIds([])
-    setCustomReleaseEmails([])
-    setCustomReleaseInput('')
+    setCustomReleaseText('')
+    setHuntGroupDropdownOpen(false)
     setHuntGroupsLoading(true)
     try {
       const res = await fetch('/api/hunt-groups')
@@ -179,17 +209,11 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
 
   const releasePoll = async () => {
     const huntGroupSelected = huntGroups.filter(g => selectedHuntGroupIds.includes(g.id))
-    const allEmails = [...huntGroupSelected.map(g => g.email), ...customReleaseEmails]
+    const manualEmails = parseEmails(customReleaseText)
+    const allEmails = [...new Set([...huntGroupSelected.map(g => g.email), ...manualEmails])]
+    if (!allEmails.length) { toast.error('Add at least one recipient.'); return }
     setShowReleaseDialog(false)
     void runAction('RELEASE_POLL', { allEmails })
-  }
-
-  const addCustomReleaseEmail = () => {
-    const email = customReleaseInput.trim()
-    if (email && !customReleaseEmails.includes(email)) {
-      setCustomReleaseEmails(prev => [...prev, email])
-    }
-    setCustomReleaseInput('')
   }
 
   const addShareRecipient = () => {
@@ -693,55 +717,69 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
-            {huntGroupsLoading ? (
-              <div className="flex items-center justify-center py-6">
-                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-              </div>
-            ) : huntGroups.length === 0 ? (
-              <p className="text-sm text-gray-500 py-4 text-center">No hunt groups configured. Add them in Settings.</p>
-            ) : (
-              huntGroups.map((group) => (
-                <label key={group.id} className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50 transition-colors">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"
-                    checked={selectedHuntGroupIds.includes(group.id)}
-                    onChange={(e) => {
-                      setSelectedHuntGroupIds(prev =>
-                        e.target.checked ? [...prev, group.id] : prev.filter(id => id !== group.id)
-                      )
-                    }}
-                  />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{group.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{group.email}</p>
-                  </div>
-                </label>
-              ))
-            )}
-          </div>
+          {/* Hunt group dropdown */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Hunt Groups</Label>
+            <div className="relative" ref={huntGroupDropdownRef}>
+              <button
+                type="button"
+                onClick={() => !huntGroupsLoading && setHuntGroupDropdownOpen(o => !o)}
+                className="flex w-full items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
+                disabled={huntGroupsLoading}
+              >
+                <span className={selectedHuntGroupIds.length === 0 ? 'text-gray-400' : ''}>
+                  {huntGroupsLoading
+                    ? 'Loading...'
+                    : selectedHuntGroupIds.length === 0
+                      ? 'Select hunt groups...'
+                      : `${selectedHuntGroupIds.length} group${selectedHuntGroupIds.length > 1 ? 's' : ''} selected`}
+                </span>
+                {huntGroupsLoading
+                  ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                  : <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${huntGroupDropdownOpen ? 'rotate-180' : ''}`} />}
+              </button>
 
-          {/* Manual individual email addresses */}
-          <div className="space-y-2 pt-1">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add Individual Emails</p>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                value={customReleaseInput}
-                onChange={(e) => setCustomReleaseInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addCustomReleaseEmail() } }}
-                placeholder="name@koenig-solutions.com"
-                className="flex-1 rounded-md border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
-              />
-              <Button type="button" size="sm" variant="outline" onClick={addCustomReleaseEmail}>Add</Button>
+              {huntGroupDropdownOpen && huntGroups.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                  {huntGroups.length === 0 ? (
+                    <p className="px-3 py-3 text-sm text-gray-400 text-center">No hunt groups configured.</p>
+                  ) : (
+                    huntGroups.map((group) => (
+                      <label key={group.id} className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          checked={selectedHuntGroupIds.includes(group.id)}
+                          onChange={(e) => {
+                            setSelectedHuntGroupIds(prev =>
+                              e.target.checked ? [...prev, group.id] : prev.filter(id => id !== group.id)
+                            )
+                          }}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900">{group.name}</p>
+                          <p className="text-xs text-gray-400 truncate">{group.email}</p>
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {huntGroupDropdownOpen && huntGroups.length === 0 && !huntGroupsLoading && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-md border border-gray-200 bg-white shadow-lg px-3 py-3">
+                  <p className="text-sm text-gray-400 text-center">No hunt groups configured. Add them in Settings.</p>
+                </div>
+              )}
             </div>
-            {customReleaseEmails.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {customReleaseEmails.map((email) => (
-                  <span key={email} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs text-blue-700">
-                    {email}
-                    <button type="button" onClick={() => setCustomReleaseEmails(prev => prev.filter(e => e !== email))} className="hover:text-red-600 ml-0.5">
+
+            {/* Selected group chips */}
+            {selectedHuntGroupIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {huntGroups.filter(g => selectedHuntGroupIds.includes(g.id)).map(g => (
+                  <span key={g.id} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-700">
+                    {g.name}
+                    <button type="button" onClick={() => setSelectedHuntGroupIds(prev => prev.filter(id => id !== g.id))} className="hover:text-red-600 ml-0.5">
                       <X className="h-3 w-3" />
                     </button>
                   </span>
@@ -750,16 +788,35 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             )}
           </div>
 
+          {/* Manual individual email addresses */}
+          <div className="space-y-1.5 pt-1 border-t border-gray-100">
+            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Add individual emails
+            </Label>
+            <Textarea
+              value={customReleaseText}
+              onChange={(e) => setCustomReleaseText(e.target.value)}
+              placeholder={'john@koenig-solutions.com\njane@koenig-solutions.com\n\nOne per line, or comma-separated.'}
+              rows={3}
+              className="resize-none text-sm"
+            />
+            {customReleaseText.trim() && (
+              <p className="text-xs text-gray-400">
+                {parseEmails(customReleaseText).length} email(s) detected
+              </p>
+            )}
+          </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowReleaseDialog(false)}>
               Cancel
             </Button>
             {(() => {
-              const total = selectedHuntGroupIds.length + customReleaseEmails.length
+              const total = selectedHuntGroupIds.length + parseEmails(customReleaseText).length
               return (
-                <Button onClick={releasePoll} disabled={total === 0 || huntGroupsLoading}>
+                <Button onClick={releasePoll} disabled={huntGroupsLoading}>
                   <Send className="mr-1.5 h-3.5 w-3.5" />
-                  Release to {total > 0 ? `${total} recipient${total > 1 ? 's' : ''}` : 'recipients'}
+                  Release to {total > 0 ? `${total} recipient${total > 1 ? 's' : ''}` : 'selected recipients'}
                 </Button>
               )
             })()}
