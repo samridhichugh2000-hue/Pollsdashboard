@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { QuestionBuilder, parseQuestions } from '@/components/polls/question-builder'
 import type { Question } from '@/components/polls/question-builder'
+import { RecipientPicker } from '@/components/polls/recipient-picker'
 import type { RegularPoll } from '@/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -30,10 +31,6 @@ function computeNextRunDate(frequency: 'monthly' | 'quarterly', scheduledDay: nu
   return next.toISOString().split('T')[0]
 }
 
-function parseRecipients(text: string): string[] {
-  return text.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
-}
-
 // ─── Form state ───────────────────────────────────────────────────────────────
 
 interface FormState {
@@ -45,14 +42,14 @@ interface FormState {
   subject: string
   draft_email_body: string
   questions: Question[]
-  recipients: string
+  recipients: string[]
 }
 
 const emptyForm: FormState = {
   name: '', description: '', frequency: 'monthly', scheduled_day: '1',
   department: '', subject: '', draft_email_body: '',
   questions: [{ text: '', type: 'open_ended' }],
-  recipients: '',
+  recipients: [],
 }
 
 function formFromTemplate(t: RegularPoll): FormState {
@@ -65,7 +62,7 @@ function formFromTemplate(t: RegularPoll): FormState {
     subject: t.subject,
     draft_email_body: t.draft_email_body,
     questions: parseQuestions(t.questions),
-    recipients: (JSON.parse(t.recipients) as string[]).join('\n'),
+    recipients: JSON.parse(t.recipients) as string[],
   }
 }
 
@@ -119,7 +116,7 @@ export default function RegularPollsPage() {
   const openEdit = (t: RegularPoll) => { setEditingId(t.id); setForm(formFromTemplate(t)); setFormOpen(true) }
 
   const saveForm = async () => {
-    if (!form.name || !form.department || !form.subject || !form.draft_email_body || !form.questions.length || !form.recipients) {
+    if (!form.name || !form.department || !form.subject || !form.draft_email_body || !form.questions.length || !form.recipients.length) {
       toast.error('Please fill in all required fields'); return
     }
     setSaving(true)
@@ -128,7 +125,7 @@ export default function RegularPollsPage() {
         ...form,
         scheduled_day: Number(form.scheduled_day),
         questions: JSON.stringify(form.questions.filter(q => q.text.trim())),
-        recipients: JSON.stringify(parseRecipients(form.recipients)),
+        recipients: JSON.stringify(form.recipients),
         next_run_date: computeNextRunDate(form.frequency, Number(form.scheduled_day)),
       }
 
@@ -445,10 +442,12 @@ export default function RegularPollsPage() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-700">Recipients * <span className="font-normal text-gray-400">(one per line or comma-separated)</span></label>
-              <textarea rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-y font-mono"
-                placeholder="john@koenig-solutions.com&#10;jane@koenig-solutions.com" value={form.recipients}
-                onChange={e => setForm(f => ({ ...f, recipients: e.target.value }))} />
+              <label className="text-xs font-medium text-gray-700 mb-2 block">Recipients *</label>
+              <RecipientPicker
+                key={editingId ?? 'new-form'}
+                value={form.recipients}
+                onChange={emails => setForm(f => ({ ...f, recipients: emails }))}
+              />
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
