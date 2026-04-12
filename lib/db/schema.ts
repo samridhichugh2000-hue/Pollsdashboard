@@ -13,6 +13,11 @@ export async function runMigrations() {
     await db.execute(`ALTER TABLE polls ADD COLUMN release_emails TEXT`)
   } catch { /* already exists */ }
 
+  // Store the Graph message ID of the release email so results can be sent as a reply
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN release_message_id TEXT`)
+  } catch { /* already exists */ }
+
   // One-time approval tokens sent via email
   try {
     await db.execute(`

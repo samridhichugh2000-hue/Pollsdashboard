@@ -128,6 +128,62 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
   })
 }
 
+// Sends email via two-step (create draft → send) and returns the Graph message ID.
+// Use this when you need the message ID for later threading (e.g. reply with results).
+export async function sendEmailGetId(options: SendEmailOptions): Promise<string> {
+  const toRecipients = Array.isArray(options.to)
+    ? options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
+    : [{ emailAddress: { address: extractEmail(options.to) } }]
+
+  const messageBody: Record<string, unknown> = {
+    subject: options.subject,
+    body: { contentType: 'HTML', content: options.htmlBody },
+    toRecipients,
+  }
+  if (options.attachments?.length) {
+    messageBody.attachments = options.attachments.map((a) => ({
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: a.name,
+      contentType: a.contentType,
+      contentBytes: a.contentBytes,
+    }))
+  }
+
+  const created = await graphRequest<{ id: string }>(
+    `/users/${options.from}/messages`,
+    { method: 'POST', body: JSON.stringify(messageBody) }
+  )
+
+  await graphRequest(`/users/${options.from}/messages/${created.id}/send`, { method: 'POST' })
+
+  return created.id
+}
+
+// Sends an HTML reply on the same email thread as the original message.
+export async function replyToMessageWithHtml(
+  from: string,
+  messageId: string,
+  options: { htmlBody: string; to: string[]; attachments?: EmailAttachment[] }
+): Promise<void> {
+  const toRecipients = options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
+  const message: Record<string, unknown> = {
+    body: { contentType: 'HTML', content: options.htmlBody },
+    toRecipients,
+  }
+  if (options.attachments?.length) {
+    message.attachments = options.attachments.map((a) => ({
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: a.name,
+      contentType: a.contentType,
+      contentBytes: a.contentBytes,
+    }))
+  }
+  await graphRequest(`/users/${from}/messages/${messageId}/reply`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  })
+}
+
 export async function replyToEmail(
   userEmail: string,
   messageId: string,

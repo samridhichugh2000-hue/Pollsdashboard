@@ -11,7 +11,7 @@ import {
   getPollResponse,
   updateResponseActionable,
 } from '@/lib/db/queries'
-import { sendEmail } from '@/lib/graph'
+import { sendEmail, sendEmailGetId, replyToMessageWithHtml } from '@/lib/graph'
 import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, formatDate } from '@/lib/utils'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
@@ -114,7 +114,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           deadline: pollDeadline,
         })
 
-        await sendEmail({
+        const releaseMessageId = await sendEmailGetId({
           from: process.env.PRIYA_EMAIL!,
           to: allEmails,
           subject: poll.subject ?? `Poll: ${poll.topic}`,
@@ -124,6 +124,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await updatePollStatus(id, 'SENT', {
           sent_at: new Date().toISOString(),
           release_emails: JSON.stringify(allEmails),
+          release_message_id: releaseMessageId,
         })
         await createAuditLog(id, 'POLL_RELEASED', userEmail, { emails: allEmails })
         break
@@ -266,13 +267,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const filename = `poll-responses-${poll.topic.slice(0, 30).replace(/\s+/g, '-').toLowerCase()}.xlsx`
 
         const emailHtml = buildResultsEmailHtml(poll.topic)
-        await sendEmail({
-          from: process.env.PRIYA_EMAIL!,
-          to: shareRecipients,
-          subject: `Poll Results: ${poll.topic}`,
-          htmlBody: emailHtml,
-          attachments: [{ name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }],
-        })
+        const attachment = { name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }
+
+        if (poll.release_message_id) {
+          // Reply on the same thread as the original release email
+          await replyToMessageWithHtml(process.env.PRIYA_EMAIL!, poll.release_message_id, {
+            htmlBody: emailHtml,
+            to: shareRecipients,
+            attachments: [attachment],
+          })
+        } else {
+          // Fallback: fresh email if no release message ID stored
+          await sendEmail({
+            from: process.env.PRIYA_EMAIL!,
+            to: shareRecipients,
+            subject: `Poll Results: ${poll.topic}`,
+            htmlBody: emailHtml,
+            attachments: [attachment],
+          })
+        }
 
         await updatePollStatus(id, 'RESULTS_UPLOADED', { results_uploaded_at: new Date().toISOString() })
         await createAuditLog(id, 'RESULTS_SHARED', userEmail, { recipients: shareRecipients })

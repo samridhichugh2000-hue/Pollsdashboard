@@ -39,6 +39,7 @@ export interface Poll {
   rms_task_id?: string | null
   rms_news_id?: string | null
   release_emails?: string | null // JSON array of email strings
+  release_message_id?: string | null // Graph message ID of the release email
   status: PollStatus
   sent_at?: string | null
   reminder_at?: string | null
