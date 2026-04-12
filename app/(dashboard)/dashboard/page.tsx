@@ -33,7 +33,7 @@ export default function DashboardPage() {
     Promise.all([
       fetch('/api/kpi').then((r) => r.json()),
       fetch('/api/polls').then((r) => r.json()),
-      fetch('/api/regular-polls').then((r) => r.json()),
+      fetch('/api/regular-polls').then((r) => r.ok ? r.json() : []),
     ]).then(([kpiData, pollsData, regularData]: [KPIData, Poll[], RegularPoll[]]) => {
       setKpi(kpiData)
       setPolls(pollsData)
