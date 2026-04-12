@@ -272,6 +272,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (poll.release_message_id) {
           // Reply on the same thread as the original release email
           await replyToMessageWithHtml(process.env.PRIYA_EMAIL!, poll.release_message_id, {
+            subject: `Re: Poll Results: ${poll.topic}`,
             htmlBody: emailHtml,
             to: shareRecipients,
             attachments: [attachment],

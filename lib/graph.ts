@@ -128,8 +128,9 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
   })
 }
 
-// Sends email via two-step (create draft → send) and returns the Graph message ID.
-// Use this when you need the message ID for later threading (e.g. reply with results).
+// Sends email via two-step (create draft → send) and returns the stable internetMessageId.
+// The Graph message `id` changes when it moves from Drafts → Sent Items, but
+// `internetMessageId` (RFC 2822 Message-ID header) is stable and safe to store for threading.
 export async function sendEmailGetId(options: SendEmailOptions): Promise<string> {
   const toRecipients = Array.isArray(options.to)
     ? options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
@@ -149,39 +150,52 @@ export async function sendEmailGetId(options: SendEmailOptions): Promise<string>
     }))
   }
 
-  const created = await graphRequest<{ id: string }>(
+  // Create draft — response includes stable internetMessageId
+  const created = await graphRequest<{ id: string; internetMessageId: string }>(
     `/users/${options.from}/messages`,
     { method: 'POST', body: JSON.stringify(messageBody) }
   )
 
+  // Send the draft
   await graphRequest(`/users/${options.from}/messages/${created.id}/send`, { method: 'POST' })
 
-  return created.id
+  // Return the RFC Message-ID (e.g. <abc@...>) — persists after Drafts → Sent move
+  return created.internetMessageId
 }
 
-// Sends an HTML reply on the same email thread as the original message.
+// Sends an HTML email threaded onto the same conversation as the original release email.
+// Uses In-Reply-To / References headers (RFC 2822) — no dependency on Graph message IDs.
 export async function replyToMessageWithHtml(
   from: string,
-  messageId: string,
-  options: { htmlBody: string; to: string[]; attachments?: EmailAttachment[] }
+  internetMessageId: string, // the RFC Message-ID stored from sendEmailGetId
+  options: { subject: string; htmlBody: string; to: string[]; attachments?: EmailAttachment[] }
 ): Promise<void> {
   const toRecipients = options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
-  const message: Record<string, unknown> = {
+
+  const messageBody: Record<string, unknown> = {
+    subject: options.subject,
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
+    // Standard RFC 2822 threading headers — Outlook threads by these
+    internetMessageHeaders: [
+      { name: 'In-Reply-To', value: internetMessageId },
+      { name: 'References', value: internetMessageId },
+    ],
   }
   if (options.attachments?.length) {
-    message.attachments = options.attachments.map((a) => ({
+    messageBody.attachments = options.attachments.map((a) => ({
       '@odata.type': '#microsoft.graph.fileAttachment',
       name: a.name,
       contentType: a.contentType,
       contentBytes: a.contentBytes,
     }))
   }
-  await graphRequest(`/users/${from}/messages/${messageId}/reply`, {
-    method: 'POST',
-    body: JSON.stringify({ message }),
-  })
+
+  const created = await graphRequest<{ id: string }>(
+    `/users/${from}/messages`,
+    { method: 'POST', body: JSON.stringify(messageBody) }
+  )
+  await graphRequest(`/users/${from}/messages/${created.id}/send`, { method: 'POST' })
 }
 
 export async function replyToEmail(
