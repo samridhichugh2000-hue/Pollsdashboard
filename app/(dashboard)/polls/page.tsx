@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Plus, RefreshCw, Copy, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,7 +11,7 @@ import { PollsTable } from '@/components/polls/polls-table'
 import { PollForm } from '@/components/polls/poll-form'
 import type { Poll } from '@/types'
 
-export default function PollsPage() {
+function PollsContent() {
   const [polls, setPolls] = useState<Poll[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -185,5 +185,17 @@ export default function PollsPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function PollsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-20">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+      </div>
+    }>
+      <PollsContent />
+    </Suspense>
   )
 }
