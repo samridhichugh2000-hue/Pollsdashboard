@@ -128,7 +128,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
   })
 }
 
-// Sends email via two-step (create draft → send) and returns the stable internetMessageId.
+// Sends email via two-step (create draft → send) and returns the stable RFC internetMessageId.
 // The Graph message `id` changes when it moves from Drafts → Sent Items, but
 // `internetMessageId` (RFC 2822 Message-ID header) is stable and safe to store for threading.
 export async function sendEmailGetId(options: SendEmailOptions): Promise<string> {
@@ -150,7 +150,7 @@ export async function sendEmailGetId(options: SendEmailOptions): Promise<string>
     }))
   }
 
-  // Create draft — response includes stable internetMessageId
+  // Create draft — response includes the stable RFC internetMessageId
   const created = await graphRequest<{ id: string; internetMessageId: string }>(
     `/users/${options.from}/messages`,
     { method: 'POST', body: JSON.stringify(messageBody) }
@@ -159,31 +159,36 @@ export async function sendEmailGetId(options: SendEmailOptions): Promise<string>
   // Send the draft
   await graphRequest(`/users/${options.from}/messages/${created.id}/send`, { method: 'POST' })
 
-  // Return the RFC Message-ID (e.g. <abc@...>) — persists after Drafts → Sent move
+  // Return the RFC Message-ID — stable even after the message moves Drafts → Sent Items
   return created.internetMessageId
 }
 
-// Sends an HTML email threaded onto the same conversation as the original release email.
-// Uses In-Reply-To / References headers (RFC 2822) — no dependency on Graph message IDs.
+// Replies on the same thread as the original release email.
+// Looks up the sent message in Sent Items by its RFC internetMessageId, then uses
+// the Graph /reply endpoint (which handles threading natively).
 export async function replyToMessageWithHtml(
   from: string,
-  internetMessageId: string, // the RFC Message-ID stored from sendEmailGetId
+  internetMessageId: string, // RFC Message-ID stored from sendEmailGetId
   options: { subject: string; htmlBody: string; to: string[]; attachments?: EmailAttachment[] }
 ): Promise<void> {
-  const toRecipients = options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
+  // Find the message's current Graph ID in Sent Items using the stable RFC header
+  const filter = `internetMessageId eq '${internetMessageId.replace(/'/g, "''")}'`
+  const search = await graphRequest<{ value: Array<{ id: string }> }>(
+    `/users/${from}/mailFolders/SentItems/messages?$filter=${encodeURIComponent(filter)}&$select=id&$top=1`
+  )
 
-  const messageBody: Record<string, unknown> = {
-    subject: options.subject,
+  const sentMessageId = search.value?.[0]?.id
+  if (!sentMessageId) {
+    throw new Error(`Could not find release email in Sent Items (internetMessageId: ${internetMessageId})`)
+  }
+
+  const toRecipients = options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
+  const message: Record<string, unknown> = {
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
-    // Standard RFC 2822 threading headers — Outlook threads by these
-    internetMessageHeaders: [
-      { name: 'In-Reply-To', value: internetMessageId },
-      { name: 'References', value: internetMessageId },
-    ],
   }
   if (options.attachments?.length) {
-    messageBody.attachments = options.attachments.map((a) => ({
+    message.attachments = options.attachments.map((a) => ({
       '@odata.type': '#microsoft.graph.fileAttachment',
       name: a.name,
       contentType: a.contentType,
@@ -191,11 +196,10 @@ export async function replyToMessageWithHtml(
     }))
   }
 
-  const created = await graphRequest<{ id: string }>(
-    `/users/${from}/messages`,
-    { method: 'POST', body: JSON.stringify(messageBody) }
-  )
-  await graphRequest(`/users/${from}/messages/${created.id}/send`, { method: 'POST' })
+  await graphRequest(`/users/${from}/messages/${sentMessageId}/reply`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  })
 }
 
 export async function replyToEmail(
