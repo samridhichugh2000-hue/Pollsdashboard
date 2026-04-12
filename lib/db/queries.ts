@@ -129,12 +129,12 @@ export async function getKPIData() {
   const db = getDb()
 
   const [totalRes, approvalRes, activeRes, closedRes, rmsRes, resultsRes] = await Promise.all([
-    db.execute({ sql: 'SELECT COUNT(*) as count FROM polls WHERE created_at >= ?', args: [iso] }),
+    db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE created_at >= ? AND status != 'ARCHIVED'", args: [iso] }),
     db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE status = 'AWAITING_APPROVAL'", args: [] }),
     db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE status IN ('SENT', 'REMINDER_SENT', 'RMS_PUBLISHED')", args: [] }),
-    db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE status IN ('CLOSED', 'RESULTS_UPLOADED', 'ARCHIVED') AND closed_at >= ?", args: [iso] }),
-    db.execute({ sql: 'SELECT COUNT(*) as total, SUM(CASE WHEN rms_task_id IS NOT NULL THEN 1 ELSE 0 END) as created FROM polls WHERE created_at >= ?', args: [iso] }),
-    db.execute({ sql: 'SELECT COUNT(*) as total, SUM(CASE WHEN results_uploaded_at IS NOT NULL THEN 1 ELSE 0 END) as uploaded FROM polls WHERE closed_at IS NOT NULL', args: [] }),
+    db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE status IN ('CLOSED', 'RESULTS_UPLOADED') AND closed_at >= ?", args: [iso] }),
+    db.execute({ sql: "SELECT COUNT(*) as total, SUM(CASE WHEN rms_task_id IS NOT NULL THEN 1 ELSE 0 END) as created FROM polls WHERE created_at >= ? AND status != 'ARCHIVED'", args: [iso] }),
+    db.execute({ sql: "SELECT COUNT(*) as total, SUM(CASE WHEN results_uploaded_at IS NOT NULL THEN 1 ELSE 0 END) as uploaded FROM polls WHERE closed_at IS NOT NULL AND status != 'ARCHIVED'", args: [] }),
   ])
 
   const total = Number(totalRes.rows[0]?.count ?? 0)
