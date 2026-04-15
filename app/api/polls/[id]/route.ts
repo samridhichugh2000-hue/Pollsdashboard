@@ -115,9 +115,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           deadline: pollDeadline,
         })
 
+        const pollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
         const releaseMessageId = await sendEmailGetId({
           from: process.env.PRIYA_EMAIL!,
-          to: allEmails,
+          to: pollsMailbox,
+          bcc: allEmails,
           subject: poll.subject ?? `Poll: ${poll.topic}`,
           htmlBody: pollHtml,
         })

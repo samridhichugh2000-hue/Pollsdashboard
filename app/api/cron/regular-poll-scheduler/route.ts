@@ -55,9 +55,11 @@ export async function GET(req: Request) {
         deadline: formatDate(deadline),
       })
 
+      const pollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
       const releaseMessageId = await sendEmailGetId({
         from: process.env.PRIYA_EMAIL!,
-        to: recipients,
+        to: pollsMailbox,
+        bcc: recipients,
         subject: template.subject,
         htmlBody: pollHtml,
       })

@@ -90,6 +90,7 @@ export interface EmailAttachment {
 export interface SendEmailOptions {
   from: string
   to: string | string[]
+  bcc?: string | string[]
   subject: string
   htmlBody: string
   replyToMessageId?: string
@@ -145,6 +146,10 @@ export async function sendEmailGetId(options: SendEmailOptions): Promise<string>
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
     from: { emailAddress: { address: pollsSender } },
+  }
+  if (options.bcc) {
+    const bccList = Array.isArray(options.bcc) ? options.bcc : [options.bcc]
+    messageBody.bccRecipients = bccList.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
   }
   if (options.attachments?.length) {
     messageBody.attachments = options.attachments.map((a) => ({
