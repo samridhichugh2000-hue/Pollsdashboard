@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Plus, Trash2, Loader2, CheckCircle2, ClipboardList, ChevronDown } from 'lucide-react'
-import { RecipientPicker } from '@/components/polls/recipient-picker'
+import { useEffect, useRef, useState } from 'react'
+import { Loader2, CheckCircle2, ClipboardList, ChevronDown, X, Plus } from 'lucide-react'
+import { QuestionBuilder, parseQuestions } from '@/components/polls/question-builder'
+import type { Question } from '@/components/polls/question-builder'
 
 interface HuntGroup { id: string; name: string; email: string }
 interface Sender { id: string; name: string; email: string }
@@ -15,15 +16,29 @@ const TIMELINE_STEPS = [
   { label: 'Results shared', desc: 'Responses collected and sent to you' },
 ]
 
+const ALLOWED_DOMAIN = 'koenig-solutions.com'
+
+function parseEmails(text: string): string[] {
+  return text.split(/[\s,;]+/).map(e => e.trim().toLowerCase()).filter(e => e.includes('@'))
+}
+
 export default function PublicRequestPage() {
   const [huntGroups, setHuntGroups] = useState<HuntGroup[]>([])
   const [senders, setSenders] = useState<Sender[]>([])
+  const [knownEmails, setKnownEmails] = useState<{ email: string; label: string }[]>([])
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [questions, setQuestions] = useState<string[]>([])
   const [showTimeline, setShowTimeline] = useState(false)
-  const [audienceEmails, setAudienceEmails] = useState<string[]>([])
+  const [questions, setQuestions] = useState<Question[]>(parseQuestions(''))
+
+  // Audience state
+  const [audienceGroupId, setAudienceGroupId] = useState('')   // '' | huntGroup.id | '__other__'
+  const [individualEmails, setIndividualEmails] = useState<string[]>([])
+  const [emailInput, setEmailInput] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const emailInputRef = useRef<HTMLInputElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
 
   const [form, setForm] = useState({
     requester_name: '',
@@ -35,32 +50,89 @@ export default function PublicRequestPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/hunt-groups').then(r => r.json()),
-      fetch('/api/senders').then(r => r.json()),
-    ]).then(([groups, snds]) => {
-      setHuntGroups(groups as HuntGroup[])
-      setSenders(snds as Sender[])
+      fetch('/api/hunt-groups').then(r => r.ok ? r.json() : []),
+      fetch('/api/senders').then(r => r.ok ? r.json() : []),
+    ]).then(([groups, snds]: [HuntGroup[], Sender[]]) => {
+      setHuntGroups(groups)
+      setSenders(snds)
+      const known = [
+        ...groups.map(g => ({ email: g.email, label: g.name })),
+        ...snds.map(s => ({ email: s.email, label: s.name })),
+      ]
+      const seen = new Set<string>()
+      setKnownEmails(known.filter(k => { const key = k.email.toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true }))
     }).catch(() => {})
+  }, [])
+
+  // Click-outside to close suggestions
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
+        emailInputRef.current && !emailInputRef.current.contains(e.target as Node)
+      ) setShowSuggestions(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
   }, [])
 
   const set = (field: string, value: string) => setForm(p => ({ ...p, [field]: value } as typeof p))
 
-  const addQuestion = () => { if (questions.length < 4) setQuestions(p => [...p, '']) }
-  const updateQuestion = (i: number, v: string) => setQuestions(p => p.map((q, idx) => idx === i ? v : q))
-  const removeQuestion = (i: number) => setQuestions(p => p.filter((_, idx) => idx !== i))
+  const addIndividualEmail = (email: string) => {
+    const trimmed = email.trim().toLowerCase()
+    if (!trimmed || !trimmed.includes('@')) return
+    if (!individualEmails.some(e => e === trimmed)) {
+      setIndividualEmails(prev => [...prev, trimmed])
+    }
+    setEmailInput('')
+    setShowSuggestions(false)
+  }
+
+  const removeIndividualEmail = (email: string) => {
+    setIndividualEmails(prev => prev.filter(e => e !== email))
+  }
+
+  const handleEmailKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      const suggestions = knownEmails.filter(k =>
+        k.email.toLowerCase().includes(emailInput.toLowerCase()) &&
+        !individualEmails.includes(k.email.toLowerCase())
+      )
+      if (suggestions.length > 0 && emailInput) addIndividualEmail(suggestions[0].email)
+      else addIndividualEmail(emailInput)
+    }
+    if (e.key === 'Backspace' && !emailInput && individualEmails.length > 0) {
+      setIndividualEmails(prev => prev.slice(0, -1))
+    }
+  }
+
+  // Derive final audience emails for submit
+  const getAudienceEmails = (): string[] => {
+    if (audienceGroupId === '__other__') return individualEmails
+    if (audienceGroupId) {
+      const g = huntGroups.find(g => g.id === audienceGroupId)
+      return g ? [g.email] : []
+    }
+    return []
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    const email = form.requester_email === '__other__' ? form.custom_email : form.requester_email
+    const email = form.requester_email === '__other__' ? form.custom_email.trim() : form.requester_email
     if (!email) { setError('Please select or enter your email.'); return }
-    if (!audienceEmails.length) { setError('Please select at least one target audience.'); return }
 
-    // Derive a human-readable department label from selected emails
+    const audienceEmails = getAudienceEmails()
+    if (!audienceEmails.length) { setError('Please select a target audience or add at least one email.'); return }
+
+    // Derive a human-readable department label
     const groupByEmail = new Map(huntGroups.map(g => [g.email.toLowerCase(), g.name]))
     const labels = audienceEmails.map(e => groupByEmail.get(e.toLowerCase()) ?? e)
     const department = labels.join(', ')
+
+    const questionTexts = questions.filter(q => q.text.trim()).map(q => q.text)
 
     setLoading(true)
     try {
@@ -72,7 +144,7 @@ export default function PublicRequestPage() {
           requester_email: email,
           topic: form.topic,
           department,
-          questions: questions.filter(q => q.trim()),
+          questions: questionTexts,
           context: form.context,
           single_response: true,
         }),
@@ -89,9 +161,18 @@ export default function PublicRequestPage() {
   const resetForm = () => {
     setSubmitted(false)
     setForm({ requester_name: '', requester_email: '', custom_email: '', topic: '', context: '' })
-    setAudienceEmails([])
-    setQuestions([])
+    setAudienceGroupId('')
+    setIndividualEmails([])
+    setEmailInput('')
+    setQuestions(parseQuestions(''))
   }
+
+  const emailSuggestions = emailInput.length >= 2
+    ? knownEmails.filter(k =>
+        k.email.toLowerCase().includes(emailInput.toLowerCase()) &&
+        !individualEmails.includes(k.email.toLowerCase())
+      ).slice(0, 5)
+    : []
 
   if (submitted) {
     return (
@@ -193,7 +274,7 @@ export default function PublicRequestPage() {
                 <option value="__other__">Other (enter manually)</option>
               </select>
               {form.requester_email === '__other__' && (
-                <input type="email" placeholder="your@email.com" value={form.custom_email}
+                <input type="email" placeholder={`your@${ALLOWED_DOMAIN}`} value={form.custom_email}
                   onChange={e => set('custom_email', e.target.value)} required
                   className="mt-2 w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition" />
               )}
@@ -207,45 +288,110 @@ export default function PublicRequestPage() {
                 className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition" />
             </div>
 
-            {/* Target Audience — RecipientPicker */}
+            {/* Target Audience */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">Target Audience *</label>
-              <RecipientPicker
-                key="request-audience"
-                value={audienceEmails}
-                onChange={setAudienceEmails}
-              />
+              <select
+                value={audienceGroupId}
+                onChange={e => { setAudienceGroupId(e.target.value); setIndividualEmails([]); setEmailInput('') }}
+                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition bg-white"
+              >
+                <option value="">Select target group...</option>
+                {huntGroups.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+                <option value="__other__">Other (add manually)</option>
+              </select>
+
+              {/* Individual email input — shown only when Other is selected */}
+              {audienceGroupId === '__other__' && (
+                <div className="mt-2 space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-gray-600">Add Individual Emails</span>
+                    <span className="text-xs text-gray-400">(type, autocomplete, or paste)</span>
+                  </div>
+
+                  {/* Added email chips */}
+                  {individualEmails.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {individualEmails.map(email => (
+                        <span key={email}
+                          className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700">
+                          {email}
+                          <button type="button" onClick={() => removeIndividualEmail(email)}
+                            className="text-gray-400 hover:text-rose-500 transition-colors">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Input with autocomplete */}
+                  <div className="relative">
+                    <input
+                      ref={emailInputRef}
+                      type="text"
+                      value={emailInput}
+                      onChange={e => { setEmailInput(e.target.value); setShowSuggestions(true) }}
+                      onFocus={() => setShowSuggestions(true)}
+                      onKeyDown={handleEmailKeyDown}
+                      placeholder={`name@${ALLOWED_DOMAIN} — Enter or comma to add`}
+                      className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition"
+                    />
+                    {showSuggestions && emailSuggestions.length > 0 && (
+                      <div ref={suggestionsRef}
+                        className="absolute z-30 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden">
+                        {emailSuggestions.map(s => (
+                          <button key={s.email} type="button"
+                            onMouseDown={e => { e.preventDefault(); addIndividualEmail(s.email) }}
+                            className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-cyan-50 transition-colors">
+                            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-cyan-100 text-xs font-bold text-cyan-700">
+                              {s.label[0]?.toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-800">{s.label}</p>
+                              <p className="text-xs text-gray-400">{s.email}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {individualEmails.length === 0 && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      No recipients added yet — type an email above and press Enter.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Questions */}
+            {/* Poll Questions */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">
                   Poll Questions <span className="normal-case font-normal text-gray-400">(optional, max 4)</span>
                 </label>
-                {questions.length < 4 && (
-                  <button type="button" onClick={addQuestion}
-                    className="flex items-center gap-1 text-xs font-medium text-cyan-600 hover:text-cyan-700">
-                    <Plus className="h-3.5 w-3.5" /> Add
-                  </button>
-                )}
               </div>
               {questions.length === 0 && (
                 <p className="rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-400">
                   Leave empty — HR will generate relevant questions automatically.
                 </p>
               )}
-              {questions.map((q, i) => (
-                <div key={i} className="flex gap-2">
-                  <input type="text" placeholder={`Question ${i + 1}`} value={q}
-                    onChange={e => updateQuestion(i, e.target.value)}
-                    className="flex-1 rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition" />
-                  <button type="button" onClick={() => removeQuestion(i)}
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-400 transition">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
+              <QuestionBuilder
+                questions={questions}
+                onChange={setQuestions}
+                maxQuestions={4}
+              />
+              {questions.length < 4 && (
+                <button type="button"
+                  onClick={() => setQuestions(prev => [...prev, { id: crypto.randomUUID(), type: 'open_ended', text: '', options: [] }])}
+                  className="flex items-center gap-1.5 text-xs font-medium text-cyan-600 hover:text-cyan-700 transition-colors mt-1">
+                  <Plus className="h-3.5 w-3.5" /> Add Question
+                </button>
+              )}
             </div>
 
             {/* Context */}
