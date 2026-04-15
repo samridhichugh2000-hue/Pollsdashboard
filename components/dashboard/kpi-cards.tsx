@@ -54,7 +54,7 @@ const cards = [
   {
     key: 'resultsUploadedPct' as keyof KPIData,
     label: 'Results',
-    sub: 'Upload rate',
+    sub: 'Share rate',
     icon: Upload,
     color: 'text-indigo-500',
     iconBg: 'bg-indigo-50',
