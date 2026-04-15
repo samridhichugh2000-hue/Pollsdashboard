@@ -102,6 +102,14 @@ function extractEmail(addr: string): string {
   return match ? match[1].trim() : addr.trim()
 }
 
+// Display sender address — overrides the "From" shown to recipients.
+// Priya's mailbox is still used for API routing; she must have Send As
+// permission on POLLS_MAILBOX for the override to work without an "on behalf of" note.
+function displayFrom(apiFrom: string): { emailAddress: { address: string } } {
+  const sender = process.env.POLLS_MAILBOX ?? apiFrom
+  return { emailAddress: { address: sender } }
+}
+
 export async function sendEmail(options: SendEmailOptions): Promise<void> {
   const toRecipients = Array.isArray(options.to)
     ? options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
@@ -111,6 +119,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     subject: options.subject,
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
+    from: displayFrom(options.from),
   }
 
   if (options.attachments?.length) {
@@ -140,6 +149,7 @@ export async function sendEmailGetId(options: SendEmailOptions): Promise<string>
     subject: options.subject,
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
+    from: displayFrom(options.from),
   }
   if (options.attachments?.length) {
     messageBody.attachments = options.attachments.map((a) => ({
@@ -186,6 +196,7 @@ export async function replyToMessageWithHtml(
   const message: Record<string, unknown> = {
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
+    from: displayFrom(from),
   }
   if (options.attachments?.length) {
     message.attachments = options.attachments.map((a) => ({
