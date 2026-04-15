@@ -67,10 +67,16 @@ export interface GraphMessage {
 }
 
 export async function getInboxMessages(userEmail: string, filter?: string): Promise<GraphMessage[]> {
-  const base = `/users/${userEmail}/mailFolders/Inbox/messages?$top=100&$orderby=receivedDateTime desc`
-  const url = filter ? `${base}&$filter=${encodeURIComponent(filter)}` : base
+  // Note: Graph API does not allow $orderby with $filter on messages without ConsistencyLevel headers.
+  // When a filter is provided we fetch without $orderby and sort in JS instead.
+  const url = filter
+    ? `/users/${userEmail}/mailFolders/Inbox/messages?$top=100&$filter=${encodeURIComponent(filter)}`
+    : `/users/${userEmail}/mailFolders/Inbox/messages?$top=100&$orderby=receivedDateTime desc`
   const data = await graphRequest<{ value: GraphMessage[] }>(url)
-  return data.value ?? []
+  const messages = data.value ?? []
+  // Sort newest first when $orderby is not applied
+  if (filter) messages.sort((a, b) => new Date(b.receivedDateTime).getTime() - new Date(a.receivedDateTime).getTime())
+  return messages
 }
 
 export async function getUnreadPollEmails(userEmail: string): Promise<GraphMessage[]> {

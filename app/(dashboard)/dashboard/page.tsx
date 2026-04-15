@@ -310,7 +310,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-cyan-600" />
-            <h2 className="font-semibold text-gray-900">Poll Requests in Inbox</h2>
+            <h2 className="font-semibold text-gray-900">Today's Inbox</h2>
             {inboxMessages.length > 0 && (
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cyan-100 text-xs font-bold text-cyan-700">
                 {inboxMessages.length}
@@ -331,7 +331,7 @@ export default function DashboardPage() {
             <Loader2 className="h-5 w-5 animate-spin text-cyan-500" />
           </div>
         ) : inboxMessages.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-gray-400">No poll-related emails found in Priya's inbox</p>
+          <p className="px-5 py-8 text-center text-sm text-gray-400">No emails received today</p>
         ) : (
           <div className="divide-y divide-gray-50">
             {inboxMessages.map((msg) => (

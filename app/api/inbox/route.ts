@@ -61,19 +61,18 @@ async function getAuthorizedEmails(): Promise<Set<string>> {
   return new Set(result.rows.map((r) => (r.email as string).toLowerCase()))
 }
 
-// GET — return today's poll-related emails from Priya's inbox (semantic search)
+// GET — return all of today's inbox emails (no AI filtering — Priya decides which to act on)
 export async function GET() {
   try {
     const priyaEmail = process.env.PRIYA_EMAIL!
 
-    // Build today's start in UTC for the OData filter
+    // Midnight UTC → include all emails received today
     const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
-    const dateFilter = `receivedDateTime ge ${todayStart.toISOString()}`
+    todayStart.setUTCHours(0, 0, 0, 0)
+    const dateFilter = `receivedDateTime ge ${todayStart.toISOString().replace('.000Z', 'Z')}`
 
     const messages = await getInboxMessages(priyaEmail, dateFilter)
-    const filtered = await filterPollRelatedEmails(messages)
-    return NextResponse.json(filtered)
+    return NextResponse.json(messages)
   } catch (err) {
     console.error('Inbox fetch error:', err)
     return NextResponse.json({ error: 'Failed to read inbox' }, { status: 500 })
