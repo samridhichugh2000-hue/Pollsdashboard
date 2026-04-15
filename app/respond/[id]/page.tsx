@@ -129,10 +129,6 @@ export default function RespondPage() {
       setSubmitError(`Only @${ALLOWED_DOMAIN} email addresses are allowed.`)
       return
     }
-    if (answers.some((a) => !a.answer.trim())) {
-      setSubmitError('Please answer all questions before submitting.')
-      return
-    }
 
     setSubmitting(true)
     try {

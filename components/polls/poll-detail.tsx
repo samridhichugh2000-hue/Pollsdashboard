@@ -530,11 +530,24 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   <Button
                     className="w-full"
                     size="sm"
+                    onClick={async () => {
+                      await runAction('APPROVE', { notes })
+                      openReleaseDialog()
+                    }}
+                    disabled={!!loading}
+                  >
+                    {loading === 'APPROVE' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                    <Send className="mr-1.5 h-3.5 w-3.5" /> Approve & Release
+                  </Button>
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    variant="outline"
                     onClick={() => runAction('APPROVE', { notes })}
                     disabled={!!loading}
                   >
                     {loading === 'APPROVE' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                    <CheckCircle className="mr-1.5 h-3.5 w-3.5" /> Approve
+                    <CheckCircle className="mr-1.5 h-3.5 w-3.5" /> Approve Only
                   </Button>
                   <Button
                     className="w-full"
@@ -570,6 +583,20 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                     disabled={!!loading}
                   >
                     Share Results via Email
+                  </Button>
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (confirm('Reopen this poll? Employees will be able to submit responses again.')) {
+                        void runAction('REOPEN')
+                      }
+                    }}
+                    disabled={!!loading}
+                  >
+                    {loading === 'REOPEN' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                    Reopen Poll
                   </Button>
                   <Button
                     className="w-full"

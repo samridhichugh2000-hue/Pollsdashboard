@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { HuntGroup } from '@/components/settings/hunt-groups-manager'
+import { RecipientPicker } from '@/components/polls/recipient-picker'
 
 interface Sender { id: string; name: string; email: string }
 
@@ -27,13 +27,10 @@ export function PollForm({ onSuccess }: PollFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [questions, setQuestions] = useState<string[]>([''])
-  const [huntGroups, setHuntGroups] = useState<HuntGroup[]>([])
   const [senders, setSenders] = useState<Sender[]>([])
+  const [recipientEmails, setRecipientEmails] = useState<string[]>([])
   const [form, setForm] = useState({
     topic: '',
-    recipient_type: '',
-    recipient_email: '',
-    recipient_label: '',
     requested_by: '',
     custom_requested_by: '',
     deadline: '',
@@ -41,26 +38,13 @@ export function PollForm({ onSuccess }: PollFormProps) {
   })
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/hunt-groups').then(r => r.json()),
-      fetch('/api/senders').then(r => r.json()),
-    ]).then(([groups, snds]) => {
-      setHuntGroups(groups as HuntGroup[])
+    fetch('/api/senders').then(r => r.ok ? r.json() : []).then(snds => {
       setSenders(snds as Sender[])
     }).catch(() => {})
   }, [])
 
   const set = (field: string, value: string) =>
     setForm(prev => ({ ...prev, [field]: value }))
-
-  const handleRecipientSelect = (value: string) => {
-    if (value === '__manual__') {
-      setForm(prev => ({ ...prev, recipient_type: '__manual__', recipient_email: '', recipient_label: '' }))
-    } else {
-      const g = huntGroups.find(g => g.id === value)
-      if (g) setForm(prev => ({ ...prev, recipient_type: value, recipient_email: g.email, recipient_label: g.name }))
-    }
-  }
 
   const addQuestion = () => { if (questions.length < 4) setQuestions(p => [...p, '']) }
   const removeQuestion = (i: number) => setQuestions(p => p.filter((_, idx) => idx !== i))
@@ -71,9 +55,8 @@ export function PollForm({ onSuccess }: PollFormProps) {
     setError('')
 
     const requestedBy = form.requested_by === '__custom__' ? form.custom_requested_by : form.requested_by
-    const department = form.recipient_type === '__manual__' ? form.recipient_email : form.recipient_label
 
-    if (!form.recipient_email) { setError('Please select a hunt group or enter a recipient email.'); return }
+    if (!recipientEmails.length) { setError('Please select at least one recipient.'); return }
 
     setLoading(true)
     try {
@@ -82,8 +65,8 @@ export function PollForm({ onSuccess }: PollFormProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: form.topic,
-          department,
-          recipient_email: form.recipient_email,
+          department: recipientEmails.join(', '),
+          recipient_email: recipientEmails.join(', '),
           requested_by: requestedBy,
           source: 'dashboard',
           questions: questions.filter(q => q.trim()),
@@ -141,22 +124,7 @@ export function PollForm({ onSuccess }: PollFormProps) {
         {/* Recipient */}
         <div className="space-y-1.5">
           <Label>Target Audience / Recipients *</Label>
-          <Select value={form.recipient_type} onValueChange={handleRecipientSelect} required>
-            <SelectTrigger><SelectValue placeholder="Select hunt group or enter manually" /></SelectTrigger>
-            <SelectContent>
-              {huntGroups.map(g => (
-                <SelectItem key={g.id} value={g.id}>{g.name} — {g.email}</SelectItem>
-              ))}
-              <SelectItem value="__manual__">Enter manually (no hunt group)</SelectItem>
-            </SelectContent>
-          </Select>
-          {form.recipient_type === '__manual__' && (
-            <Input type="email" placeholder="recipient@koenig-solutions.com"
-              value={form.recipient_email} onChange={e => set('recipient_email', e.target.value)} required className="mt-2" />
-          )}
-          {form.recipient_type && form.recipient_type !== '__manual__' && (
-            <p className="text-xs text-gray-500">Sending to: <span className="font-medium text-gray-700">{form.recipient_email}</span></p>
-          )}
+          <RecipientPicker value={recipientEmails} onChange={setRecipientEmails} />
         </div>
 
         {/* Requested By — select from authorized senders */}

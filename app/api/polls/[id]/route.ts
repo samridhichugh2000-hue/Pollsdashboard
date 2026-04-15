@@ -146,6 +146,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break
       }
 
+      case 'REOPEN': {
+        await updatePollStatus(id, 'SENT', { closed_at: null })
+        await createAuditLog(id, 'POLL_REOPENED', userEmail)
+        break
+      }
+
       case 'ARCHIVE': {
         await updatePollStatus(id, 'ARCHIVED')
         await createAuditLog(id, 'POLL_ARCHIVED', userEmail)
