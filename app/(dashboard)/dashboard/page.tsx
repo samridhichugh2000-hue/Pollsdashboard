@@ -2,13 +2,25 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { KPICards } from '@/components/dashboard/kpi-cards'
-import { AlertTriangle, Clock, ExternalLink, Bell, CalendarClock } from 'lucide-react'
+import { AlertTriangle, Clock, ExternalLink, Bell, CalendarClock, Mail, Loader2, RefreshCw, Plus } from 'lucide-react'
 import { formatRelative, formatDateTime, isApprovalOverdue } from '@/lib/utils'
 import { StatusBadge } from '@/components/polls/status-badge'
+import { toast } from 'sonner'
 import type { Poll, KPIData, RegularPoll } from '@/types'
+
+interface InboxMessage {
+  id: string
+  conversationId: string
+  subject: string
+  bodyPreview: string
+  from: { emailAddress: { address: string; name: string } }
+  receivedDateTime: string
+  isRead: boolean
+}
 
 const defaultKPI: KPIData = {
   totalThisMonth: 0,
@@ -24,10 +36,14 @@ function SkeletonCard({ className = '' }: { className?: string }) {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [kpi, setKpi] = useState<KPIData>(defaultKPI)
   const [polls, setPolls] = useState<Poll[]>([])
   const [regularPolls, setRegularPolls] = useState<RegularPoll[]>([])
   const [loading, setLoading] = useState(true)
+  const [inboxMessages, setInboxMessages] = useState<InboxMessage[]>([])
+  const [inboxLoading, setInboxLoading] = useState(true)
+  const [creatingPoll, setCreatingPoll] = useState<string | null>(null) // messageId being converted
 
   const fetchData = () =>
     Promise.all([
@@ -40,12 +56,52 @@ export default function DashboardPage() {
       setRegularPolls(regularData)
     }).catch(console.error)
 
+  const fetchInbox = useCallback(async () => {
+    try {
+      const res = await fetch('/api/inbox')
+      if (!res.ok) return
+      const data = await res.json() as InboxMessage[]
+      setInboxMessages(data)
+    } catch { /* silent */ } finally {
+      setInboxLoading(false)
+    }
+  }, [])
+
+  const createPollFromEmail = async (msg: InboxMessage) => {
+    setCreatingPoll(msg.id)
+    try {
+      const res = await fetch('/api/inbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageId: msg.id,
+          conversationId: msg.conversationId,
+          subject: msg.subject,
+          senderEmail: msg.from.emailAddress.address,
+          senderName: msg.from.emailAddress.name,
+          bodyPreview: msg.bodyPreview,
+        }),
+      })
+      const data = await res.json() as { pollId?: string; error?: string }
+      if (!res.ok) throw new Error(data.error ?? 'Failed')
+      toast.success('Poll draft created!')
+      router.push(`/polls/${data.pollId}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create poll')
+    } finally {
+      setCreatingPoll(null)
+    }
+  }
+
   useEffect(() => {
     fetchData().finally(() => setLoading(false))
+    void fetchInbox()
     // Auto-refresh every 60s so email approvals and status changes appear without manual reload
     const interval = setInterval(fetchData, 60_000)
-    return () => clearInterval(interval)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    // Refresh inbox every 2 min
+    const inboxInterval = setInterval(fetchInbox, 120_000)
+    return () => { clearInterval(interval); clearInterval(inboxInterval) }
+  }, [fetchInbox]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
@@ -247,6 +303,79 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Inbox — poll-related emails from Priya's mailbox */}
+      <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Mail className="h-4 w-4 text-cyan-600" />
+            <h2 className="font-semibold text-gray-900">Poll Requests in Inbox</h2>
+            {inboxMessages.length > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cyan-100 text-xs font-bold text-cyan-700">
+                {inboxMessages.length}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => void fetchInbox()}
+            disabled={inboxLoading}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3 w-3 ${inboxLoading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+        </div>
+
+        {inboxLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-5 w-5 animate-spin text-cyan-500" />
+          </div>
+        ) : inboxMessages.length === 0 ? (
+          <p className="px-5 py-8 text-center text-sm text-gray-400">No poll-related emails found in Priya's inbox</p>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {inboxMessages.map((msg) => (
+              <div key={msg.id} className="flex items-start gap-4 px-5 py-4 hover:bg-gray-50 transition-colors">
+                {/* Unread indicator */}
+                <div className="mt-1.5 flex-shrink-0">
+                  {!msg.isRead ? (
+                    <span className="h-2 w-2 rounded-full bg-cyan-500 block" />
+                  ) : (
+                    <span className="h-2 w-2 rounded-full bg-transparent block" />
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={`text-sm truncate ${!msg.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                        {msg.subject}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {msg.from.emailAddress.name || msg.from.emailAddress.address}
+                        <span className="text-gray-300 mx-1">·</span>
+                        {formatRelative(msg.receivedDateTime)}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1 line-clamp-2">{msg.bodyPreview}</p>
+                    </div>
+                    <button
+                      onClick={() => void createPollFromEmail(msg)}
+                      disabled={creatingPoll !== null}
+                      className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700 disabled:opacity-60 transition-colors"
+                    >
+                      {creatingPoll === msg.id ? (
+                        <><Loader2 className="h-3 w-3 animate-spin" /> Creating…</>
+                      ) : (
+                        <><Plus className="h-3 w-3" /> Create Poll</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
