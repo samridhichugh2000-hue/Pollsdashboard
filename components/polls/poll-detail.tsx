@@ -473,110 +473,6 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             </>
           )}
 
-          {/* Results & Follow-up */}
-          {response?.response_data && (() => {
-            type EntryType = {
-              email?: string
-              respondent?: string
-              submitted_at: string
-              answers: { question: string; answer: string }[]
-              actionable?: boolean | null
-              remarks?: string
-            }
-            const entries = JSON.parse(response.response_data) as EntryType[]
-            return (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <CardTitle>Results & Follow-up <span className="text-sm font-normal text-gray-400">({entries.length} {entries.length === 1 ? 'response' : 'responses'})</span></CardTitle>
-                    <Button size="sm" variant="outline" onClick={downloadResponses}>
-                      <Download className="mr-1.5 h-3.5 w-3.5" /> Download Excel
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {entries.map((entry, i) => (
-                    <div key={i} className="rounded-xl border border-gray-200 overflow-hidden">
-                      {/* Entry header */}
-                      <div className="flex items-center justify-between bg-gray-50 px-4 py-2.5 border-b border-gray-200">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-800">{entry.respondent ?? 'Anonymous'}</p>
-                          <p className="text-xs text-gray-400">{entry.email ?? ''} · {formatDateTime(entry.submitted_at)}</p>
-                        </div>
-                        {entry.actionable === true && (
-                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Actionable</span>
-                        )}
-                        {entry.actionable === false && (
-                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Not Actionable</span>
-                        )}
-                      </div>
-
-                      {/* Answers */}
-                      <div className="px-4 py-3 space-y-2">
-                        {entry.answers.map((a, ai) => (
-                          <div key={ai} className="text-sm">
-                            <p className="font-medium text-gray-500">{ai + 1}. {a.question}</p>
-                            <p className="mt-0.5 pl-3 text-gray-800">
-                              {a.answer ? a.answer : <span className="italic text-gray-400">No answer</span>}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Actionable / Remarks / Save */}
-                      <div className="border-t border-gray-100 px-4 py-3 space-y-2.5 bg-gray-50/50">
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void saveEntry(i, true)}
-                            disabled={savingEntry === i}
-                            className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
-                              entry.actionable === true
-                                ? 'bg-emerald-500 text-white border-emerald-500'
-                                : 'border-gray-300 text-gray-600 hover:border-emerald-400 hover:text-emerald-600'
-                            }`}
-                          >
-                            Actionable
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void saveEntry(i, false)}
-                            disabled={savingEntry === i}
-                            className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
-                              entry.actionable === false
-                                ? 'bg-gray-500 text-white border-gray-500'
-                                : 'border-gray-300 text-gray-600 hover:border-gray-400'
-                            }`}
-                          >
-                            Not Actionable
-                          </button>
-                        </div>
-                        <Textarea
-                          placeholder="Add remarks..."
-                          value={entryRemarks[i] ?? entry.remarks ?? ''}
-                          onChange={e => setEntryRemarks(p => ({ ...p, [i]: e.target.value }))}
-                          rows={2}
-                          className="text-sm resize-none"
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void saveEntry(i, entry.actionable ?? null)}
-                          disabled={savingEntry === i}
-                        >
-                          {savingEntry === i
-                            ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
-                            : <Save className="mr-1.5 h-3 w-3" />
-                          }
-                          Save
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )
-          })()}
         </div>
 
         {/* Sidebar: Actions + Timeline */}
@@ -777,6 +673,120 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
           )}
         </div>
       </div>
+
+      {/* Results & Follow-up — full width */}
+      {response?.response_data && (() => {
+        type EntryType = {
+          email?: string
+          respondent?: string
+          submitted_at: string
+          answers: { question: string; answer: string }[]
+          actionable?: boolean | null
+          remarks?: string
+        }
+        const entries = JSON.parse(response.response_data) as EntryType[]
+        return (
+          <Card className="mt-6">
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle>
+                  Results & Follow-up{' '}
+                  <span className="text-sm font-normal text-gray-400">
+                    ({entries.length} {entries.length === 1 ? 'response' : 'responses'})
+                  </span>
+                </CardTitle>
+                <Button size="sm" variant="outline" onClick={downloadResponses}>
+                  <Download className="mr-1.5 h-3.5 w-3.5" /> Download Excel
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {entries.map((entry, i) => (
+                <div key={i} className="rounded-xl border border-gray-200">
+                  {/* Entry header */}
+                  <div className="flex items-center justify-between bg-gray-50 px-5 py-3 border-b border-gray-200 rounded-t-xl">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{entry.respondent ?? 'Anonymous'}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{entry.email ?? ''} · {formatDateTime(entry.submitted_at)}</p>
+                    </div>
+                    {entry.actionable === true && (
+                      <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">Actionable</span>
+                    )}
+                    {entry.actionable === false && (
+                      <span className="text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-600">Not Actionable</span>
+                    )}
+                  </div>
+
+                  {/* Answers */}
+                  <div className="px-5 py-4 space-y-3">
+                    {entry.answers.map((a, ai) => (
+                      <div key={ai} className="text-sm">
+                        <p className="font-semibold text-gray-500">{ai + 1}. {a.question}</p>
+                        <p className="mt-1 pl-4 text-gray-800">
+                          {a.answer ? a.answer : <span className="italic text-gray-400">No answer</span>}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Actionable / Remarks / Save */}
+                  <div className="border-t border-gray-100 px-5 py-4 space-y-3 bg-gray-50 rounded-b-xl">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Follow-up</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void saveEntry(i, true)}
+                        disabled={savingEntry === i}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                          entry.actionable === true
+                            ? 'bg-emerald-500 text-white border-emerald-500'
+                            : 'border-gray-300 text-gray-600 hover:border-emerald-400 hover:text-emerald-600'
+                        }`}
+                      >
+                        Actionable
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void saveEntry(i, false)}
+                        disabled={savingEntry === i}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                          entry.actionable === false
+                            ? 'bg-gray-500 text-white border-gray-500'
+                            : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                        }`}
+                      >
+                        Not Actionable
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-gray-500">Remarks</label>
+                      <textarea
+                        placeholder="Add internal remarks about this response..."
+                        value={entryRemarks[i] ?? entry.remarks ?? ''}
+                        onChange={e => setEntryRemarks(p => ({ ...p, [i]: e.target.value }))}
+                        rows={3}
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition resize-none"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void saveEntry(i, entry.actionable ?? null)}
+                      disabled={savingEntry === i}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-1.5 text-xs font-semibold text-gray-700 hover:border-cyan-400 hover:text-cyan-600 transition-colors disabled:opacity-50"
+                    >
+                      {savingEntry === i
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <Save className="h-3.5 w-3.5" />
+                      }
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Release Poll Dialog */}
       <Dialog open={showReleaseDialog} onOpenChange={setShowReleaseDialog}>
