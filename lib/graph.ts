@@ -67,10 +67,9 @@ export interface GraphMessage {
 }
 
 export async function getInboxMessages(userEmail: string, filter?: string): Promise<GraphMessage[]> {
-  const encodedFilter = filter ? `&$filter=${encodeURIComponent(filter)}` : ''
-  const data = await graphRequest<{ value: GraphMessage[] }>(
-    `/users/${userEmail}/mailFolders/Inbox/messages?$top=50&$orderby=receivedDateTime desc${encodedFilter}`
-  )
+  const base = `/users/${userEmail}/mailFolders/Inbox/messages?$top=100&$orderby=receivedDateTime desc`
+  const url = filter ? `${base}&$filter=${encodeURIComponent(filter)}` : base
+  const data = await graphRequest<{ value: GraphMessage[] }>(url)
   return data.value ?? []
 }
 

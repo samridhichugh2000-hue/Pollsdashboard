@@ -61,11 +61,17 @@ async function getAuthorizedEmails(): Promise<Set<string>> {
   return new Set(result.rows.map((r) => (r.email as string).toLowerCase()))
 }
 
-// GET — return all poll-related emails from Priya's inbox (semantic search)
+// GET — return today's poll-related emails from Priya's inbox (semantic search)
 export async function GET() {
   try {
     const priyaEmail = process.env.PRIYA_EMAIL!
-    const messages = await getInboxMessages(priyaEmail)
+
+    // Build today's start in UTC for the OData filter
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const dateFilter = `receivedDateTime ge ${todayStart.toISOString()}`
+
+    const messages = await getInboxMessages(priyaEmail, dateFilter)
     const filtered = await filterPollRelatedEmails(messages)
     return NextResponse.json(filtered)
   } catch (err) {
