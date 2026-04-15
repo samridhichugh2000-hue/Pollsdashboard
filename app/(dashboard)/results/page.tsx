@@ -127,7 +127,7 @@ function ManageDialog({
               <span className="text-rose-600 font-medium">{notActionableCount} not actionable</span>
             )}
             {entries.filter(e => e.actionable == null).length > 0 && (
-              <span className="text-amber-600 font-medium">{entries.filter(e => e.actionable == null).length} pending review</span>
+              <span className="text-gray-400">{entries.filter(e => e.actionable == null).length} not reviewed</span>
             )}
           </div>
         )}
