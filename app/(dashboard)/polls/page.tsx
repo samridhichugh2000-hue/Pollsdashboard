@@ -2,33 +2,19 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Plus, RefreshCw, Copy, X, Loader2 } from 'lucide-react'
+import { Plus, RefreshCw, Copy, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { PollsTable } from '@/components/polls/polls-table'
 import { PollForm } from '@/components/polls/poll-form'
-import { formatRelative } from '@/lib/utils'
 import type { Poll } from '@/types'
-
-interface InboxMessage {
-  id: string
-  conversationId: string
-  subject: string
-  bodyPreview: string
-  from: { emailAddress: { address: string; name: string } }
-  receivedDateTime: string
-  isRead: boolean
-}
 
 function PollsContent() {
   const [polls, setPolls] = useState<Poll[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
-  const [inboxMsgs, setInboxMsgs] = useState<InboxMessage[]>([])
-  const [inboxLoading, setInboxLoading] = useState(true)
-  const [creatingPoll, setCreatingPoll] = useState<string | null>(null)
 
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -43,44 +29,7 @@ function PollsContent() {
     finally { setLoading(false) }
   }, [])
 
-  const fetchInbox = useCallback(async () => {
-    setInboxLoading(true)
-    try {
-      const res = await fetch('/api/inbox')
-      if (res.ok) setInboxMsgs(await res.json() as InboxMessage[])
-    } catch { /* silent */ } finally {
-      setInboxLoading(false)
-    }
-  }, [])
-
-  const createPollFromEmail = async (msg: InboxMessage) => {
-    setCreatingPoll(msg.id)
-    try {
-      const res = await fetch('/api/inbox', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messageId: msg.id,
-          conversationId: msg.conversationId,
-          subject: msg.subject,
-          senderEmail: msg.from.emailAddress.address,
-          senderName: msg.from.emailAddress.name,
-          bodyPreview: msg.bodyPreview,
-        }),
-      })
-      const data = await res.json() as { pollId?: string; error?: string }
-      if (!res.ok) throw new Error(data.error ?? 'Failed')
-      toast.success('Poll draft created!')
-      router.push(`/polls/${data.pollId}`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create poll')
-    } finally {
-      setCreatingPoll(null)
-    }
-  }
-
   useEffect(() => { void fetchPolls() }, [fetchPolls])
-  useEffect(() => { void fetchInbox() }, [fetchInbox])
 
   const handleMarkClosed = async (pollId: string) => {
     await fetch(`/api/polls/${pollId}`, {
@@ -224,7 +173,7 @@ function PollsContent() {
             <div className="border-b border-gray-100 px-5 pt-4">
               <TabsList className="bg-gray-100 mb-0 flex-wrap h-auto gap-1">
                 <TabsTrigger value="all">All ({filterByTab('all').length})</TabsTrigger>
-                <TabsTrigger value="inbox">Inbox ({inboxMsgs.length + filterByTab('inbox').length})</TabsTrigger>
+                <TabsTrigger value="inbox">Inbox ({filterByTab('inbox').length})</TabsTrigger>
                 <TabsTrigger value="manual">Manual ({filterByTab('manual').length})</TabsTrigger>
                 <TabsTrigger value="external" className="relative">
                   External ({filterByTab('external').length})
@@ -239,58 +188,11 @@ function PollsContent() {
                 <TabsTrigger value="archived">Archived ({filterByTab('archived').length})</TabsTrigger>
               </TabsList>
             </div>
-            {(['all', 'manual', 'external', 'pending', 'active'] as const).map((tab) => (
+            {(['all', 'inbox', 'manual', 'external', 'pending', 'active'] as const).map((tab) => (
               <TabsContent key={tab} value={tab} className="mt-0">
                 <PollsTable polls={filterByTab(tab)} onMarkClosed={handleMarkClosed} onArchive={handleArchive} onReject={handleReject} />
               </TabsContent>
             ))}
-
-            {/* Inbox tab — today's emails + email-sourced polls */}
-            <TabsContent value="inbox" className="mt-0">
-              {/* Today's unprocessed emails */}
-              {inboxLoading ? (
-                <div className="flex items-center justify-center py-8 border-b border-gray-50">
-                  <Loader2 className="h-5 w-5 animate-spin text-cyan-500" />
-                </div>
-              ) : inboxMsgs.length > 0 ? (
-                <div className="border-b border-gray-100">
-                  <div className="flex items-center justify-between px-5 py-3 bg-cyan-50/60">
-                    <p className="text-xs font-semibold text-cyan-700 uppercase tracking-wider">Today's Poll Emails — {inboxMsgs.length} unprocessed</p>
-                    <button onClick={() => void fetchInbox()} className="text-xs text-cyan-600 hover:text-cyan-800 flex items-center gap-1">
-                      <RefreshCw className="h-3 w-3" /> Refresh
-                    </button>
-                  </div>
-                  {inboxMsgs.map((msg) => (
-                    <div key={msg.id} className="flex items-start gap-4 px-5 py-3.5 border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <div className="mt-1.5 flex-shrink-0">
-                        {!msg.isRead ? <span className="block h-2 w-2 rounded-full bg-cyan-500" /> : <span className="block h-2 w-2" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm truncate ${!msg.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>{msg.subject}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {msg.from.emailAddress.name || msg.from.emailAddress.address}
-                          <span className="mx-1 text-gray-300">·</span>
-                          {formatRelative(msg.receivedDateTime)}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{msg.bodyPreview}</p>
-                      </div>
-                      <button
-                        onClick={() => void createPollFromEmail(msg)}
-                        disabled={creatingPoll !== null}
-                        className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700 disabled:opacity-60 transition-colors"
-                      >
-                        {creatingPoll === msg.id
-                          ? <><Loader2 className="h-3 w-3 animate-spin" /> Creating…</>
-                          : <><Plus className="h-3 w-3" /> Create Poll</>}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-
-              {/* Already-processed email polls */}
-              <PollsTable polls={filterByTab('inbox')} onMarkClosed={handleMarkClosed} onArchive={handleArchive} onReject={handleReject} />
-            </TabsContent>
             <TabsContent value="archived" className="mt-0">
               <PollsTable polls={filterByTab('archived')} />
             </TabsContent>

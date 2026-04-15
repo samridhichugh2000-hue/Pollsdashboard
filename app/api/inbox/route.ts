@@ -11,7 +11,10 @@ import type { GraphMessage } from '@/lib/graph'
 const POLL_KEYWORDS = ['poll', 'survey', 'questionnaire', 'feedback form', 'run a poll', 'create a poll', 'sending a poll', 'conduct a poll', 'conduct a survey']
 
 function filterPollRelatedEmails(messages: GraphMessage[]): GraphMessage[] {
+  const pollsMailbox = (process.env.POLLS_MAILBOX ?? '').toLowerCase()
   return messages.filter(m => {
+    // Exclude emails sent by the polls mailbox itself (released poll notifications)
+    if (pollsMailbox && m.from.emailAddress.address.toLowerCase() === pollsMailbox) return false
     const text = `${m.subject} ${m.bodyPreview}`.toLowerCase()
     return POLL_KEYWORDS.some(kw => text.includes(kw))
   })
