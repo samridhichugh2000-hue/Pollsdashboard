@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download, RefreshCw, Plus, Trash2, Save, X, ChevronDown } from 'lucide-react'
+import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download, RefreshCw, Save, X, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,23 +13,8 @@ import { StatusBadge } from './status-badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { formatDate, formatDateTime, formatRelative, isApprovalOverdue } from '@/lib/utils'
 import type { Poll, PollApproval, AuditLog, PollResponse } from '@/types'
-
-interface PollQuestion {
-  text: string
-  type: 'rating' | 'open_ended'
-}
-
-function parseQuestions(raw: string | null | undefined): PollQuestion[] {
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw) as Array<string | PollQuestion>
-    return parsed.map((q) =>
-      typeof q === 'string'
-        ? { text: q, type: /rate|rating|scale|satisfied|satisfaction|recommend|\(1\s*[=-]/i.test(q) ? 'rating' : 'open_ended' as 'rating' | 'open_ended' }
-        : q
-    )
-  } catch { return [] }
-}
+import { QuestionBuilder, parseQuestions } from './question-builder'
+import type { Question } from './question-builder'
 
 interface PollDetailProps {
   poll: Poll
@@ -52,7 +37,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   // Draft edit state
   const [editSubject, setEditSubject] = useState(initialPoll.subject || `Poll: ${initialPoll.topic}`)
   const [editEmailBody, setEditEmailBody] = useState(initialPoll.draft_email_body || '')
-  const [editQuestions, setEditQuestions] = useState<PollQuestion[]>(parseQuestions(initialPoll.questions))
+  const [editQuestions, setEditQuestions] = useState<Question[]>(parseQuestions(initialPoll.questions ?? ''))
   const [keywords, setKeywords] = useState('')
   const [tone, setTone] = useState('professional')
   const [useKeywords, setUseKeywords] = useState(true)
@@ -83,7 +68,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     if (poll.status === 'DRAFT') {
       setEditSubject(poll.subject || `Poll: ${poll.topic}`)
       setEditEmailBody(poll.draft_email_body || '')
-      setEditQuestions(parseQuestions(poll.questions))
+      setEditQuestions(parseQuestions(poll.questions ?? ''))
     }
   }, [poll])
 
@@ -115,7 +100,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const hasChanges =
     editSubject !== (poll.subject || `Poll: ${poll.topic}`) ||
     editEmailBody !== (poll.draft_email_body || '') ||
-    JSON.stringify(editQuestions) !== JSON.stringify(parseQuestions(poll.questions))
+    JSON.stringify(editQuestions) !== JSON.stringify(parseQuestions(poll.questions ?? ''))
 
   const runAction = async (action: string, extra?: Record<string, unknown>) => {
     setLoading(action)
@@ -230,7 +215,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     window.open(`/api/polls/${poll.id}/download`, '_blank')
   }
 
-  const questions: PollQuestion[] = parseQuestions(poll.questions)
+  const questions: Question[] = parseQuestions(poll.questions ?? '')
 
   return (
     <div className="space-y-5">
@@ -398,52 +383,12 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {editQuestions.map((q, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <select
-                        value={q.type}
-                        onChange={(e) => {
-                          const updated = [...editQuestions]
-                          updated[i] = { ...updated[i], type: e.target.value as 'rating' | 'open_ended' }
-                          setEditQuestions(updated)
-                        }}
-                        className="w-32 shrink-0 rounded-md border border-input bg-background px-2 py-2 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-                      >
-                        <option value="rating">⭐ Rating</option>
-                        <option value="open_ended">📝 Open-ended</option>
-                      </select>
-                      <Input
-                        value={q.text}
-                        onChange={(e) => {
-                          const updated = [...editQuestions]
-                          updated[i] = { ...updated[i], text: e.target.value }
-                          setEditQuestions(updated)
-                        }}
-                        className="flex-1"
-                        placeholder={`Question ${i + 1}`}
-                      />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="shrink-0 text-gray-400 hover:text-red-500"
-                        onClick={() => setEditQuestions(editQuestions.filter((_, idx) => idx !== i))}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                  {editQuestions.length < 4 && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => setEditQuestions([...editQuestions, { text: '', type: 'open_ended' }])}
-                    >
-                      <Plus className="mr-1 h-3.5 w-3.5" /> Add Question
-                    </Button>
-                  )}
-                  <p className="text-xs text-gray-400">⭐ Rating = 1–5 scale &nbsp;·&nbsp; 📝 Open-ended = text answer</p>
+                <CardContent>
+                  <QuestionBuilder
+                    questions={editQuestions}
+                    onChange={setEditQuestions}
+                    maxQuestions={6}
+                  />
                 </CardContent>
               </Card>
 

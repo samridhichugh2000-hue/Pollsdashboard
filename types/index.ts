@@ -11,6 +11,7 @@ export type PollStatus =
   | 'CLOSED'
   | 'RESULTS_UPLOADED'
   | 'ARCHIVED'
+  | 'REJECTED'
   | 'RMS_TASK_FAILED'
   | 'RMS_PUBLISH_FAILED'
   | 'SEND_FAILED'
@@ -165,6 +166,7 @@ export const STATUS_LABELS: Record<PollStatus, string> = {
   CLOSED: 'Closed',
   RESULTS_UPLOADED: 'Results Uploaded',
   ARCHIVED: 'Archived',
+  REJECTED: 'Rejected',
   RMS_TASK_FAILED: 'RMS Task Failed',
   RMS_PUBLISH_FAILED: 'RMS Publish Failed',
   SEND_FAILED: 'Send Failed',
@@ -183,6 +185,7 @@ export const STATUS_COLORS: Record<PollStatus, string> = {
   CLOSED: 'bg-slate-100 text-slate-800',
   RESULTS_UPLOADED: 'bg-emerald-100 text-emerald-800',
   ARCHIVED: 'bg-gray-200 text-gray-600',
+  REJECTED: 'bg-red-100 text-red-700',
   RMS_TASK_FAILED: 'bg-red-100 text-red-800',
   RMS_PUBLISH_FAILED: 'bg-red-100 text-red-800',
   SEND_FAILED: 'bg-red-100 text-red-800',

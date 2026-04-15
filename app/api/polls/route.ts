@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as CreatePollInput & { questions?: string[]; recipient_email?: string }
 
-    if (!body.topic || !body.department || !body.requested_by) {
-      return NextResponse.json({ error: 'Missing required fields: topic, department, requested_by' }, { status: 400 })
+    if (!body.topic || !body.department) {
+      return NextResponse.json({ error: 'Missing required fields: topic, department' }, { status: 400 })
     }
 
     // Create poll record
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       topic: body.topic,
       department: body.department,
       recipient_email: body.recipient_email,
-      requested_by: body.requested_by,
+      requested_by: body.requested_by ?? '',
       source: body.source ?? 'dashboard',
       email_thread_id: body.email_thread_id,
       questions: body.questions,

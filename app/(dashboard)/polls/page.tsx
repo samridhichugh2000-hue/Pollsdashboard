@@ -56,7 +56,22 @@ function PollsContent() {
     void fetchPolls()
   }
 
-  const active = (p: Poll) => p.status !== 'ARCHIVED'
+  const handleReject = async (pollId: string) => {
+    const res = await fetch(`/api/polls/${pollId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'REJECT' }),
+    })
+    if (res.ok) {
+      toast.success('Poll request rejected')
+    } else {
+      const data = await res.json() as { error?: string }
+      toast.error(data.error ?? 'Failed to reject poll')
+    }
+    void fetchPolls()
+  }
+
+  const active = (p: Poll) => p.status !== 'ARCHIVED' && p.status !== 'REJECTED'
 
   // Apply search filter on top of all tab filters
   const applySearch = (list: Poll[]): Poll[] => {
@@ -77,7 +92,7 @@ function PollsContent() {
       case 'external': base = polls.filter(p => active(p) && p.source === 'external'); break
       case 'pending':  base = polls.filter(p => active(p) && p.status === 'AWAITING_APPROVAL'); break
       case 'active':   base = polls.filter(p => active(p) && ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)); break
-      case 'archived': base = polls.filter(p => p.status === 'ARCHIVED'); break
+      case 'archived': base = polls.filter(p => p.status === 'ARCHIVED' || p.status === 'REJECTED'); break
       default:         base = polls.filter(p => active(p))
     }
     return applySearch(base)
@@ -175,7 +190,7 @@ function PollsContent() {
             </div>
             {(['all', 'inbox', 'manual', 'external', 'pending', 'active'] as const).map((tab) => (
               <TabsContent key={tab} value={tab} className="mt-0">
-                <PollsTable polls={filterByTab(tab)} onMarkClosed={handleMarkClosed} onArchive={handleArchive} />
+                <PollsTable polls={filterByTab(tab)} onMarkClosed={handleMarkClosed} onArchive={handleArchive} onReject={handleReject} />
               </TabsContent>
             ))}
             <TabsContent value="archived" className="mt-0">

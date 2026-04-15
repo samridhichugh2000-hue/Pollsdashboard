@@ -18,8 +18,16 @@ function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function isDue(dateStr: string) {
-  return new Date(dateStr) <= new Date()
+function isDueToday(dateStr: string) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const d = new Date(dateStr); d.setHours(0, 0, 0, 0)
+  return d <= today
+}
+
+function isDueTomorrow(dateStr: string) {
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0, 0, 0, 0)
+  const d = new Date(dateStr); d.setHours(0, 0, 0, 0)
+  return d.getTime() === tomorrow.getTime()
 }
 
 function computeNextRunDate(frequency: 'monthly' | 'quarterly', scheduledDay: number): string {
@@ -208,7 +216,7 @@ export default function RegularPollsPage() {
     finally { setReleasing(false) }
   }
 
-  const duePolls = polls.filter(p => p.is_active && isDue(p.next_run_date))
+  const upcomingPolls = polls.filter(p => p.is_active && (isDueTomorrow(p.next_run_date) || isDueToday(p.next_run_date)))
   const releasingTemplate = polls.find(p => p.id === releaseId)
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -219,7 +227,7 @@ export default function RegularPollsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-white">Regular Polls</h2>
-          <p className="text-sm text-white/50">{polls.length} template{polls.length !== 1 ? 's' : ''} · {duePolls.length} due</p>
+          <p className="text-sm text-white/50">{polls.length} template{polls.length !== 1 ? 's' : ''} · auto-releases daily at 9 AM</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm"
@@ -234,19 +242,30 @@ export default function RegularPollsPage() {
         </div>
       </div>
 
-      {/* Due alert banner */}
-      {duePolls.length > 0 && (
+      {/* Upcoming auto-release alert banner */}
+      {upcomingPolls.length > 0 && (
         <div className="rounded-2xl bg-amber-500/20 border border-amber-400/30 px-5 py-4 backdrop-blur-sm">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-1">
             <CalendarClock className="h-4 w-4 text-amber-300" />
-            <span className="font-semibold text-amber-200">{duePolls.length} poll{duePolls.length > 1 ? 's' : ''} due for release</span>
+            <span className="font-semibold text-amber-200">
+              {upcomingPolls.length} poll{upcomingPolls.length > 1 ? 's' : ''} will auto-release {upcomingPolls.some(p => isDueTomorrow(p.next_run_date)) ? 'tomorrow' : 'today'} at 9 AM
+            </span>
           </div>
+          <p className="text-xs text-amber-300/80 mb-3">Pause a poll now if you want to skip this cycle.</p>
           <div className="flex flex-wrap gap-2">
-            {duePolls.map(p => (
-              <button key={p.id} onClick={() => openRelease(p)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/30 px-3 py-1.5 text-sm font-medium text-amber-100 transition-colors">
-                <Play className="h-3 w-3" /> Release: {p.name}
-              </button>
+            {upcomingPolls.map(p => (
+              <div key={p.id} className="inline-flex items-center gap-2 rounded-lg bg-amber-400/20 border border-amber-400/30 px-3 py-1.5">
+                <CalendarClock className="h-3 w-3 text-amber-300" />
+                <span className="text-sm font-medium text-amber-100">{p.name}</span>
+                <span className="text-xs text-amber-300/70">
+                  {isDueTomorrow(p.next_run_date) ? 'tomorrow' : 'today'}
+                </span>
+                <button
+                  onClick={() => void toggleActive(p)}
+                  className="ml-1 rounded-md bg-amber-400/30 hover:bg-amber-400/50 px-2 py-0.5 text-xs font-medium text-amber-100 transition-colors">
+                  Pause
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -268,7 +287,9 @@ export default function RegularPollsPage() {
         ) : (
           <div className="divide-y divide-gray-50">
             {polls.map((t) => {
-              const due = t.is_active && isDue(t.next_run_date)
+              const dueToday = t.is_active && isDueToday(t.next_run_date)
+              const dueTomorrow = t.is_active && isDueTomorrow(t.next_run_date)
+              const due = dueToday || dueTomorrow
               const isExpanded = expanded === t.id
               const recipientList: string[] = JSON.parse(t.recipients)
               const questionList = parseQuestions(t.questions)
@@ -279,7 +300,7 @@ export default function RegularPollsPage() {
                   <div className="flex items-center gap-4 px-5 py-4">
                     {/* Active indicator */}
                     <div className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${
-                      !t.is_active ? 'bg-gray-300' : due ? 'bg-amber-400 shadow-[0_0_6px_2px_rgba(251,191,36,0.4)]' : 'bg-emerald-400'
+                      !t.is_active ? 'bg-gray-300' : dueToday ? 'bg-amber-400 shadow-[0_0_6px_2px_rgba(251,191,36,0.4)]' : dueTomorrow ? 'bg-yellow-300 shadow-[0_0_6px_2px_rgba(253,224,71,0.4)]' : 'bg-emerald-400'
                     }`} />
 
                     {/* Info */}
@@ -288,14 +309,15 @@ export default function RegularPollsPage() {
                         <span className="font-semibold text-gray-900 text-sm">{t.name}</span>
                         <FrequencyBadge frequency={t.frequency} />
                         {!t.is_active && <span className="text-xs text-gray-400">(Paused)</span>}
-                        {due && <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Due</span>}
+                        {dueToday && <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Releasing today</span>}
+                        {dueTomorrow && <span className="text-xs font-medium text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded-full">Releases tomorrow</span>}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
                         <span>{t.department}</span>
                         <span>·</span>
                         <span>Day {t.scheduled_day} of month</span>
                         <span>·</span>
-                        <span className={due ? 'text-amber-600 font-medium' : ''}>
+                        <span className={dueToday ? 'text-amber-600 font-medium' : dueTomorrow ? 'text-yellow-700 font-medium' : ''}>
                           Next: {formatDate(t.next_run_date)}
                         </span>
                         <span>·</span>
@@ -306,10 +328,10 @@ export default function RegularPollsPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      {due && (
-                        <Button size="sm" className="h-7 bg-amber-500 hover:bg-amber-600 text-white text-xs"
+                      {dueToday && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
                           onClick={() => openRelease(t)}>
-                          <Play className="mr-1 h-3 w-3" /> Release
+                          <Play className="mr-1 h-3 w-3" /> Release Now
                         </Button>
                       )}
                       <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit template" onClick={() => openEdit(t)}>

@@ -48,7 +48,12 @@ export default function DashboardPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const dueRegularPolls = regularPolls.filter(p => p.is_active && new Date(p.next_run_date) <= today)
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
+  const dueRegularPolls = regularPolls.filter(p => {
+    if (!p.is_active) return false
+    const d = new Date(p.next_run_date); d.setHours(0, 0, 0, 0)
+    return d <= tomorrow
+  })
   const recentPolls = polls.filter(p => p.status !== 'ARCHIVED').slice(0, 6)
   const overdueApprovals = polls.filter(
     (p) => p.status === 'AWAITING_APPROVAL' && isApprovalOverdue(p.updated_at)
@@ -93,7 +98,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 mb-2">
             <CalendarClock className="h-4 w-4 text-amber-300" />
             <span className="font-semibold text-amber-100">
-              {dueRegularPolls.length} regular poll{dueRegularPolls.length > 1 ? 's' : ''} due for release
+              {dueRegularPolls.length} regular poll{dueRegularPolls.length > 1 ? 's' : ''} auto-releasing soon — pause to skip
             </span>
             <Link href="/regular-polls" className="ml-auto text-xs text-amber-200 hover:text-white underline">
               Go to Regular Polls →

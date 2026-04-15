@@ -161,8 +161,8 @@ export function PollForm({ onSuccess }: PollFormProps) {
 
         {/* Requested By — select from authorized senders */}
         <div className="space-y-1.5">
-          <Label htmlFor="requested_by">Requested By *</Label>
-          <Select value={form.requested_by} onValueChange={v => set('requested_by', v)} required>
+          <Label htmlFor="requested_by">Requested By</Label>
+          <Select value={form.requested_by} onValueChange={v => set('requested_by', v)}>
             <SelectTrigger id="requested_by">
               <SelectValue placeholder="Select requester" />
             </SelectTrigger>
@@ -177,7 +177,7 @@ export function PollForm({ onSuccess }: PollFormProps) {
           </Select>
           {form.requested_by === '__custom__' && (
             <Input placeholder="Name or email" value={form.custom_requested_by}
-              onChange={e => set('custom_requested_by', e.target.value)} required className="mt-2" />
+              onChange={e => set('custom_requested_by', e.target.value)} className="mt-2" />
           )}
         </div>
 

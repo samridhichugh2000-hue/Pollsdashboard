@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ExternalLink, Eye, XCircle, Trash2 } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { StatusBadge } from './status-badge'
 import { Button } from '@/components/ui/button'
 import { formatDateTime, formatRelative, isApprovalOverdue } from '@/lib/utils'
@@ -12,11 +12,13 @@ interface PollsTableProps {
   polls: Poll[]
   onMarkClosed?: (pollId: string) => void
   onArchive?: (pollId: string) => void
+  onReject?: (pollId: string) => void
 }
 
-export function PollsTable({ polls, onMarkClosed, onArchive }: PollsTableProps) {
+export function PollsTable({ polls, onMarkClosed, onArchive, onReject }: PollsTableProps) {
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const [confirmArchive, setConfirmArchive] = useState<string | null>(null)
+  const [confirmReject, setConfirmReject] = useState<string | null>(null)
 
   if (polls.length === 0) {
     return (
@@ -73,11 +75,31 @@ export function PollsTable({ polls, onMarkClosed, onArchive }: PollsTableProps) 
                   ) : <span className="text-gray-300">—</span>}
                 </td>
                 <td className="px-5 py-3.5">
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" asChild className="h-7 w-7">
-                      <Link href={`/polls/${poll.id}`}><Eye className="h-3.5 w-3.5" /></Link>
-                    </Button>
-                    {onMarkClosed && !['CLOSED', 'RESULTS_UPLOADED', 'ARCHIVED'].includes(poll.status) && (
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Link href={`/polls/${poll.id}`}
+                      className="text-xs font-medium text-cyan-600 hover:text-cyan-800 hover:underline">
+                      View
+                    </Link>
+                    {onReject && poll.source === 'external' && !['REJECTED', 'ARCHIVED', 'CLOSED', 'RESULTS_UPLOADED'].includes(poll.status) && (
+                      confirmReject === poll.id ? (
+                        <div className="flex items-center gap-1">
+                          <Button variant="destructive" size="sm" className="h-6 text-xs"
+                            onClick={() => { onReject(poll.id); setConfirmReject(null) }}>
+                            Confirm
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-6 text-xs"
+                            onClick={() => setConfirmReject(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <button className="text-xs font-medium text-orange-500 hover:text-orange-700 hover:underline"
+                          onClick={() => setConfirmReject(poll.id)}>
+                          Reject
+                        </button>
+                      )
+                    )}
+                    {onMarkClosed && !['CLOSED', 'RESULTS_UPLOADED', 'ARCHIVED', 'REJECTED'].includes(poll.status) && (
                       confirmClose === poll.id ? (
                         <div className="flex items-center gap-1">
                           <Button variant="destructive" size="sm" className="h-6 text-xs"
@@ -90,10 +112,10 @@ export function PollsTable({ polls, onMarkClosed, onArchive }: PollsTableProps) 
                           </Button>
                         </div>
                       ) : (
-                        <Button variant="ghost" size="icon" className="h-7 w-7"
+                        <button className="text-xs font-medium text-rose-500 hover:text-rose-700 hover:underline"
                           onClick={() => setConfirmClose(poll.id)}>
-                          <XCircle className="h-3.5 w-3.5 text-rose-400" />
-                        </Button>
+                          Close
+                        </button>
                       )
                     )}
                     {onArchive && poll.status !== 'ARCHIVED' && (
@@ -109,10 +131,10 @@ export function PollsTable({ polls, onMarkClosed, onArchive }: PollsTableProps) 
                           </Button>
                         </div>
                       ) : (
-                        <Button variant="ghost" size="icon" className="h-7 w-7"
+                        <button className="text-xs font-medium text-gray-400 hover:text-rose-600 hover:underline"
                           onClick={() => setConfirmArchive(poll.id)}>
-                          <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-rose-500" />
-                        </Button>
+                          Delete
+                        </button>
                       )
                     )}
                   </div>
