@@ -177,6 +177,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'UPDATE_ENTRY_ACTIONABLE': {
         const entryIndex = body.entryIndex as number
         const actionable = body.actionable as boolean | null
+        const remarks = body.remarks as string | undefined
         const pollResp = await getPollResponse(id)
         if (!pollResp?.response_data) {
           return NextResponse.json({ error: 'No responses found.' }, { status: 400 })
@@ -185,9 +186,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (entryIndex < 0 || entryIndex >= entries.length) {
           return NextResponse.json({ error: 'Invalid entry index.' }, { status: 400 })
         }
-        entries[entryIndex] = { ...entries[entryIndex], actionable }
+        entries[entryIndex] = {
+          ...entries[entryIndex],
+          actionable,
+          ...(remarks !== undefined ? { remarks } : {}),
+        }
         await upsertPollResponse(id, JSON.stringify(entries))
-        await createAuditLog(id, 'ENTRY_ACTIONABLE_UPDATED', userEmail, { entryIndex, actionable })
+        await createAuditLog(id, 'ENTRY_ACTIONABLE_UPDATED', userEmail, { entryIndex, actionable, remarks })
         break
       }
 

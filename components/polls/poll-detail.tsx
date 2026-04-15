@@ -32,7 +32,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const [response, setResponse] = useState(initialResponse)
   const [loading, setLoading] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
-  const [emailReply, setEmailReply] = useState('')
+
 
   // Draft edit state
   const [editSubject, setEditSubject] = useState(initialPoll.subject || `Poll: ${initialPoll.topic}`)
@@ -60,6 +60,10 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [shareRecipients, setShareRecipients] = useState<string[]>([])
   const [shareRecipientInput, setShareRecipientInput] = useState('')
+
+  // Per-entry remarks state (index → text)
+  const [entryRemarks, setEntryRemarks] = useState<Record<number, string>>({})
+  const [savingEntry, setSavingEntry] = useState<number | null>(null)
 
   const router = useRouter()
 
@@ -121,6 +125,33 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
       toast.error(err instanceof Error ? err.message : 'Action failed')
     } finally {
       setLoading(null)
+    }
+  }
+
+  const saveEntry = async (index: number, actionable: boolean | null) => {
+    if (!response?.response_data) return
+    setSavingEntry(index)
+    type EntryType = { email?: string; respondent?: string; submitted_at: string; answers: { question: string; answer: string }[]; actionable?: boolean | null; remarks?: string }
+    const entries = JSON.parse(response.response_data) as EntryType[]
+    const remarks = entryRemarks[index] ?? entries[index]?.remarks ?? ''
+    try {
+      const res = await fetch(`/api/polls/${poll.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPDATE_ENTRY_ACTIONABLE', entryIndex: index, actionable, remarks }),
+      })
+      if (!res.ok) {
+        const d = await res.json() as { error: string }
+        throw new Error(d.error)
+      }
+      // Optimistically update local response state
+      const updated = entries.map((e, i) => i === index ? { ...e, actionable, remarks } : e)
+      setResponse(prev => prev ? { ...prev, response_data: JSON.stringify(updated) } : prev)
+      toast.success('Entry saved')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setSavingEntry(null)
     }
   }
 
@@ -442,42 +473,110 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             </>
           )}
 
-          {/* Response management */}
-          {['CLOSED', 'RESULTS_UPLOADED', 'ARCHIVED'].includes(poll.status) && (
-            <Card>
-              <CardHeader><CardTitle>Response Management</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                {response ? (
-                  <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
-                    Responses collected. {response.is_actionable ? 'Marked as actionable.' : 'Not actionable.'}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">No responses fetched yet.</p>
-                )}
-
-                <div className="space-y-2">
-                  <Label>Follow-up Email Response</Label>
-                  <Textarea
-                    placeholder="Type a follow-up email to send to the requester..."
-                    value={emailReply}
-                    onChange={(e) => setEmailReply(e.target.value)}
-                    rows={3}
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => runAction('UPDATE_RESPONSE', { is_actionable: true, email_response: emailReply })}
-                      disabled={!!loading}
-                    >
-                      {loading === 'UPDATE_RESPONSE' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                      Mark Actionable & Save
+          {/* Results & Follow-up */}
+          {response?.response_data && (() => {
+            type EntryType = {
+              email?: string
+              respondent?: string
+              submitted_at: string
+              answers: { question: string; answer: string }[]
+              actionable?: boolean | null
+              remarks?: string
+            }
+            const entries = JSON.parse(response.response_data) as EntryType[]
+            return (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <CardTitle>Results & Follow-up <span className="text-sm font-normal text-gray-400">({entries.length} {entries.length === 1 ? 'response' : 'responses'})</span></CardTitle>
+                    <Button size="sm" variant="outline" onClick={downloadResponses}>
+                      <Download className="mr-1.5 h-3.5 w-3.5" /> Download Excel
                     </Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {entries.map((entry, i) => (
+                    <div key={i} className="rounded-xl border border-gray-200 overflow-hidden">
+                      {/* Entry header */}
+                      <div className="flex items-center justify-between bg-gray-50 px-4 py-2.5 border-b border-gray-200">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">{entry.respondent ?? 'Anonymous'}</p>
+                          <p className="text-xs text-gray-400">{entry.email ?? ''} · {formatDateTime(entry.submitted_at)}</p>
+                        </div>
+                        {entry.actionable === true && (
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Actionable</span>
+                        )}
+                        {entry.actionable === false && (
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Not Actionable</span>
+                        )}
+                      </div>
+
+                      {/* Answers */}
+                      <div className="px-4 py-3 space-y-2">
+                        {entry.answers.map((a, ai) => (
+                          <div key={ai} className="text-sm">
+                            <p className="font-medium text-gray-500">{ai + 1}. {a.question}</p>
+                            <p className="mt-0.5 pl-3 text-gray-800">
+                              {a.answer ? a.answer : <span className="italic text-gray-400">No answer</span>}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Actionable / Remarks / Save */}
+                      <div className="border-t border-gray-100 px-4 py-3 space-y-2.5 bg-gray-50/50">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void saveEntry(i, true)}
+                            disabled={savingEntry === i}
+                            className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                              entry.actionable === true
+                                ? 'bg-emerald-500 text-white border-emerald-500'
+                                : 'border-gray-300 text-gray-600 hover:border-emerald-400 hover:text-emerald-600'
+                            }`}
+                          >
+                            Actionable
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void saveEntry(i, false)}
+                            disabled={savingEntry === i}
+                            className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                              entry.actionable === false
+                                ? 'bg-gray-500 text-white border-gray-500'
+                                : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                            }`}
+                          >
+                            Not Actionable
+                          </button>
+                        </div>
+                        <Textarea
+                          placeholder="Add remarks..."
+                          value={entryRemarks[i] ?? entry.remarks ?? ''}
+                          onChange={e => setEntryRemarks(p => ({ ...p, [i]: e.target.value }))}
+                          rows={2}
+                          className="text-sm resize-none"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void saveEntry(i, entry.actionable ?? null)}
+                          disabled={savingEntry === i}
+                        >
+                          {savingEntry === i
+                            ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                            : <Save className="mr-1.5 h-3 w-3" />
+                          }
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )
+          })()}
         </div>
 
         {/* Sidebar: Actions + Timeline */}

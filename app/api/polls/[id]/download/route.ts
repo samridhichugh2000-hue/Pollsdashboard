@@ -7,6 +7,8 @@ interface ResponseEntry {
   email?: string
   submitted_at: string
   answers: { question: string; answer: string }[]
+  actionable?: boolean | null
+  remarks?: string
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -31,6 +33,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     entry.answers.forEach((a, qi) => {
       row[`Q${qi + 1}: ${a.question.slice(0, 60)}${a.question.length > 60 ? '...' : ''}`] = a.answer
     })
+    row['Actionable'] = entry.actionable === true ? 'Yes' : entry.actionable === false ? 'No' : ''
+    row['Remarks'] = entry.remarks ?? ''
     return row
   })
 
