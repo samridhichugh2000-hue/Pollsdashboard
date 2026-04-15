@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/inbox-reader",
-      "schedule": "0 8 * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/reminder-scheduler",

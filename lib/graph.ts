@@ -79,9 +79,16 @@ export async function getInboxMessages(userEmail: string, filter?: string): Prom
   return messages
 }
 
+const POLL_KEYWORDS = ['poll', 'survey', 'questionnaire', 'feedback form', 'run a poll', 'create a poll', 'conduct a poll', 'conduct a survey']
+const EXCLUDE_SENDERS = [process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com']
+
 export async function getUnreadPollEmails(userEmail: string): Promise<GraphMessage[]> {
   const messages = await getInboxMessages(userEmail, `isRead eq false`)
-  return messages.filter((m) => m.subject.toLowerCase().includes('poll'))
+  return messages.filter((m) => {
+    if (EXCLUDE_SENDERS.some(s => m.from.emailAddress.address.toLowerCase() === s.toLowerCase())) return false
+    const text = `${m.subject} ${m.bodyPreview}`.toLowerCase()
+    return POLL_KEYWORDS.some(kw => text.includes(kw))
+  })
 }
 
 // ─── Email Sending ─────────────────────────────────────────────────────────────
