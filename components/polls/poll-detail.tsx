@@ -101,6 +101,25 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     return () => clearInterval(interval)
   }, [poll.id, poll.status])
 
+  // Fetch / refresh response data from API
+  const refreshResponse = async () => {
+    try {
+      const res = await fetch(`/api/polls/${poll.id}`)
+      if (!res.ok) return
+      const data = await res.json() as { response: PollResponse | null }
+      setResponse(data.response)
+    } catch { /* silent */ }
+  }
+
+  // Auto-refresh responses every 30s while poll is live
+  useEffect(() => {
+    const LIVE = ['SENT', 'REMINDER_SENT']
+    if (!LIVE.includes(poll.status)) return
+    void refreshResponse()                     // load immediately on mount
+    const interval = setInterval(refreshResponse, 30_000)
+    return () => clearInterval(interval)
+  }, [poll.id, poll.status]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const hasChanges =
     editSubject !== (poll.subject || `Poll: ${poll.topic}`) ||
     editEmailBody !== (poll.draft_email_body || '') ||
@@ -675,7 +694,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
       </div>
 
       {/* Results & Follow-up — full width */}
-      {response?.response_data && (() => {
+      {['SENT', 'REMINDER_SENT', 'CLOSED', 'RESULTS_UPLOADED', 'ARCHIVED'].includes(poll.status) && (() => {
         type EntryType = {
           email?: string
           respondent?: string
@@ -684,7 +703,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
           actionable?: boolean | null
           remarks?: string
         }
-        const entries = JSON.parse(response.response_data) as EntryType[]
+        const entries: EntryType[] = response?.response_data ? JSON.parse(response.response_data) as EntryType[] : []
         return (
           <Card className="mt-6">
             <CardHeader>
@@ -695,13 +714,25 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                     ({entries.length} {entries.length === 1 ? 'response' : 'responses'})
                   </span>
                 </CardTitle>
-                <Button size="sm" variant="outline" onClick={downloadResponses}>
-                  <Download className="mr-1.5 h-3.5 w-3.5" /> Download Excel
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => void refreshResponse()}>
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
+                  </Button>
+                  {entries.length > 0 && (
+                    <Button size="sm" variant="outline" onClick={downloadResponses}>
+                      <Download className="mr-1.5 h-3.5 w-3.5" /> Download Excel
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
-              {entries.map((entry, i) => (
+              {entries.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-200 px-6 py-10 text-center">
+                  <p className="text-sm font-medium text-gray-400">No responses yet</p>
+                  <p className="mt-1 text-xs text-gray-300">Responses will appear here as employees fill out the poll. Auto-refreshes every 30 s.</p>
+                </div>
+              ) : entries.map((entry, i) => (
                 <div key={i} className="rounded-xl border border-gray-200">
                   {/* Entry header */}
                   <div className="flex items-center justify-between bg-gray-50 px-5 py-3 border-b border-gray-200 rounded-t-xl">
