@@ -102,24 +102,16 @@ function extractEmail(addr: string): string {
   return match ? match[1].trim() : addr.trim()
 }
 
-// Display sender address — overrides the "From" shown to recipients.
-// Priya's mailbox is still used for API routing; she must have Send As
-// permission on POLLS_MAILBOX for the override to work without an "on behalf of" note.
-function displayFrom(apiFrom: string): { emailAddress: { address: string } } {
-  const sender = process.env.POLLS_MAILBOX ?? apiFrom
-  return { emailAddress: { address: sender } }
-}
-
 export async function sendEmail(options: SendEmailOptions): Promise<void> {
   const toRecipients = Array.isArray(options.to)
     ? options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
     : [{ emailAddress: { address: extractEmail(options.to) } }]
 
+  // Approval requests, results and reminders are sent from Priya's address — no from override.
   const message: Record<string, unknown> = {
     subject: options.subject,
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
-    from: displayFrom(options.from),
   }
 
   if (options.attachments?.length) {
@@ -145,11 +137,14 @@ export async function sendEmailGetId(options: SendEmailOptions): Promise<string>
     ? options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
     : [{ emailAddress: { address: extractEmail(options.to) } }]
 
+  // Poll release emails are sent from POLLS_MAILBOX (polls@koenig-solutions.com).
+  // Priya's mailbox handles the API call; she must have Send As permission on the group.
+  const pollsSender = process.env.POLLS_MAILBOX ?? options.from
   const messageBody: Record<string, unknown> = {
     subject: options.subject,
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
-    from: displayFrom(options.from),
+    from: { emailAddress: { address: pollsSender } },
   }
   if (options.attachments?.length) {
     messageBody.attachments = options.attachments.map((a) => ({
@@ -193,10 +188,10 @@ export async function replyToMessageWithHtml(
   }
 
   const toRecipients = options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
+  // Results are shared from Priya's address — no from override.
   const message: Record<string, unknown> = {
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
-    from: displayFrom(from),
   }
   if (options.attachments?.length) {
     message.attachments = options.attachments.map((a) => ({
