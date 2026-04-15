@@ -5,55 +5,16 @@ import { getDb } from '@/lib/db/client'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
 import { formatDate } from '@/lib/utils'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { GraphMessage } from '@/lib/graph'
 
-// Use Gemini to semantically classify which emails are requesting a poll/survey
-async function filterPollRelatedEmails(messages: GraphMessage[]): Promise<GraphMessage[]> {
-  if (!messages.length) return []
+// Keyword filter — no AI needed; mailbox access is via Microsoft Graph (Azure AD creds)
+const POLL_KEYWORDS = ['poll', 'survey', 'questionnaire', 'feedback form', 'rms', 'run a poll', 'create a poll', 'sending a poll']
 
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    // Fallback to keyword matching if Gemini not configured
-    const kw = ['poll', 'survey', 'questionnaire', 'feedback form', 'run a poll', 'create a poll']
-    return messages.filter(m => {
-      const text = `${m.subject} ${m.bodyPreview}`.toLowerCase()
-      return kw.some(k => text.includes(k))
-    })
-  }
-
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-
-  const emailList = messages.map((m, i) => (
-    `[${i}] Subject: ${m.subject}\nFrom: ${m.from.emailAddress.name} <${m.from.emailAddress.address}>\nPreview: ${m.bodyPreview}`
-  )).join('\n\n')
-
-  const prompt = `You are an email classifier for an HR team. Review the following emails from Priya's inbox and identify which ones are:
-- Requesting to create, run, or conduct a poll, survey, or questionnaire
-- Asking for employee feedback via a structured format
-- Mentioning sending out a poll or survey to a team or department
-
-Return ONLY a JSON array of the zero-based indices of matching emails. Example: [0, 2, 4]
-If none match, return: []
-Do not return any explanation — just the JSON array.
-
-Emails:
-${emailList}`
-
-  try {
-    const result = await model.generateContent(prompt)
-    const raw = result.response.text().trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-    const indices = JSON.parse(raw) as number[]
-    return indices.map(i => messages[i]).filter(Boolean)
-  } catch {
-    // Fallback to keyword matching on Gemini error
-    const kw = ['poll', 'survey', 'questionnaire', 'feedback form']
-    return messages.filter(m => {
-      const text = `${m.subject} ${m.bodyPreview}`.toLowerCase()
-      return kw.some(k => text.includes(k))
-    })
-  }
+function filterPollRelatedEmails(messages: GraphMessage[]): GraphMessage[] {
+  return messages.filter(m => {
+    const text = `${m.subject} ${m.bodyPreview}`.toLowerCase()
+    return POLL_KEYWORDS.some(kw => text.includes(kw))
+  })
 }
 
 async function getAuthorizedEmails(): Promise<Set<string>> {
@@ -61,7 +22,7 @@ async function getAuthorizedEmails(): Promise<Set<string>> {
   return new Set(result.rows.map((r) => (r.email as string).toLowerCase()))
 }
 
-// GET — return all of today's inbox emails (no AI filtering — Priya decides which to act on)
+// GET — return today's poll-related emails, classified by Claude
 export async function GET() {
   try {
     const priyaEmail = process.env.PRIYA_EMAIL!
@@ -72,7 +33,8 @@ export async function GET() {
     const dateFilter = `receivedDateTime ge ${todayStart.toISOString().replace('.000Z', 'Z')}`
 
     const messages = await getInboxMessages(priyaEmail, dateFilter)
-    return NextResponse.json(messages)
+    const filtered = filterPollRelatedEmails(messages)
+    return NextResponse.json(filtered)
   } catch (err) {
     console.error('Inbox fetch error:', err)
     return NextResponse.json({ error: 'Failed to read inbox' }, { status: 500 })
