@@ -4,8 +4,8 @@ import { getAllPolls } from '@/lib/db/queries'
 import { PollsTable } from '@/components/polls/polls-table'
 
 export default async function ArchivedPage() {
-  const polls = await getAllPolls()
-  const archived = polls.filter(p => p.status === 'ARCHIVED')
+  const raw = await getAllPolls()
+  const archived = JSON.parse(JSON.stringify(raw.filter(p => p.status === 'ARCHIVED'))) as typeof raw
 
   return (
     <div className="space-y-4">
