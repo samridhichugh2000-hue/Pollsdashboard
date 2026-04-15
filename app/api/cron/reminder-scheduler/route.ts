@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getPollsByStatus, updatePollStatus, createAuditLog } from '@/lib/db/queries'
-import { sendEmail } from '@/lib/graph'
+import { sendEmail, replyToMessageWithHtml } from '@/lib/graph'
 import { buildPollEmailHtml, formatDate, getNextWorkingDay } from '@/lib/utils'
 import { isWeekend } from 'date-fns'
 
@@ -42,12 +42,27 @@ export async function GET(req: Request) {
         deadline,
       })
 
-      await sendEmail({
-        from: process.env.PRIYA_EMAIL!,
-        to: releaseEmails,
-        subject: `Reminder: ${poll.topic} — Poll Closing Soon`,
-        htmlBody,
-      })
+      // Send as a reply on the original poll release thread so recipients
+      // see it as a follow-up in the same conversation, not a separate email.
+      if (poll.release_message_id) {
+        await replyToMessageWithHtml(
+          process.env.PRIYA_EMAIL!,
+          poll.release_message_id,
+          {
+            subject: `Reminder: ${poll.topic} — Poll Closing Soon`,
+            htmlBody,
+            to: releaseEmails,
+          }
+        )
+      } else {
+        // Fallback for polls released before release_message_id was stored
+        await sendEmail({
+          from: process.env.PRIYA_EMAIL!,
+          to: releaseEmails,
+          subject: `Reminder: ${poll.topic} — Poll Closing Soon`,
+          htmlBody,
+        })
+      }
 
       await updatePollStatus(poll.id, 'REMINDER_SENT', {
         reminder_sent_at: new Date().toISOString(),
