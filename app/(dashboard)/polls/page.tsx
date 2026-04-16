@@ -31,6 +31,18 @@ function PollsContent() {
     finally { setLoading(false) }
   }, [])
 
+  const handleRefresh = useCallback(async () => {
+    // Sync inbox emails first, then reload polls
+    try {
+      const sync = await fetch('/api/inbox/sync', { method: 'POST' })
+      const data = await sync.json() as { processed?: number; error?: string }
+      if (sync.ok && data.processed && data.processed > 0) {
+        toast.success(`${data.processed} new poll${data.processed > 1 ? 's' : ''} detected from inbox`)
+      }
+    } catch { /* silent — don't block poll refresh on sync failure */ }
+    void fetchPolls()
+  }, [fetchPolls])
+
   useEffect(() => { void fetchPolls() }, [fetchPolls])
 
   const handleMarkClosed = async (pollId: string) => {
@@ -153,7 +165,7 @@ function PollsContent() {
           </Button>
           <Button variant="outline" size="sm"
             className="border-white/20 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
-            onClick={fetchPolls}>
+            onClick={() => void handleRefresh()}>
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
