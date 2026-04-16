@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Plus, RefreshCw, Copy, X } from 'lucide-react'
+import { Plus, RefreshCw, Copy, X, CalendarRange } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,8 @@ function PollsContent() {
   const [polls, setPolls] = useState<Poll[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -73,16 +75,32 @@ function PollsContent() {
 
   const active = (p: Poll) => p.status !== 'ARCHIVED' && p.status !== 'REJECTED'
 
-  // Apply search filter on top of all tab filters
+  // Apply search + date range filter on top of all tab filters
   const applySearch = (list: Poll[]): Poll[] => {
-    if (!searchQuery) return list
-    return list.filter(p =>
-      p.topic.toLowerCase().includes(searchQuery) ||
-      (p.department ?? '').toLowerCase().includes(searchQuery) ||
-      p.status.toLowerCase().includes(searchQuery) ||
-      (p.requested_by ?? '').toLowerCase().includes(searchQuery)
-    )
+    let result = list
+    if (searchQuery) {
+      result = result.filter(p =>
+        p.topic.toLowerCase().includes(searchQuery) ||
+        (p.department ?? '').toLowerCase().includes(searchQuery) ||
+        p.status.toLowerCase().includes(searchQuery) ||
+        (p.requested_by ?? '').toLowerCase().includes(searchQuery)
+      )
+    }
+    if (dateFrom) {
+      const from = new Date(dateFrom)
+      from.setHours(0, 0, 0, 0)
+      result = result.filter(p => new Date(p.created_at) >= from)
+    }
+    if (dateTo) {
+      const to = new Date(dateTo)
+      to.setHours(23, 59, 59, 999)
+      result = result.filter(p => new Date(p.created_at) <= to)
+    }
+    return result
   }
+
+  const hasDateFilter = dateFrom || dateTo
+  const clearDateFilter = () => { setDateFrom(''); setDateTo('') }
 
   const filterByTab = (tab: string): Poll[] => {
     let base: Poll[]
@@ -150,6 +168,31 @@ function PollsContent() {
             </DialogContent>
           </Dialog>
         </div>
+      </div>
+
+      {/* Date range filter */}
+      <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 py-2.5">
+        <CalendarRange className="h-4 w-4 text-white/60 flex-shrink-0" />
+        <span className="text-xs text-white/60 flex-shrink-0">From</span>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={e => setDateFrom(e.target.value)}
+          className="bg-transparent text-sm text-white [color-scheme:dark] outline-none cursor-pointer"
+        />
+        <span className="text-xs text-white/60 flex-shrink-0">To</span>
+        <input
+          type="date"
+          value={dateTo}
+          onChange={e => setDateTo(e.target.value)}
+          min={dateFrom || undefined}
+          className="bg-transparent text-sm text-white [color-scheme:dark] outline-none cursor-pointer"
+        />
+        {hasDateFilter && (
+          <button onClick={clearDateFilter} className="ml-auto flex items-center gap-1 text-xs text-white/50 hover:text-white transition-colors">
+            <X className="h-3.5 w-3.5" /> Clear
+          </button>
+        )}
       </div>
 
       {/* Search active banner */}
