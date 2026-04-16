@@ -52,13 +52,13 @@ const cards = [
     suffix: '%',
   },
   {
-    key: 'resultsUploadedPct' as keyof KPIData,
-    label: 'Results',
-    sub: 'Share rate',
+    key: 'resultsUploaded' as keyof KPIData,
+    label: 'Results Shared',
+    sub: 'Total shared',
     icon: Upload,
     color: 'text-indigo-500',
     iconBg: 'bg-indigo-50',
-    suffix: '%',
+    suffix: '',
   },
 ]
 

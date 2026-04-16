@@ -11,14 +11,17 @@ import type { Poll } from '@/types'
 interface PollsTableProps {
   polls: Poll[]
   onMarkClosed?: (pollId: string) => void
+  onCloseExternal?: (pollId: string) => void
   onArchive?: (pollId: string) => void
   onReject?: (pollId: string) => void
+  onRejectExternal?: (pollId: string, reason: string) => void
 }
 
-export function PollsTable({ polls, onMarkClosed, onArchive, onReject }: PollsTableProps) {
+export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, onReject, onRejectExternal }: PollsTableProps) {
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const [confirmArchive, setConfirmArchive] = useState<string | null>(null)
   const [confirmReject, setConfirmReject] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
 
   if (polls.length === 0) {
     return (
@@ -80,30 +83,56 @@ export function PollsTable({ polls, onMarkClosed, onArchive, onReject }: PollsTa
                       className="text-xs font-medium text-cyan-600 hover:text-cyan-800 hover:underline">
                       View
                     </Link>
-                    {onReject && poll.source === 'external' && !['REJECTED', 'ARCHIVED', 'CLOSED', 'RESULTS_UPLOADED'].includes(poll.status) && (
+                    {(onReject || onRejectExternal) && poll.source === 'external' && !['REJECTED', 'ARCHIVED', 'CLOSED', 'RESULTS_UPLOADED'].includes(poll.status) && (
                       confirmReject === poll.id ? (
-                        <div className="flex items-center gap-1">
-                          <Button variant="destructive" size="sm" className="h-6 text-xs"
-                            onClick={() => { onReject(poll.id); setConfirmReject(null) }}>
-                            Confirm
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-6 text-xs"
-                            onClick={() => setConfirmReject(null)}>
-                            Cancel
-                          </Button>
+                        <div className="flex flex-col gap-1.5" style={{ minWidth: 200 }}>
+                          <textarea
+                            autoFocus
+                            rows={2}
+                            placeholder="Reason for rejection (required)"
+                            value={rejectReason}
+                            onChange={e => setRejectReason(e.target.value)}
+                            className="w-full rounded border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none"
+                          />
+                          <div className="flex gap-1">
+                            <Button variant="destructive" size="sm" className="h-6 text-xs"
+                              disabled={!rejectReason.trim()}
+                              onClick={() => {
+                                if (onRejectExternal) {
+                                  onRejectExternal(poll.id, rejectReason.trim())
+                                } else {
+                                  onReject?.(poll.id)
+                                }
+                                setConfirmReject(null)
+                                setRejectReason('')
+                              }}>
+                              Confirm
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-6 text-xs"
+                              onClick={() => { setConfirmReject(null); setRejectReason('') }}>
+                              Cancel
+                            </Button>
+                          </div>
                         </div>
                       ) : (
                         <button className="text-xs font-medium text-orange-500 hover:text-orange-700 hover:underline"
-                          onClick={() => setConfirmReject(poll.id)}>
+                          onClick={() => { setConfirmReject(poll.id); setRejectReason('') }}>
                           Reject
                         </button>
                       )
                     )}
-                    {onMarkClosed && !['CLOSED', 'RESULTS_UPLOADED', 'ARCHIVED', 'REJECTED'].includes(poll.status) && (
+                    {(onCloseExternal && poll.source === 'external' || onMarkClosed) && !['CLOSED', 'ARCHIVED', 'REJECTED'].includes(poll.status) && (
                       confirmClose === poll.id ? (
                         <div className="flex items-center gap-1">
                           <Button variant="destructive" size="sm" className="h-6 text-xs"
-                            onClick={() => { onMarkClosed(poll.id); setConfirmClose(null) }}>
+                            onClick={() => {
+                              if (onCloseExternal && poll.source === 'external') {
+                                onCloseExternal(poll.id)
+                              } else {
+                                onMarkClosed?.(poll.id)
+                              }
+                              setConfirmClose(null)
+                            }}>
                             Confirm
                           </Button>
                           <Button variant="ghost" size="sm" className="h-6 text-xs"
@@ -114,7 +143,7 @@ export function PollsTable({ polls, onMarkClosed, onArchive, onReject }: PollsTa
                       ) : (
                         <button className="text-xs font-medium text-rose-500 hover:text-rose-700 hover:underline"
                           onClick={() => setConfirmClose(poll.id)}>
-                          Close
+                          {onCloseExternal && poll.source === 'external' ? 'Close & Notify' : 'Close'}
                         </button>
                       )
                     )}

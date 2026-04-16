@@ -102,6 +102,7 @@ export interface EmailAttachment {
 export interface SendEmailOptions {
   from: string
   to: string | string[]
+  cc?: string | string[]
   bcc?: string | string[]
   subject: string
   htmlBody: string
@@ -125,6 +126,11 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     subject: options.subject,
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
+  }
+
+  if (options.cc) {
+    const ccList = Array.isArray(options.cc) ? options.cc : [options.cc]
+    message.ccRecipients = ccList.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
   }
 
   if (options.attachments?.length) {
@@ -188,24 +194,52 @@ export async function sendEmailGetId(options: SendEmailOptions): Promise<string>
 // Replies on the same thread as the original release email.
 // Looks up the sent message in Sent Items by its RFC internetMessageId, then uses
 // the Graph /reply endpoint (which handles threading natively).
+//
+// Exchange saves the sent copy to the FROM address's Sent Items (polls mailbox),
+// not Priya's, so we search polls@ first, then fall back to Priya's mailbox.
+// ConsistencyLevel: eventual is required for filtering on non-indexed properties.
 export async function replyToMessageWithHtml(
   from: string,
   internetMessageId: string, // RFC Message-ID stored from sendEmailGetId
   options: { subject: string; htmlBody: string; to: string[]; attachments?: EmailAttachment[] }
 ): Promise<void> {
-  // Find the message's current Graph ID in Sent Items using the stable RFC header
   const filter = `internetMessageId eq '${internetMessageId.replace(/'/g, "''")}'`
-  const search = await graphRequest<{ value: Array<{ id: string }> }>(
-    `/users/${from}/mailFolders/SentItems/messages?$filter=${encodeURIComponent(filter)}&$select=id&$top=1`
-  )
+  // $count=true is required alongside ConsistencyLevel:eventual for advanced query capabilities
+  const qs = `$filter=${encodeURIComponent(filter)}&$select=id&$top=1&$count=true`
 
-  const sentMessageId = search.value?.[0]?.id
-  if (!sentMessageId) {
-    throw new Error(`Could not find release email in Sent Items (internetMessageId: ${internetMessageId})`)
+  // Search polls mailbox Sent Items first (release email sent "From: polls@"),
+  // then fall back to Priya's Sent Items.
+  const pollsMailbox = process.env.POLLS_MAILBOX
+  const mailboxesToSearch = [...new Set([pollsMailbox, from].filter(Boolean))] as string[]
+
+  let sentMessageId: string | undefined
+  let foundInMailbox = from
+
+  console.log(`[replyToMessageWithHtml] Searching for internetMessageId: ${internetMessageId}`)
+  for (const mailbox of mailboxesToSearch) {
+    try {
+      console.log(`[replyToMessageWithHtml] Searching mailbox: ${mailbox}`)
+      const search = await graphRequest<{ value: Array<{ id: string }> }>(
+        `/users/${mailbox}/mailFolders/SentItems/messages?${qs}`,
+        { headers: { ConsistencyLevel: 'eventual' } }
+      )
+      console.log(`[replyToMessageWithHtml] Found ${search.value?.length ?? 0} result(s) in ${mailbox}`)
+      if (search.value?.[0]?.id) {
+        sentMessageId = search.value[0].id
+        foundInMailbox = mailbox
+        break
+      }
+    } catch (searchErr) {
+      console.warn(`[replyToMessageWithHtml] Could not search mailbox ${mailbox} (skipping):`, searchErr)
+    }
   }
 
+  if (!sentMessageId) {
+    throw new Error(`Could not find release email in Sent Items (internetMessageId: ${internetMessageId}). Searched: ${mailboxesToSearch.join(', ')}`)
+  }
+  console.log(`[replyToMessageWithHtml] Found message ${sentMessageId} in ${foundInMailbox}, sending reply`)
+
   const toRecipients = options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
-  // Results are shared from Priya's address — no from override.
   const message: Record<string, unknown> = {
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
@@ -219,7 +253,7 @@ export async function replyToMessageWithHtml(
     }))
   }
 
-  await graphRequest(`/users/${from}/messages/${sentMessageId}/reply`, {
+  await graphRequest(`/users/${foundInMailbox}/messages/${sentMessageId}/reply`, {
     method: 'POST',
     body: JSON.stringify({ message }),
   })

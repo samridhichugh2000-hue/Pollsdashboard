@@ -31,7 +31,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       'Submitted At': new Date(entry.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
     }
     entry.answers.forEach((a, qi) => {
-      row[`Q${qi + 1}: ${a.question.slice(0, 60)}${a.question.length > 60 ? '...' : ''}`] = a.answer
+      row[`Q${qi + 1}: ${a.question}`] = a.answer
     })
     row['Actionable'] = entry.actionable === true ? 'Yes' : entry.actionable === false ? 'No' : ''
     row['Remarks'] = entry.remarks ?? ''

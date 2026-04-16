@@ -109,7 +109,7 @@ export interface KPIData {
   active: number
   closedThisMonth: number
   rmsTasksCreatedPct: number
-  resultsUploadedPct: number
+  resultsUploaded: number
 }
 
 export interface Notification {

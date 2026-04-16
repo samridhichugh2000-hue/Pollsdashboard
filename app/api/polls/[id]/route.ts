@@ -115,6 +115,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           deadline: pollDeadline,
         })
 
+        const releaseAttachments = Array.isArray(body.attachments)
+          ? (body.attachments as { name: string; contentType: string; contentBytes: string }[])
+          : []
+
         const pollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
         const releaseMessageId = await sendEmailGetId({
           from: process.env.PRIYA_EMAIL!,
@@ -122,6 +126,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           bcc: allEmails,
           subject: poll.subject ?? `Poll: ${poll.topic}`,
           htmlBody: pollHtml,
+          attachments: releaseAttachments,
         })
 
         await updatePollStatus(id, 'SENT', {
@@ -146,6 +151,68 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break
       }
 
+      case 'CLOSE_EXTERNAL_REQUEST': {
+        const closedAt = new Date()
+        await updatePollStatus(id, 'CLOSED', { closed_at: closedAt.toISOString() })
+        await createAuditLog(id, 'POLL_CLOSED', userEmail, { notified: true })
+
+        // Extract requester name + email from "Name <email>" or bare "email"
+        const nameEmailMatch = poll.requested_by?.match(/^(.+?)\s*<([^>]+)>$/)
+        const requesterEmail = nameEmailMatch ? nameEmailMatch[2].trim() : poll.requested_by?.trim()
+        const requesterName = nameEmailMatch ? nameEmailMatch[1].trim() : 'there'
+
+        if (requesterEmail && process.env.PRIYA_EMAIL) {
+          const closedDateStr = closedAt.toLocaleDateString('en-IN', {
+            day: 'numeric', month: 'long', year: 'numeric',
+            timeZone: 'Asia/Kolkata',
+          })
+          const closedTimeStr = closedAt.toLocaleTimeString('en-IN', {
+            hour: '2-digit', minute: '2-digit',
+            timeZone: 'Asia/Kolkata',
+          })
+
+          const closureHtml = `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827;">
+  <div style="background:#6b7280;padding:24px 32px;border-radius:8px 8px 0 0;">
+    <h2 style="margin:0;color:#fff;font-size:20px;">Poll Request Closed</h2>
+  </div>
+  <div style="background:#f9fafb;padding:24px 32px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none;">
+    <p style="margin:0 0 16px;font-size:14px;">Hi <strong>${requesterName}</strong>,</p>
+    <p style="margin:0 0 16px;font-size:14px;">We wanted to let you know that your poll request has been closed.</p>
+    <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:6px;border:1px solid #e5e7eb;margin-bottom:16px;">
+      <tr style="background:#f3f4f6;">
+        <td style="padding:8px 12px;color:#6b7280;font-size:13px;width:130px;">Topic</td>
+        <td style="padding:8px 12px;font-size:13px;font-weight:600;">${poll.topic}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Department</td>
+        <td style="padding:8px 12px;font-size:13px;">${poll.department}</td>
+      </tr>
+      <tr style="background:#f3f4f6;">
+        <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Status</td>
+        <td style="padding:8px 12px;font-size:13px;">Closed</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Closed On</td>
+        <td style="padding:8px 12px;font-size:13px;">${closedDateStr} at ${closedTimeStr} IST</td>
+      </tr>
+    </table>
+    <p style="margin:0 0 8px;font-size:14px;">If you have any concerns or questions, please feel free to reply to this email and we will be happy to assist.</p>
+    <p style="margin:0;font-size:13px;color:#6b7280;">Thank you for your request.</p>
+  </div>
+</div>`
+
+          await sendEmail({
+            from: process.env.PRIYA_EMAIL,
+            to: requesterEmail,
+            cc: process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com',
+            subject: `Poll Request Closed: ${poll.topic}`,
+            htmlBody: closureHtml,
+          })
+        }
+        break
+      }
+
       case 'REOPEN': {
         await updatePollStatus(id, 'SENT', { closed_at: null })
         await createAuditLog(id, 'POLL_REOPENED', userEmail)
@@ -161,6 +228,63 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'REJECT': {
         await updatePollStatus(id, 'REJECTED')
         await createAuditLog(id, 'POLL_REJECTED', userEmail, { reason: body.reason as string | undefined })
+        break
+      }
+
+      case 'REJECT_EXTERNAL_REQUEST': {
+        const rejectionReason = body.reason as string
+        if (!rejectionReason?.trim()) {
+          return NextResponse.json({ error: 'A reason is required to reject an external request.' }, { status: 400 })
+        }
+
+        await updatePollStatus(id, 'REJECTED')
+        await createAuditLog(id, 'POLL_REJECTED', userEmail, { reason: rejectionReason, notified: true })
+
+        // Extract requester name + email from "Name <email>" or bare "email"
+        const reqMatch = poll.requested_by?.match(/^(.+?)\s*<([^>]+)>$/)
+        const requesterEmail = reqMatch ? reqMatch[2].trim() : poll.requested_by?.trim()
+        const requesterName = reqMatch ? reqMatch[1].trim() : 'there'
+
+        if (requesterEmail && process.env.PRIYA_EMAIL) {
+          const rejectionHtml = `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827;">
+  <div style="background:#dc2626;padding:24px 32px;border-radius:8px 8px 0 0;">
+    <h2 style="margin:0;color:#fff;font-size:20px;">Poll Request Not Approved</h2>
+  </div>
+  <div style="background:#f9fafb;padding:24px 32px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none;">
+    <p style="margin:0 0 16px;font-size:14px;">Hi <strong>${requesterName}</strong>,</p>
+    <p style="margin:0 0 16px;font-size:14px;">We have reviewed your poll request and are unable to proceed with it at this time.</p>
+    <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:6px;border:1px solid #e5e7eb;margin-bottom:16px;">
+      <tr style="background:#f3f4f6;">
+        <td style="padding:8px 12px;color:#6b7280;font-size:13px;width:130px;">Topic</td>
+        <td style="padding:8px 12px;font-size:13px;font-weight:600;">${poll.topic}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Department</td>
+        <td style="padding:8px 12px;font-size:13px;">${poll.department}</td>
+      </tr>
+      <tr style="background:#f3f4f6;">
+        <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Status</td>
+        <td style="padding:8px 12px;font-size:13px;">Not Approved</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;color:#6b7280;font-size:13px;vertical-align:top;">Reason</td>
+        <td style="padding:8px 12px;font-size:13px;">${rejectionReason}</td>
+      </tr>
+    </table>
+    <p style="margin:0 0 8px;font-size:14px;">If you have any questions or would like to discuss this further, please feel free to reply to this email.</p>
+    <p style="margin:0;font-size:13px;color:#6b7280;">Thank you for your understanding.</p>
+  </div>
+</div>`
+
+          await sendEmail({
+            from: process.env.PRIYA_EMAIL,
+            to: requesterEmail,
+            cc: process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com',
+            subject: `Poll Request Not Approved: ${poll.topic}`,
+            htmlBody: rejectionHtml,
+          })
+        }
         break
       }
 
@@ -249,6 +373,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           questions: body.questions as string,
           ms_form_link: (body.ms_form_link as string) || existingFormLink,
           ms_form_id: poll.ms_form_id ?? id,
+          ...(body.deadline ? { deadline: new Date(body.deadline as string).toISOString() } : {}),
         })
         await createAuditLog(id, 'DRAFT_UPDATED', userEmail)
         break
@@ -287,7 +412,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             'Submitted At': new Date(entry.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
           }
           entry.answers.forEach((a, qi) => {
-            row[`Q${qi + 1}: ${a.question.slice(0, 60)}${a.question.length > 60 ? '...' : ''}`] = a.answer
+            row[`Q${qi + 1}: ${a.question}`] = a.answer
           })
           return row
         })
@@ -303,24 +428,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const emailHtml = buildResultsEmailHtml(poll.topic)
         const attachment = { name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }
 
-        if (poll.release_message_id) {
-          // Reply on the same thread as the original release email
-          await replyToMessageWithHtml(process.env.PRIYA_EMAIL!, poll.release_message_id, {
-            subject: `Re: Poll Results: ${poll.topic}`,
-            htmlBody: emailHtml,
-            to: shareRecipients,
-            attachments: [attachment],
-          })
-        } else {
-          // Fallback: fresh email if no release message ID stored
-          await sendEmail({
-            from: process.env.PRIYA_EMAIL!,
-            to: shareRecipients,
-            subject: `Poll Results: ${poll.topic}`,
-            htmlBody: emailHtml,
-            attachments: [attachment],
-          })
+        if (!poll.release_message_id) {
+          return NextResponse.json({ error: 'No release thread found for this poll. Results can only be shared on the original poll email thread.' }, { status: 400 })
         }
+
+        await replyToMessageWithHtml(process.env.PRIYA_EMAIL!, poll.release_message_id, {
+          subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
+          htmlBody: emailHtml,
+          to: shareRecipients,
+          attachments: [attachment],
+        })
 
         await updatePollStatus(id, 'RESULTS_UPLOADED', { results_uploaded_at: new Date().toISOString() })
         await createAuditLog(id, 'RESULTS_SHARED', userEmail, { recipients: shareRecipients })

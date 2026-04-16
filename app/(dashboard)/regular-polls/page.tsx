@@ -100,8 +100,9 @@ export default function RegularPollsPage() {
 
   // Release dialog
   const [releaseId, setReleaseId] = useState<string | null>(null)
-  const [releaseForm, setReleaseForm] = useState<{ subject: string; draft_email_body: string; questions: Question[] }>({
-    subject: '', draft_email_body: '', questions: [],
+  const defaultDeadline = () => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString().split('T')[0] }
+  const [releaseForm, setReleaseForm] = useState<{ subject: string; draft_email_body: string; questions: Question[]; deadline: string }>({
+    subject: '', draft_email_body: '', questions: [], deadline: defaultDeadline(),
   })
   const [releasing, setReleasing] = useState(false)
 
@@ -186,6 +187,7 @@ export default function RegularPollsPage() {
       subject: t.subject,
       draft_email_body: t.draft_email_body,
       questions: parseQuestions(t.questions),
+      deadline: defaultDeadline(),
     })
   }
 
@@ -203,6 +205,7 @@ export default function RegularPollsPage() {
           subject: releaseForm.subject,
           draft_email_body: releaseForm.draft_email_body,
           questions: JSON.stringify(releaseForm.questions.filter(q => q.text.trim())),
+          deadline: releaseForm.deadline,
         }),
       })
       if (!res.ok) {
@@ -501,6 +504,25 @@ export default function RegularPollsPage() {
                 <textarea rows={6} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-y"
                   value={releaseForm.draft_email_body}
                   onChange={e => setReleaseForm(f => ({ ...f, draft_email_body: e.target.value }))} />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-700">
+                  Response Deadline
+                  {releaseForm.deadline === defaultDeadline() && (
+                    <span className="ml-2 font-normal text-gray-400">(48 hrs default)</span>
+                  )}
+                </label>
+                <input
+                  type="date"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={releaseForm.deadline}
+                  onChange={e => setReleaseForm(f => ({ ...f, deadline: e.target.value || defaultDeadline() }))}
+                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
+                    releaseForm.deadline === defaultDeadline() ? 'border-gray-200 text-gray-400' : 'border-cyan-300 text-gray-800'
+                  }`}
+                />
+                <p className="mt-1 text-xs text-amber-600">Please choose a suitable deadline — the 48-hour default may not apply.</p>
               </div>
 
               <div>

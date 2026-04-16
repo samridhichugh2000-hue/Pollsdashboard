@@ -55,7 +55,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!recipients.length) return NextResponse.json({ error: 'No recipients configured.' }, { status: 400 })
 
         const appUrl = process.env.NEXTAUTH_URL?.replace('http://localhost:3000', 'https://pollsdashboard.vercel.app') ?? 'https://pollsdashboard.vercel.app'
-        const deadline = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+        const deadlineRaw = body.deadline as string | undefined
+        const deadline = deadlineRaw ? new Date(deadlineRaw).toISOString() : new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
 
         // Create a standard poll record (pre-approved, skip approval workflow)
         const poll = await createPoll({

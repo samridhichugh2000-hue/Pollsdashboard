@@ -5,8 +5,8 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { KPICards } from '@/components/dashboard/kpi-cards'
-import { AlertTriangle, Clock, ExternalLink, Bell, CalendarClock } from 'lucide-react'
-import { formatRelative, formatDateTime, isApprovalOverdue } from '@/lib/utils'
+import { AlertTriangle, Clock, ExternalLink, Bell, CalendarClock, CalendarRange, X } from 'lucide-react'
+import { formatRelative, isApprovalOverdue } from '@/lib/utils'
 import { StatusBadge } from '@/components/polls/status-badge'
 import type { Poll, KPIData, RegularPoll } from '@/types'
 
@@ -16,7 +16,7 @@ const defaultKPI: KPIData = {
   active: 0,
   closedThisMonth: 0,
   rmsTasksCreatedPct: 0,
-  resultsUploadedPct: 0,
+  resultsUploaded: 0,
 }
 
 function SkeletonCard({ className = '' }: { className?: string }) {
@@ -28,11 +28,13 @@ export default function DashboardPage() {
   const [polls, setPolls] = useState<Poll[]>([])
   const [regularPolls, setRegularPolls] = useState<RegularPoll[]>([])
   const [loading, setLoading] = useState(true)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   const fetchData = useCallback(() =>
     Promise.all([
-      fetch('/api/kpi').then((r) => r.json()),
-      fetch('/api/polls').then((r) => r.json()),
+      fetch('/api/kpi').then((r) => r.ok ? r.json() : defaultKPI),
+      fetch('/api/polls').then((r) => r.ok ? r.json() : []),
       fetch('/api/regular-polls').then((r) => r.ok ? r.json() : []),
     ]).then(([kpiData, pollsData, regularData]: [KPIData, Poll[], RegularPoll[]]) => {
       setKpi(kpiData)
@@ -47,6 +49,20 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [fetchData])
 
+  // Apply date range filter to polls (by created_at)
+  const filteredPolls = polls.filter(p => {
+    if (dateFrom) {
+      const from = new Date(dateFrom); from.setHours(0, 0, 0, 0)
+      if (new Date(p.created_at) < from) return false
+    }
+    if (dateTo) {
+      const to = new Date(dateTo); to.setHours(23, 59, 59, 999)
+      if (new Date(p.created_at) > to) return false
+    }
+    return true
+  })
+  const hasDateFilter = dateFrom || dateTo
+
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
   const dueRegularPolls = regularPolls.filter(p => {
@@ -54,15 +70,15 @@ export default function DashboardPage() {
     const d = new Date(p.next_run_date); d.setHours(0, 0, 0, 0)
     return d <= tomorrow
   })
-  const recentPolls = polls.filter(p => p.status !== 'ARCHIVED').slice(0, 6)
-  const overdueApprovals = polls.filter(
+  const recentPolls = filteredPolls.filter(p => p.status !== 'ARCHIVED').slice(0, 6)
+  const overdueApprovals = filteredPolls.filter(
     (p) => p.status === 'AWAITING_APPROVAL' && isApprovalOverdue(p.updated_at)
   )
-  const activePolls = polls.filter((p) => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
+  const activePolls = filteredPolls.filter((p) => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
 
   // Polls ready for result collection: reminder sent > 24h ago OR sent > 48h ago with no reminder
   const now = Date.now()
-  const readyToCollect = polls.filter((p) => {
+  const readyToCollect = filteredPolls.filter((p) => {
     if (!['SENT', 'REMINDER_SENT'].includes(p.status)) return false
     if (p.reminder_sent_at) {
       return (now - new Date(p.reminder_sent_at).getTime()) / 3_600_000 > 24
@@ -91,6 +107,34 @@ export default function DashboardPage() {
     <div className="space-y-5">
       {/* KPI row */}
       <KPICards data={kpi} />
+
+      {/* Date range filter */}
+      <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 py-2.5">
+        <CalendarRange className="h-4 w-4 text-white/60 flex-shrink-0" />
+        <span className="text-xs text-white/60 flex-shrink-0">From</span>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={e => setDateFrom(e.target.value)}
+          className="bg-transparent text-sm text-white [color-scheme:dark] outline-none cursor-pointer"
+        />
+        <span className="text-xs text-white/60 flex-shrink-0">To</span>
+        <input
+          type="date"
+          value={dateTo}
+          onChange={e => setDateTo(e.target.value)}
+          min={dateFrom || undefined}
+          className="bg-transparent text-sm text-white [color-scheme:dark] outline-none cursor-pointer"
+        />
+        {hasDateFilter && (
+          <button
+            onClick={() => { setDateFrom(''); setDateTo('') }}
+            className="ml-auto flex items-center gap-1 text-xs text-white/50 hover:text-white transition-colors"
+          >
+            <X className="h-3.5 w-3.5" /> Clear
+          </button>
+        )}
+      </div>
 
       {/* Due regular polls alert */}
       {dueRegularPolls.length > 0 && (
@@ -232,11 +276,11 @@ export default function DashboardPage() {
             <h2 className="mb-3 font-semibold text-gray-900">Pipeline</h2>
             <div className="space-y-2.5">
               {[
-                { label: 'Draft', count: polls.filter(p => p.status === 'DRAFT').length, color: 'bg-gray-300' },
-                { label: 'Awaiting Approval', count: polls.filter(p => p.status === 'AWAITING_APPROVAL').length, color: 'bg-amber-400' },
-                { label: 'Approved', count: polls.filter(p => p.status === 'APPROVED').length, color: 'bg-green-400' },
-                { label: 'Sent / Active', count: polls.filter(p => ['SENT','REMINDER_SENT'].includes(p.status)).length, color: 'bg-violet-400' },
-                { label: 'Closed', count: polls.filter(p => ['CLOSED','RESULTS_UPLOADED'].includes(p.status)).length, color: 'bg-slate-400' },
+                { label: 'Draft', count: filteredPolls.filter(p => p.status === 'DRAFT').length, color: 'bg-gray-300' },
+                { label: 'Awaiting Approval', count: filteredPolls.filter(p => p.status === 'AWAITING_APPROVAL').length, color: 'bg-amber-400' },
+                { label: 'Approved', count: filteredPolls.filter(p => p.status === 'APPROVED').length, color: 'bg-green-400' },
+                { label: 'Sent / Active', count: filteredPolls.filter(p => ['SENT','REMINDER_SENT'].includes(p.status)).length, color: 'bg-violet-400' },
+                { label: 'Closed', count: filteredPolls.filter(p => ['CLOSED','RESULTS_UPLOADED'].includes(p.status)).length, color: 'bg-slate-400' },
               ].map(({ label, count, color }) => (
                 <div key={label} className="flex items-center gap-3">
                   <span className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${color}`} />

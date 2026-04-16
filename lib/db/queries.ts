@@ -140,7 +140,6 @@ export async function getKPIData() {
   const total = Number(totalRes.rows[0]?.count ?? 0)
   const rmsTotal = Number((rmsRes.rows[0] as Record<string, unknown>)?.total ?? 0)
   const rmsCreated = Number((rmsRes.rows[0] as Record<string, unknown>)?.created ?? 0)
-  const resTotal = Number((resultsRes.rows[0] as Record<string, unknown>)?.total ?? 0)
   const resUploaded = Number((resultsRes.rows[0] as Record<string, unknown>)?.uploaded ?? 0)
 
   return {
@@ -149,7 +148,7 @@ export async function getKPIData() {
     active: Number(activeRes.rows[0]?.count ?? 0),
     closedThisMonth: Number(closedRes.rows[0]?.count ?? 0),
     rmsTasksCreatedPct: rmsTotal > 0 ? Math.round((rmsCreated / rmsTotal) * 100) : 0,
-    resultsUploadedPct: resTotal > 0 ? Math.round((resUploaded / resTotal) * 100) : 0,
+    resultsUploaded: resUploaded,
   }
 }
 

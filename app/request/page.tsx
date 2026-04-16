@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, CheckCircle2, ClipboardList, ChevronDown, X, Plus } from 'lucide-react'
+import { Loader2, CheckCircle2, ClipboardList, ChevronDown, X, Plus, Paperclip } from 'lucide-react'
 import { QuestionBuilder, parseQuestions } from '@/components/polls/question-builder'
 import type { Question } from '@/components/polls/question-builder'
 
@@ -17,9 +17,26 @@ const TIMELINE_STEPS = [
 ]
 
 const ALLOWED_DOMAIN = 'koenig-solutions.com'
+const MAX_FILES = 5
+const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
 
 function parseEmails(text: string): string[] {
   return text.split(/[\s,;]+/).map(e => e.trim().toLowerCase()).filter(e => e.includes('@'))
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve((reader.result as string).split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
 }
 
 export default function PublicRequestPage() {
@@ -33,12 +50,25 @@ export default function PublicRequestPage() {
   const [questions, setQuestions] = useState<Question[]>(parseQuestions(''))
 
   // Audience state
-  const [audienceGroupId, setAudienceGroupId] = useState('')   // '' | huntGroup.id | '__other__'
+  const [audienceGroupId, setAudienceGroupId] = useState('')
   const [individualEmails, setIndividualEmails] = useState<string[]>([])
   const [emailInput, setEmailInput] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const emailInputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
+
+  // Attachments
+  const [attachments, setAttachments] = useState<File[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Deadline (default: 48 hrs = today + 2 days)
+  const defaultDeadline = (() => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString().split('T')[0] })()
+  const [deadline, setDeadline] = useState(defaultDeadline)
+
+  // Frequency
+  const [isFrequent, setIsFrequent] = useState(false)
+  const [frequency, setFrequency] = useState<'monthly' | 'quarterly'>('monthly')
+  const [frequencyStartDate, setFrequencyStartDate] = useState('')
 
   const [form, setForm] = useState({
     requester_name: '',
@@ -107,6 +137,29 @@ export default function PublicRequestPage() {
     }
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files ?? [])
+    const combined = [...attachments, ...selected]
+    const tooBig = selected.filter(f => f.size > MAX_FILE_BYTES)
+    if (tooBig.length) {
+      setError(`File(s) exceed 5 MB limit: ${tooBig.map(f => f.name).join(', ')}`)
+      e.target.value = ''
+      return
+    }
+    if (combined.length > MAX_FILES) {
+      setError(`You can attach up to ${MAX_FILES} files.`)
+      e.target.value = ''
+      return
+    }
+    setError('')
+    setAttachments(combined)
+    e.target.value = ''
+  }
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index))
+  }
+
   // Derive final audience emails for submit
   const getAudienceEmails = (): string[] => {
     if (audienceGroupId === '__other__') return individualEmails
@@ -127,12 +180,33 @@ export default function PublicRequestPage() {
     const audienceEmails = getAudienceEmails()
     if (!audienceEmails.length) { setError('Please select a target audience or add at least one email.'); return }
 
-    // Derive a human-readable department label
+    if (isFrequent && !frequencyStartDate) {
+      setError('Please select a start date for the recurring poll.')
+      return
+    }
+
     const groupByEmail = new Map(huntGroups.map(g => [g.email.toLowerCase(), g.name]))
     const labels = audienceEmails.map(e => groupByEmail.get(e.toLowerCase()) ?? e)
     const department = labels.join(', ')
 
     const questionTexts = questions.filter(q => q.text.trim()).map(q => q.text)
+
+    // Convert attachments to base64
+    let attachmentData: { name: string; contentType: string; contentBytes: string }[] = []
+    if (attachments.length > 0) {
+      try {
+        attachmentData = await Promise.all(
+          attachments.map(async (f) => ({
+            name: f.name,
+            contentType: f.type || 'application/octet-stream',
+            contentBytes: await fileToBase64(f),
+          }))
+        )
+      } catch {
+        setError('Failed to process attachments. Please try again.')
+        return
+      }
+    }
 
     setLoading(true)
     try {
@@ -146,7 +220,13 @@ export default function PublicRequestPage() {
           department,
           questions: questionTexts,
           context: form.context,
+          deadline,
+          audience_emails: audienceEmails,
           single_response: true,
+          attachments: attachmentData,
+          is_frequent: isFrequent,
+          frequency: isFrequent ? frequency : undefined,
+          frequency_start_date: isFrequent ? frequencyStartDate : undefined,
         }),
       })
       if (!res.ok) { const d = await res.json() as { error: string }; throw new Error(d.error) }
@@ -165,6 +245,11 @@ export default function PublicRequestPage() {
     setIndividualEmails([])
     setEmailInput('')
     setQuestions(parseQuestions(''))
+    setAttachments([])
+    setDeadline(defaultDeadline)
+    setIsFrequent(false)
+    setFrequency('monthly')
+    setFrequencyStartDate('')
   }
 
   const emailSuggestions = emailInput.length >= 2
@@ -288,6 +373,26 @@ export default function PublicRequestPage() {
                 className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition" />
             </div>
 
+            {/* Deadline */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Response Deadline
+                {deadline === defaultDeadline && (
+                  <span className="ml-2 font-normal normal-case text-gray-400">(48 hrs default)</span>
+                )}
+              </label>
+              <input
+                type="date"
+                value={deadline}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={e => setDeadline(e.target.value || defaultDeadline)}
+                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition [color-scheme:light] ${
+                  deadline === defaultDeadline ? 'border-gray-200 text-gray-400' : 'border-cyan-300 text-gray-800'
+                }`}
+              />
+              <p className="text-xs text-amber-600">Please choose a suitable deadline — the 48-hour default may not apply to your poll.</p>
+            </div>
+
             {/* Target Audience */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">Target Audience *</label>
@@ -303,7 +408,6 @@ export default function PublicRequestPage() {
                 <option value="__other__">Other (add manually)</option>
               </select>
 
-              {/* Individual email input — shown only when Other is selected */}
               {audienceGroupId === '__other__' && (
                 <div className="mt-2 space-y-2">
                   <div className="flex items-center gap-1.5">
@@ -311,7 +415,6 @@ export default function PublicRequestPage() {
                     <span className="text-xs text-gray-400">(type, autocomplete, or paste)</span>
                   </div>
 
-                  {/* Added email chips */}
                   {individualEmails.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {individualEmails.map(email => (
@@ -327,7 +430,6 @@ export default function PublicRequestPage() {
                     </div>
                   )}
 
-                  {/* Input with autocomplete */}
                   <div className="relative">
                     <input
                       ref={emailInputRef}
@@ -391,6 +493,113 @@ export default function PublicRequestPage() {
                   className="flex items-center gap-1.5 text-xs font-medium text-cyan-600 hover:text-cyan-700 transition-colors mt-1">
                   <Plus className="h-3.5 w-3.5" /> Add Question
                 </button>
+              )}
+            </div>
+
+            {/* Recurring Poll */}
+            <div className="rounded-xl border border-gray-200 px-4 py-4 space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isFrequent}
+                  onChange={e => setIsFrequent(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                />
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Recurring Poll</p>
+                  <p className="text-xs text-gray-400">This poll should be run on a regular schedule</p>
+                </div>
+              </label>
+
+              {isFrequent && (
+                <div className="ml-7 space-y-3 border-t border-gray-100 pt-3">
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Frequency</p>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="frequency"
+                          value="monthly"
+                          checked={frequency === 'monthly'}
+                          onChange={() => setFrequency('monthly')}
+                          className="h-4 w-4 border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                        />
+                        <span className="text-sm text-gray-700">Monthly</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="frequency"
+                          value="quarterly"
+                          checked={frequency === 'quarterly'}
+                          onChange={() => setFrequency('quarterly')}
+                          className="h-4 w-4 border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                        />
+                        <span className="text-sm text-gray-700">Quarterly</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Starting From *</p>
+                    <input
+                      type="date"
+                      value={frequencyStartDate}
+                      onChange={e => setFrequencyStartDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition"
+                    />
+                    <p className="text-xs text-gray-400">HR will set up the recurring schedule from this date.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Attachments */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Attachments <span className="normal-case font-normal text-gray-400">(optional, max {MAX_FILES} files · 5 MB each)</span>
+              </label>
+
+              {/* Attached file chips */}
+              {attachments.length > 0 && (
+                <div className="space-y-1.5">
+                  {attachments.map((file, i) => (
+                    <div key={i}
+                      className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                        <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                        <span className="text-xs text-gray-400 flex-shrink-0">{formatBytes(file.size)}</span>
+                      </div>
+                      <button type="button" onClick={() => removeAttachment(i)}
+                        className="ml-2 flex-shrink-0 text-gray-400 hover:text-rose-500 transition-colors">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {attachments.length < MAX_FILES && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 hover:border-cyan-400 hover:text-cyan-600 hover:bg-cyan-50 transition-colors"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                    {attachments.length === 0 ? 'Attach files' : 'Attach more files'}
+                  </button>
+                </>
               )}
             </div>
 

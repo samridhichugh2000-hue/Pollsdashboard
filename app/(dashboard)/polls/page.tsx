@@ -55,6 +55,21 @@ function PollsContent() {
     void fetchPolls()
   }
 
+  const handleCloseExternal = async (pollId: string) => {
+    const res = await fetch(`/api/polls/${pollId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'CLOSE_EXTERNAL_REQUEST' }),
+    })
+    if (res.ok) {
+      toast.success('Poll closed and requester notified')
+    } else {
+      const data = await res.json() as { error?: string }
+      toast.error(data.error ?? 'Failed to close poll')
+    }
+    void fetchPolls()
+  }
+
   const handleArchive = async (pollId: string) => {
     const res = await fetch(`/api/polls/${pollId}`, {
       method: 'PATCH',
@@ -78,6 +93,21 @@ function PollsContent() {
     })
     if (res.ok) {
       toast.success('Poll request rejected')
+    } else {
+      const data = await res.json() as { error?: string }
+      toast.error(data.error ?? 'Failed to reject poll')
+    }
+    void fetchPolls()
+  }
+
+  const handleRejectExternal = async (pollId: string, reason: string) => {
+    const res = await fetch(`/api/polls/${pollId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'REJECT_EXTERNAL_REQUEST', reason }),
+    })
+    if (res.ok) {
+      toast.success('Poll request rejected and requester notified')
     } else {
       const data = await res.json() as { error?: string }
       toast.error(data.error ?? 'Failed to reject poll')
@@ -229,15 +259,32 @@ function PollsContent() {
               <TabsList className="bg-gray-100 mb-0 flex-wrap h-auto gap-1">
                 <TabsTrigger value="all">All ({filterByTab('all').length})</TabsTrigger>
                 <TabsTrigger value="inbox">Inbox ({filterByTab('inbox').length})</TabsTrigger>
-                <TabsTrigger value="manual">Manual ({filterByTab('manual').length})</TabsTrigger>
-                <TabsTrigger value="external" className="relative">
-                  External ({filterByTab('external').length})
-                  {filterByTab('external').length > 0 && (
-                    <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-xs font-bold text-white">
-                      {filterByTab('external').length}
-                    </span>
-                  )}
-                </TabsTrigger>
+                {(() => {
+                  const manualNew = filterByTab('manual').filter(p => p.status === 'DRAFT').length
+                  return (
+                    <TabsTrigger value="manual" className="relative">
+                      Manual ({filterByTab('manual').length})
+                      {manualNew > 0 && (
+                        <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-xs font-bold text-white">
+                          {manualNew}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                  )
+                })()}
+                {(() => {
+                  const externalNew = filterByTab('external').filter(p => p.status === 'DRAFT').length
+                  return (
+                    <TabsTrigger value="external" className="relative">
+                      External ({filterByTab('external').length})
+                      {externalNew > 0 && (
+                        <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-xs font-bold text-white">
+                          {externalNew}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                  )
+                })()}
                 <TabsTrigger value="pending">Pending ({filterByTab('pending').length})</TabsTrigger>
                 <TabsTrigger value="active">Active ({filterByTab('active').length})</TabsTrigger>
                 <TabsTrigger value="archived">Archived ({filterByTab('archived').length})</TabsTrigger>
@@ -245,7 +292,14 @@ function PollsContent() {
             </div>
             {(['all', 'inbox', 'manual', 'external', 'pending', 'active'] as const).map((tab) => (
               <TabsContent key={tab} value={tab} className="mt-0">
-                <PollsTable polls={filterByTab(tab)} onMarkClosed={handleMarkClosed} onArchive={handleArchive} onReject={handleReject} />
+                <PollsTable
+                  polls={filterByTab(tab)}
+                  onMarkClosed={handleMarkClosed}
+                  onCloseExternal={handleCloseExternal}
+                  onArchive={handleArchive}
+                  onReject={handleReject}
+                  onRejectExternal={handleRejectExternal}
+                />
               </TabsContent>
             ))}
             <TabsContent value="archived" className="mt-0">

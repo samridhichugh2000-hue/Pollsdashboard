@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download, RefreshCw, Save, X, ChevronDown } from 'lucide-react'
+import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download, RefreshCw, Save, X, ChevronDown, Paperclip } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -38,6 +38,10 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const [editSubject, setEditSubject] = useState(initialPoll.subject || `Poll: ${initialPoll.topic}`)
   const [editEmailBody, setEditEmailBody] = useState(initialPoll.draft_email_body || '')
   const [editQuestions, setEditQuestions] = useState<Question[]>(parseQuestions(initialPoll.questions ?? ''))
+  const defaultDeadline = (() => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString().split('T')[0] })()
+  const [editDeadline, setEditDeadline] = useState(
+    initialPoll.deadline ? initialPoll.deadline.split('T')[0] : defaultDeadline
+  )
   const [keywords, setKeywords] = useState('')
   const [tone, setTone] = useState('professional')
   const [useKeywords, setUseKeywords] = useState(true)
@@ -55,6 +59,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const [customReleaseText, setCustomReleaseText] = useState('')
   const [huntGroupDropdownOpen, setHuntGroupDropdownOpen] = useState(false)
   const huntGroupDropdownRef = useRef<HTMLDivElement>(null)
+  const [releaseAttachments, setReleaseAttachments] = useState<File[]>([])
+  const releaseFileInputRef = useRef<HTMLInputElement>(null)
 
   // Share results state
   const [showShareDialog, setShowShareDialog] = useState(false)
@@ -73,8 +79,9 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
       setEditSubject(poll.subject || `Poll: ${poll.topic}`)
       setEditEmailBody(poll.draft_email_body || '')
       setEditQuestions(parseQuestions(poll.questions ?? ''))
+      setEditDeadline(poll.deadline ? poll.deadline.split('T')[0] : defaultDeadline)
     }
-  }, [poll])
+  }, [poll]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close hunt group dropdown when clicking outside
   useEffect(() => {
@@ -123,7 +130,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const hasChanges =
     editSubject !== (poll.subject || `Poll: ${poll.topic}`) ||
     editEmailBody !== (poll.draft_email_body || '') ||
-    JSON.stringify(editQuestions) !== JSON.stringify(parseQuestions(poll.questions ?? ''))
+    JSON.stringify(editQuestions) !== JSON.stringify(parseQuestions(poll.questions ?? '')) ||
+    editDeadline !== (poll.deadline ? poll.deadline.split('T')[0] : defaultDeadline)
 
   const runAction = async (action: string, extra?: Record<string, unknown>) => {
     setLoading(action)
@@ -209,6 +217,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
           subject: editSubject,
           draft_email_body: editEmailBody,
           questions: JSON.stringify(editQuestions),
+          deadline: editDeadline,
         }),
       })
       if (!res.ok) {
@@ -225,11 +234,38 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     }
   }
 
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve((reader.result as string).split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+
+  const handleReleaseFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files ?? [])
+    const tooBig = selected.filter(f => f.size > 5 * 1024 * 1024)
+    if (tooBig.length) {
+      toast.error(`File(s) exceed 5 MB: ${tooBig.map(f => f.name).join(', ')}`)
+      e.target.value = ''
+      return
+    }
+    const combined = [...releaseAttachments, ...selected]
+    if (combined.length > 5) {
+      toast.error('Maximum 5 attachments allowed.')
+      e.target.value = ''
+      return
+    }
+    setReleaseAttachments(combined)
+    e.target.value = ''
+  }
+
   const openReleaseDialog = async () => {
     setShowReleaseDialog(true)
     setSelectedHuntGroupIds([])
     setCustomReleaseText('')
     setHuntGroupDropdownOpen(false)
+    setReleaseAttachments([])
     setHuntGroupsLoading(true)
     try {
       const res = await fetch('/api/hunt-groups')
@@ -247,8 +283,25 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     const manualEmails = parseEmails(customReleaseText)
     const allEmails = [...new Set([...huntGroupSelected.map(g => g.email), ...manualEmails])]
     if (!allEmails.length) { toast.error('Add at least one recipient.'); return }
+
+    let attachments: { name: string; contentType: string; contentBytes: string }[] = []
+    if (releaseAttachments.length > 0) {
+      try {
+        attachments = await Promise.all(
+          releaseAttachments.map(async (f) => ({
+            name: f.name,
+            contentType: f.type || 'application/octet-stream',
+            contentBytes: await fileToBase64(f),
+          }))
+        )
+      } catch {
+        toast.error('Failed to process attachments.')
+        return
+      }
+    }
+
     setShowReleaseDialog(false)
-    void runAction('RELEASE_POLL', { allEmails })
+    void runAction('RELEASE_POLL', { allEmails, attachments })
   }
 
   const addShareRecipient = () => {
@@ -363,6 +416,30 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   />
                   <p className="text-xs text-gray-400">
                     This subject will appear on the poll response form and in all emails.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Section A2: Deadline */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Response Deadline
+                    {editDeadline === defaultDeadline && (
+                      <span className="text-xs font-normal text-gray-400">(48 hrs default)</span>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Input
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={editDeadline}
+                    onChange={e => setEditDeadline(e.target.value || defaultDeadline)}
+                    className={editDeadline === defaultDeadline ? 'text-gray-400' : ''}
+                  />
+                  <p className="mt-1.5 text-xs text-amber-600">
+                    Please choose a suitable deadline — the 48-hour default may not apply.
                   </p>
                 </CardContent>
               </Card>
@@ -624,7 +701,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 </>
               )}
 
-              {!['CLOSED', 'RESULTS_UPLOADED', 'ARCHIVED'].includes(poll.status) && (
+              {!['CLOSED', 'ARCHIVED'].includes(poll.status) && (
                 <Button
                   className="w-full"
                   size="sm"
@@ -916,6 +993,53 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               <p className="text-xs text-gray-400">
                 {parseEmails(customReleaseText).length} email(s) detected
               </p>
+            )}
+          </div>
+
+          {/* Attachments */}
+          <div className="space-y-2 pt-1 border-t border-gray-100">
+            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Attachments <span className="normal-case font-normal text-gray-400">(optional · max 5 files · 5 MB each)</span>
+            </Label>
+
+            {releaseAttachments.length > 0 && (
+              <div className="space-y-1.5">
+                {releaseAttachments.map((file, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                      <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                      <span className="text-xs text-gray-400 flex-shrink-0">
+                        {file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
+                      </span>
+                    </div>
+                    <button type="button" onClick={() => setReleaseAttachments(prev => prev.filter((_, j) => j !== i))}
+                      className="ml-2 flex-shrink-0 text-gray-400 hover:text-rose-500 transition-colors">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {releaseAttachments.length < 5 && (
+              <>
+                <input
+                  ref={releaseFileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleReleaseFileChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => releaseFileInputRef.current?.click()}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-2.5 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                >
+                  <Paperclip className="h-4 w-4" />
+                  {releaseAttachments.length === 0 ? 'Attach files' : 'Attach more files'}
+                </button>
+              </>
             )}
           </div>
 

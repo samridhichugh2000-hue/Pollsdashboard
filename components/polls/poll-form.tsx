@@ -29,11 +29,13 @@ export function PollForm({ onSuccess }: PollFormProps) {
   const [questions, setQuestions] = useState<string[]>([''])
   const [senders, setSenders] = useState<Sender[]>([])
   const [recipientEmails, setRecipientEmails] = useState<string[]>([])
+  const defaultDeadline = (() => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString().split('T')[0] })()
+
   const [form, setForm] = useState({
     topic: '',
     requested_by: '',
     custom_requested_by: '',
-    deadline: '',
+    deadline: defaultDeadline,
     remarks: '',
   })
 
@@ -174,8 +176,21 @@ export function PollForm({ onSuccess }: PollFormProps) {
 
         {/* Deadline */}
         <div className="space-y-1.5">
-          <Label htmlFor="deadline">Deadline Override <span className="font-normal text-gray-400">(default: +48 hrs)</span></Label>
-          <Input id="deadline" type="datetime-local" value={form.deadline} onChange={e => set('deadline', e.target.value)} />
+          <Label htmlFor="deadline">
+            Response Deadline
+            {form.deadline === defaultDeadline && (
+              <span className="ml-2 font-normal text-gray-400">(48 hrs default)</span>
+            )}
+          </Label>
+          <Input
+            id="deadline"
+            type="date"
+            min={new Date().toISOString().split('T')[0]}
+            value={form.deadline}
+            onChange={e => set('deadline', e.target.value || defaultDeadline)}
+            className={form.deadline === defaultDeadline ? 'text-gray-400' : ''}
+          />
+          <p className="text-xs text-amber-600">Please choose a suitable deadline — the 48-hour default may not apply.</p>
         </div>
 
         {/* Remarks */}

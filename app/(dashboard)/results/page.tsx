@@ -68,7 +68,7 @@ function ManageDialog({
 
   useEffect(() => {
     fetch(`/api/polls/${poll.id}`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : {})
       .then((data: { response?: PollResponse }) => {
         if (data.response?.response_data) {
           setEntries(JSON.parse(data.response.response_data) as ResponseEntry[])
@@ -229,7 +229,7 @@ export default function ResultsPage() {
   const fetchPolls = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await fetch('/api/polls').then(r => r.json()) as Poll[]
+      const data = await fetch('/api/polls').then(r => r.ok ? r.json() : []) as Poll[]
       setPolls(data.filter(p => RELEASED_STATUSES.includes(p.status)))
     } catch {
       toast.error('Failed to load polls')
