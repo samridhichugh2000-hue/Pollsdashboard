@@ -51,7 +51,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
             const overdue = poll.status === 'AWAITING_APPROVAL' && isApprovalOverdue(poll.updated_at)
 
             return (
-              <tr key={poll.id} className="group hover:bg-gray-50 transition-colors">
+              <tr key={poll.id} className="hover:bg-gray-50 transition-colors">
                 <td className="max-w-[200px] px-5 py-3.5">
                   <p className="truncate font-medium text-gray-900">{poll.topic}</p>
                   {overdue && <span className="text-xs font-medium text-rose-500">Overdue</span>}
@@ -60,9 +60,11 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                 <td className="px-5 py-3.5 text-gray-500 max-w-[140px] truncate">{poll.requested_by}</td>
                 <td className="px-5 py-3.5">
                   <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    poll.source === 'email' ? 'bg-cyan-50 text-cyan-700' : 'bg-gray-100 text-gray-600'
+                    poll.source === 'email' ? 'bg-cyan-50 text-cyan-700' :
+                    poll.source === 'external' ? 'bg-purple-50 text-purple-700' :
+                    'bg-gray-100 text-gray-600'
                   }`}>
-                    {poll.source === 'email' ? 'Inbox' : 'Manual'}
+                    {poll.source === 'email' ? 'Inbox' : poll.source === 'external' ? 'External' : 'Manual'}
                   </span>
                 </td>
                 <td className="px-5 py-3.5"><StatusBadge status={poll.status} /></td>
@@ -78,7 +80,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                   ) : <span className="text-gray-300">—</span>}
                 </td>
                 <td className="px-5 py-3.5">
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-2">
                     <Link href={`/polls/${poll.id}`}
                       className="text-xs font-medium text-cyan-600 hover:text-cyan-800 hover:underline">
                       View
