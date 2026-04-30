@@ -6,19 +6,29 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// SQLite CURRENT_TIMESTAMP stores as "2026-04-30 12:00:00" (no Z) — browsers
+// treat that as local time. Append Z so it's always parsed as UTC.
+function parseDate(date: string | Date): Date {
+  if (date instanceof Date) return date
+  if (!date.includes('Z') && !date.includes('+') && !date.includes('-', 10)) {
+    return new Date(date.replace(' ', 'T') + 'Z')
+  }
+  return new Date(date)
+}
+
 export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return '—'
-  return format(new Date(date), 'MMM d, yyyy')
+  return format(parseDate(date), 'MMM d, yyyy')
 }
 
 export function formatDateTime(date: string | Date | null | undefined): string {
   if (!date) return '—'
-  return format(new Date(date), 'MMM d, yyyy h:mm a')
+  return format(parseDate(date), 'MMM d, yyyy h:mm a')
 }
 
 export function formatRelative(date: string | Date | null | undefined): string {
   if (!date) return '—'
-  return formatDistanceToNow(new Date(date), { addSuffix: true })
+  return formatDistanceToNow(parseDate(date), { addSuffix: true })
 }
 
 export function getNextWorkingDay(from: Date = new Date()): Date {

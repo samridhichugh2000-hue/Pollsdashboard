@@ -71,7 +71,14 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const [entryRemarks, setEntryRemarks] = useState<Record<number, string>>({})
   const [savingEntry, setSavingEntry] = useState<number | null>(null)
 
+  const [, setTick] = useState(0)
   const router = useRouter()
+
+  // Re-render relative timestamps every minute
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60_000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Sync local edit state when poll changes (after actions)
   useEffect(() => {
