@@ -242,8 +242,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: 'A reason is required to reject an external request.' }, { status: 400 })
         }
 
-        await updatePollStatus(id, 'REJECTED')
-        await createAuditLog(id, 'POLL_REJECTED', userEmail, { reason: rejectionReason, notified: true })
+        await createApproval(id, 'rejected', rejectionReason, userEmail)
+        await updatePollStatus(id, 'DRAFT')
+        await createAuditLog(id, 'EDIT_REQUESTED', userEmail, { reason: rejectionReason, notified: true })
 
         // Extract requester name + email from "Name <email>" or bare "email"
         const reqMatch = poll.requested_by?.match(/^(.+?)\s*<([^>]+)>$/)
