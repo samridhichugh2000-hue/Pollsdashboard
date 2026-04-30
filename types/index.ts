@@ -18,7 +18,7 @@ export type PollStatus =
 
 export type PollSource = 'email' | 'dashboard' | 'external'
 
-export type ApprovalAction = 'approved' | 'edited' | 'clarification'
+export type ApprovalAction = 'approved' | 'edited' | 'clarification' | 'rejected'
 
 export type UserRole = 'super_admin' | 'admin'
 
