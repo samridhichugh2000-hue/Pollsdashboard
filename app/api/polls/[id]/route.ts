@@ -230,8 +230,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'REJECT': {
-        await updatePollStatus(id, 'REJECTED')
-        await createAuditLog(id, 'POLL_REJECTED', userEmail, { reason: body.reason as string | undefined })
+        await createApproval(id, 'rejected', body.reason as string | undefined, userEmail)
+        await updatePollStatus(id, 'DRAFT')
+        await createAuditLog(id, 'EDIT_REQUESTED', userEmail, { reason: body.reason as string | undefined })
         break
       }
 
