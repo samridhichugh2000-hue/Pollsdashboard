@@ -112,7 +112,7 @@ export default function ApprovePage({
   if (status === 'done') {
     const doneConfig = {
       approve: { icon: <CheckCircle2 className="h-9 w-9 text-emerald-500" />, bg: 'bg-emerald-50', title: 'Poll Approved!', message: 'Thank you. The poll has been approved and the HR team has been notified.' },
-      reject:  { icon: <XCircle className="h-9 w-9 text-red-500" />,        bg: 'bg-red-50',     title: 'Poll Rejected',  message: 'The poll request has been rejected. The HR team has been notified.' },
+      reject:  { icon: <XCircle className="h-9 w-9 text-red-500" />,        bg: 'bg-red-50',     title: 'Poll Sent Back',  message: 'Your feedback has been recorded. The poll has been sent back to the HR team for revision.' },
       feedback:{ icon: <MessageSquare className="h-9 w-9 text-amber-500" />,bg: 'bg-amber-50',   title: 'Feedback Sent',  message: 'Your feedback has been recorded. The poll has been sent back for revision.' },
     }
     const cfg = doneConfig[doneAction ?? 'approve']

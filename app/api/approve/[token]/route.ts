@@ -48,8 +48,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
   if (body.action === 'reject') {
     await createApproval(poll.id, 'rejected', body.reason, 'email-link')
-    await updatePollStatus(poll.id, 'REJECTED')
-    await createAuditLog(poll.id, 'POLL_REJECTED', 'email-link', { via: 'approval-email', reason: body.reason })
+    await updatePollStatus(poll.id, 'DRAFT')
+    await createAuditLog(poll.id, 'EDIT_REQUESTED', 'email-link', { via: 'approval-email', action: 'reject', reason: body.reason })
     await consumeApprovalToken(token)
     return NextResponse.json({ success: true, action: 'reject' })
   }

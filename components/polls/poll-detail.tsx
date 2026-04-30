@@ -404,6 +404,24 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
           {/* DRAFT status — editable sections */}
           {poll.status === 'DRAFT' && (
             <>
+              {/* Rejection banner — shown when poll was rejected and sent back for revision */}
+              {(() => {
+                const rejection = [...approvals].reverse().find(a => a.action === 'rejected' && a.notes)
+                if (!rejection) return null
+                return (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4">
+                    <div className="flex items-start gap-3">
+                      <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-600" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-red-800">Rejected — sent back for revision</p>
+                        <p className="mt-1 text-sm text-red-700 whitespace-pre-wrap">{rejection.notes}</p>
+                        <p className="mt-1.5 text-xs text-red-400">{formatRelative(rejection.actioned_at)}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* Feedback banner — shown when poll was sent back with remarks */}
               {(() => {
                 const feedback = [...approvals].reverse().find(a => a.action === 'clarification' && a.notes)
