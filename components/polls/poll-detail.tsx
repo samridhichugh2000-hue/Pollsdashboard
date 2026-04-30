@@ -737,7 +737,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 </>
               )}
 
-              {!['CLOSED', 'ARCHIVED'].includes(poll.status) && (
+              {['SENT', 'REMINDER_SENT', 'AWAITING_APPROVAL', 'APPROVED'].includes(poll.status) && (
                 <Button
                   className="w-full"
                   size="sm"
