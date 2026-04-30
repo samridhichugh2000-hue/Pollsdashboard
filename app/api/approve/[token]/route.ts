@@ -38,10 +38,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   if (!poll) return NextResponse.json({ error: 'Poll not found.' }, { status: 404 })
 
   const body = await req.json() as {
-    action: 'approve' | 'save_and_approve'
+    action: 'approve' | 'save_and_approve' | 'reject' | 'feedback'
     subject?: string
     draft_email_body?: string
     questions?: string
+    reason?: string
+    remarks?: string
+  }
+
+  if (body.action === 'reject') {
+    await createApproval(poll.id, 'rejected', body.reason, 'email-link')
+    await updatePollStatus(poll.id, 'REJECTED')
+    await createAuditLog(poll.id, 'POLL_REJECTED', 'email-link', { via: 'approval-email', reason: body.reason })
+    await consumeApprovalToken(token)
+    return NextResponse.json({ success: true, action: 'reject' })
+  }
+
+  if (body.action === 'feedback') {
+    await createApproval(poll.id, 'clarification', body.remarks, 'email-link')
+    await updatePollStatus(poll.id, 'DRAFT')
+    await createAuditLog(poll.id, 'EDIT_REQUESTED', 'email-link', { via: 'approval-email', remarks: body.remarks })
+    await consumeApprovalToken(token)
+    return NextResponse.json({ success: true, action: 'feedback' })
   }
 
   if (body.action === 'save_and_approve') {
@@ -57,5 +75,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   await createAuditLog(poll.id, 'POLL_APPROVED', 'email-link', { via: 'approval-email', action: body.action })
   await consumeApprovalToken(token)
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, action: 'approve' })
 }

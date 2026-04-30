@@ -50,6 +50,8 @@ export function buildApprovalEmailHtml(params: {
   deadline: string
   approveUrl: string
   editUrl: string
+  feedbackUrl: string
+  rejectUrl: string
 }): string {
   const questionsHtml = params.questions
     .map((q, i) => `<li style="margin-bottom:6px;">${i + 1}. ${q}</li>`)
@@ -83,18 +85,38 @@ export function buildApprovalEmailHtml(params: {
   <h3 style="font-size:14px; color:#374151; margin-bottom:8px; text-transform:uppercase; letter-spacing:.05em;">Poll Questions</h3>
   <ul style="padding-left:18px; font-size:14px; line-height:1.7; margin-bottom:24px;">${questionsHtml}</ul>
 
-  <div style="display:flex; gap:12px; margin-bottom:24px;">
-    <a href="${params.approveUrl}"
-       style="display:inline-block; background:#16a34a; color:#fff; padding:12px 28px; border-radius:6px; text-decoration:none; font-weight:600; font-size:15px;">
-      ✓ Approve
-    </a>
-    <a href="${params.editUrl}"
-       style="display:inline-block; background:#ffffff; color:#1d4ed8; padding:12px 28px; border-radius:6px; text-decoration:none; font-weight:600; font-size:15px; border:2px solid #1d4ed8;">
-      ✏ Edit &amp; Approve
-    </a>
-  </div>
+  <table style="border-collapse:collapse; margin-bottom:12px;">
+    <tr>
+      <td style="padding-right:10px; padding-bottom:10px;">
+        <a href="${params.approveUrl}"
+           style="display:inline-block; background:#16a34a; color:#fff; padding:12px 24px; border-radius:6px; text-decoration:none; font-weight:600; font-size:14px;">
+          ✓ Approve
+        </a>
+      </td>
+      <td style="padding-bottom:10px;">
+        <a href="${params.editUrl}"
+           style="display:inline-block; background:#ffffff; color:#1d4ed8; padding:12px 24px; border-radius:6px; text-decoration:none; font-weight:600; font-size:14px; border:2px solid #1d4ed8;">
+          ✏ Edit &amp; Approve
+        </a>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding-right:10px;">
+        <a href="${params.feedbackUrl}"
+           style="display:inline-block; background:#ffffff; color:#b45309; padding:12px 24px; border-radius:6px; text-decoration:none; font-weight:600; font-size:14px; border:2px solid #d97706;">
+          💬 Feedback
+        </a>
+      </td>
+      <td>
+        <a href="${params.rejectUrl}"
+           style="display:inline-block; background:#ffffff; color:#dc2626; padding:12px 24px; border-radius:6px; text-decoration:none; font-weight:600; font-size:14px; border:2px solid #dc2626;">
+          ✗ Reject
+        </a>
+      </td>
+    </tr>
+  </table>
 
-  <p style="font-size:12px; color:#9ca3af;">This link expires in 7 days and can only be used once. — Koenig Solutions HR</p>
+  <p style="font-size:12px; color:#9ca3af; margin-top:8px;">This link expires in 7 days and can only be used once. — Koenig Solutions HR</p>
 </div>
 `
 }

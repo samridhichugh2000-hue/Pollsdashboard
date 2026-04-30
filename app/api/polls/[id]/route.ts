@@ -61,6 +61,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const appUrl = process.env.NEXTAUTH_URL?.replace('http://localhost:3000', 'https://pollsdashboard.vercel.app') ?? 'https://pollsdashboard.vercel.app'
         const approveUrl = `${appUrl}/approve/${approvalToken}`
         const editUrl = `${appUrl}/approve/${approvalToken}?mode=edit`
+        const feedbackUrl = `${appUrl}/approve/${approvalToken}?mode=feedback`
+        const rejectUrl = `${appUrl}/approve/${approvalToken}?mode=reject`
 
         const approvalHtml = buildApprovalEmailHtml({
           topic: poll.topic,
@@ -71,6 +73,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           deadline,
           approveUrl,
           editUrl,
+          feedbackUrl,
+          rejectUrl,
         })
 
         const recipients = Array.isArray(body.recipients) && (body.recipients as string[]).length > 0
