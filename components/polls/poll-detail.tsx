@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download, RefreshCw, Save, X, ChevronDown, Paperclip } from 'lucide-react'
+import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download, RefreshCw, Save, X, ChevronDown, Paperclip, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -404,6 +404,24 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
           {/* DRAFT status — editable sections */}
           {poll.status === 'DRAFT' && (
             <>
+              {/* Feedback banner — shown when poll was sent back with remarks */}
+              {(() => {
+                const feedback = [...approvals].reverse().find(a => a.action === 'clarification' && a.notes)
+                if (!feedback) return null
+                return (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+                    <div className="flex items-start gap-3">
+                      <MessageSquare className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-amber-800">Feedback from approver</p>
+                        <p className="mt-1 text-sm text-amber-700 whitespace-pre-wrap">{feedback.notes}</p>
+                        <p className="mt-1.5 text-xs text-amber-500">{formatRelative(feedback.actioned_at)}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* Section A: Subject Line */}
               <Card>
                 <CardHeader><CardTitle>Email Subject Line</CardTitle></CardHeader>
