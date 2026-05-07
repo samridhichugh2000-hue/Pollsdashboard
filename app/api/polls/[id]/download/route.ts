@@ -8,7 +8,10 @@ interface ResponseEntry {
   submitted_at: string
   answers: { question: string; answer: string }[]
   actionable?: boolean | null
+  classification?: 'rms' | 'non_rms' | 'partial' | null
+  status?: 'wip' | 'completed' | null
   remarks?: string
+  reply_sent_at?: string
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -34,6 +37,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       row[`Q${qi + 1}: ${a.question}`] = a.answer
     })
     row['Actionable'] = entry.actionable === true ? 'Yes' : entry.actionable === false ? 'No' : ''
+    row['Classification'] = entry.classification === 'rms' ? 'RMS' : entry.classification === 'non_rms' ? 'Non-RMS' : entry.classification === 'partial' ? 'Partial' : ''
+    row['Status'] = entry.status === 'wip' ? 'WIP' : entry.status === 'completed' ? 'Completed' : ''
+    row['Replied'] = entry.reply_sent_at ? 'Yes' : 'No'
     row['Remarks'] = entry.remarks ?? ''
     return row
   })

@@ -157,6 +157,127 @@ export function buildResultsEmailHtml(topic: string): string {
 `
 }
 
+export function buildAutoResponseHtml(params: {
+  topic: string
+  answers: { question: string; answer: string }[]
+}): string {
+  const answersHtml = params.answers
+    .map((a, i) => `
+      <tr style="background:${i % 2 === 0 ? '#f9fafb' : '#fff'};">
+        <td style="padding:10px 14px;font-size:13px;color:#6b7280;white-space:nowrap;vertical-align:top;width:24px;">${i + 1}.</td>
+        <td style="padding:10px 14px;font-size:13px;">
+          <div style="color:#374151;font-weight:600;margin-bottom:4px;">${a.question}</div>
+          <div style="color:#111827;">${a.answer?.trim() || '<em style="color:#9ca3af;">No answer provided</em>'}</div>
+        </td>
+      </tr>`)
+    .join('')
+
+  return `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827;">
+  <div style="background:#0e7490;padding:22px 28px;border-radius:8px 8px 0 0;">
+    <h2 style="margin:0;color:#fff;font-size:17px;font-weight:600;">Response Recorded</h2>
+    <p style="margin:4px 0 0;color:rgba(255,255,255,0.65);font-size:13px;">${params.topic}</p>
+  </div>
+  <div style="background:#f9fafb;padding:22px 28px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none;">
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.6;">
+      Your response has been recorded. HR team will review and will work on it if found feasible.
+    </p>
+
+    <p style="margin:0 0 8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;">Your Response</p>
+    <table style="width:100%;border-collapse:collapse;border-radius:6px;border:1px solid #e5e7eb;overflow:hidden;margin-bottom:20px;">
+      ${answersHtml}
+    </table>
+
+    <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.7;">
+      Regards,<br>
+      <strong style="color:#374151;">Team HR</strong><br>
+      Poll Dashboard
+    </p>
+  </div>
+</div>`
+}
+
+export function buildDeadlineExtensionAudienceHtml(params: {
+  topic: string
+  newDeadline: string
+  msFormLink: string
+}): string {
+  return `
+<div style="font-family:Arial,sans-serif;max-width:600px;color:#111827;">
+  <p style="margin:0 0 12px;font-size:14px;">Dear Team,</p>
+  <p style="margin:0 0 12px;font-size:14px;">
+    The response deadline for the poll <strong>${params.topic}</strong> has been extended to <strong>${params.newDeadline}</strong>.
+  </p>
+  <p style="margin:0 0 20px;font-size:14px;">
+    If you have not already shared your feedback, request you to do so by the updated deadline.
+  </p>
+  <p style="margin:0 0 24px;">
+    <a href="${params.msFormLink}" style="display:inline-block;background:#1e40af;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;font-size:14px;font-weight:600;">
+      Take the Poll
+    </a>
+  </p>
+  <p style="margin:0;font-size:14px;">Warm Regards,<br>Team HR<br>Poll Dashboard</p>
+</div>`
+}
+
+export function buildDeadlineExtensionRequesterHtml(params: {
+  topic: string
+  newDeadline: string
+  requesterName: string
+}): string {
+  return `
+<div style="font-family:Arial,sans-serif;max-width:600px;color:#111827;">
+  <p style="margin:0 0 12px;font-size:14px;">Hi <strong>${params.requesterName}</strong>,</p>
+  <p style="margin:0 0 12px;font-size:14px;">
+    This is to inform you that the response deadline for the poll <strong>${params.topic}</strong> has been extended to <strong>${params.newDeadline}</strong>.
+  </p>
+  <p style="margin:0 0 8px;font-size:14px;">Participants have been notified of the updated deadline.</p>
+  <p style="margin:0;font-size:14px;">Warm Regards,<br>Team HR<br>Poll Dashboard</p>
+</div>`
+}
+
+export function buildReplyToRespondentHtml(params: {
+  name: string
+  topic: string
+  replyMessage: string
+  answers: { question: string; answer: string }[]
+}): string {
+  const answersHtml = params.answers
+    .map((a, i) => `
+      <tr style="background:${i % 2 === 0 ? '#f9fafb' : '#fff'};">
+        <td style="padding:10px 14px;font-size:13px;color:#6b7280;white-space:nowrap;vertical-align:top;width:24px;">${i + 1}.</td>
+        <td style="padding:10px 14px;font-size:13px;">
+          <div style="color:#374151;font-weight:600;margin-bottom:4px;">${a.question}</div>
+          <div style="color:#111827;">${a.answer?.trim() || '<em style="color:#9ca3af;">No answer provided</em>'}</div>
+        </td>
+      </tr>`)
+    .join('')
+
+  return `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827;">
+  <div style="background:#1e40af;padding:22px 28px;border-radius:8px 8px 0 0;">
+    <h2 style="margin:0;color:#fff;font-size:17px;font-weight:600;">Response from HR</h2>
+    <p style="margin:4px 0 0;color:rgba(255,255,255,0.65);font-size:13px;">${params.topic}</p>
+  </div>
+  <div style="background:#f9fafb;padding:22px 28px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none;">
+    <p style="margin:0 0 6px;font-size:14px;">Hi <strong>${params.name}</strong>,</p>
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.6;">Thank you for submitting your response with us.</p>
+    <div style="background:#fff;border-left:4px solid #1e40af;border-radius:4px;padding:14px 18px;margin-bottom:24px;font-size:14px;line-height:1.7;color:#1a1a1a;">
+      ${params.replyMessage.replace(/\n/g, '<br>')}
+    </div>
+    <p style="margin:0 0 8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;">Your Response</p>
+    <table style="width:100%;border-collapse:collapse;border-radius:6px;border:1px solid #e5e7eb;overflow:hidden;margin-bottom:20px;">
+      ${answersHtml}
+    </table>
+    <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.7;">
+      Regards,<br>
+      <strong style="color:#374151;">Priya</strong><br>
+      Poll Dashboard
+    </p>
+  </div>
+</div>`
+}
+
 export function truncate(str: string, maxLength: number): string {
   if (str.length <= maxLength) return str
   return str.slice(0, maxLength) + '...'

@@ -13,7 +13,7 @@ import {
   upsertPollResponse,
 } from '@/lib/db/queries'
 import { sendEmail, sendEmailGetId, replyToMessageWithHtml } from '@/lib/graph'
-import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, formatDate } from '@/lib/utils'
+import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, formatDate } from '@/lib/utils'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
 import * as XLSX from 'xlsx'
@@ -81,10 +81,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           ? (body.recipients as string[])
           : [poll.requested_by]
 
+        const pollSubject = poll.subject ?? (poll.department && poll.department !== 'All Departments' ? `Poll of ${poll.department} – ${poll.topic}` : `Poll – ${poll.topic}`)
         await sendEmail({
           from: process.env.PRIYA_EMAIL!,
           to: recipients,
-          subject: poll.subject ?? `Poll Approval Required: ${poll.topic}`,
+          subject: `Poll Approval Required: ${pollSubject}`,
           htmlBody: approvalHtml,
         })
 
@@ -128,7 +129,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           from: process.env.PRIYA_EMAIL!,
           to: pollsMailbox,
           bcc: allEmails,
-          subject: poll.subject ?? `Poll: ${poll.topic}`,
+          subject: poll.subject ?? (poll.department && poll.department !== 'All Departments' ? `Poll of ${poll.department} – ${poll.topic}` : `Poll – ${poll.topic}`),
           htmlBody: pollHtml,
           attachments: releaseAttachments,
         })
@@ -308,6 +309,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const entryIndex = body.entryIndex as number
         const actionable = body.actionable as boolean | null
         const remarks = body.remarks as string | undefined
+        const classification = body.classification as string | null | undefined
         const pollResp = await getPollResponse(id)
         if (!pollResp?.response_data) {
           return NextResponse.json({ error: 'No responses found.' }, { status: 400 })
@@ -316,13 +318,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (entryIndex < 0 || entryIndex >= entries.length) {
           return NextResponse.json({ error: 'Invalid entry index.' }, { status: 400 })
         }
+        const status = body.status as string | null | undefined
         entries[entryIndex] = {
           ...entries[entryIndex],
           actionable,
           ...(remarks !== undefined ? { remarks } : {}),
+          ...(classification !== undefined ? { classification } : {}),
+          ...(status !== undefined ? { status } : {}),
         }
         await upsertPollResponse(id, JSON.stringify(entries))
-        await createAuditLog(id, 'ENTRY_ACTIONABLE_UPDATED', userEmail, { entryIndex, actionable, remarks })
+        await createAuditLog(id, 'ENTRY_ACTIONABLE_UPDATED', userEmail, { entryIndex, actionable, remarks, classification, status })
         break
       }
 
@@ -447,6 +452,169 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         await updatePollStatus(id, 'RESULTS_UPLOADED', { results_uploaded_at: new Date().toISOString() })
         await createAuditLog(id, 'RESULTS_SHARED', userEmail, { recipients: shareRecipients })
+        break
+      }
+
+      case 'UPLOAD_RESPONSES': {
+        const fileBase64 = body.fileBase64 as string
+        const fileName = (body.fileName as string) ?? 'responses.xlsx'
+        if (!fileBase64) {
+          return NextResponse.json({ error: 'No file data provided.' }, { status: 400 })
+        }
+        const buffer = Buffer.from(fileBase64, 'base64')
+        const wb = XLSX.read(buffer, { type: 'buffer' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' })
+        if (rows.length === 0) {
+          return NextResponse.json({ error: 'No data rows found in the file.' }, { status: 400 })
+        }
+        const entries = rows.map(row => {
+          const keys = Object.keys(row)
+          const emailKey = keys.find(k => k.toLowerCase() === 'email') ?? ''
+          const nameKey = keys.find(k => ['name', 'respondent'].includes(k.toLowerCase())) ?? ''
+          const dateKey = keys.find(k => ['submitted at', 'submitted_at', 'date', 'timestamp'].includes(k.toLowerCase())) ?? ''
+          const skipSet = new Set(['#', emailKey, nameKey, dateKey].filter(Boolean))
+          const email = (row[emailKey] ?? '').toString().trim().toLowerCase()
+          const respondent = (row[nameKey] ?? email.split('@')[0].split('.').map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')).toString().trim()
+          const rawDate = dateKey ? row[dateKey] : ''
+          const submitted_at = rawDate ? (() => { try { return new Date(rawDate).toISOString() } catch { return new Date().toISOString() } })() : new Date().toISOString()
+          const answers: { question: string; answer: string }[] = Object.entries(row)
+            .filter(([k]) => !skipSet.has(k))
+            .map(([k, v]) => ({ question: k.replace(/^Q\d+:\s*/i, '').trim(), answer: String(v ?? '').trim() }))
+          return { email, respondent, submitted_at, answers }
+        }).filter(e => e.answers.length > 0)
+        if (entries.length === 0) {
+          return NextResponse.json({ error: 'No valid rows found in the file.' }, { status: 400 })
+        }
+        await upsertPollResponse(id, JSON.stringify(entries))
+        await createAuditLog(id, 'RESPONSES_UPLOADED', userEmail, { count: entries.length, fileName })
+        break
+      }
+
+      case 'PUSH_TO_RMS': {
+        const pushResp = await getPollResponse(id)
+        if (!pushResp?.response_data) {
+          return NextResponse.json({ error: 'No responses available to push to RMS.' }, { status: 400 })
+        }
+        interface RMSEntry { respondent?: string; email?: string; submitted_at: string; answers: { question: string; answer: string }[]; actionable?: boolean | null; classification?: string | null; status?: string | null; remarks?: string; reply_sent_at?: string }
+        const rmsEntries: RMSEntry[] = JSON.parse(pushResp.response_data)
+        const rmsRows = rmsEntries.map((entry, i) => {
+          const row: Record<string, string> = {
+            '#': String(i + 1),
+            'Email': entry.email ?? 'Not provided',
+            'Name': entry.respondent ?? 'Anonymous',
+            'Submitted At': new Date(entry.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+          }
+          entry.answers.forEach((a, qi) => { row[`Q${qi + 1}: ${a.question}`] = a.answer })
+          row['Actionable'] = entry.actionable === true ? 'Yes' : entry.actionable === false ? 'No' : ''
+          row['Classification'] = entry.classification === 'rms' ? 'RMS' : entry.classification === 'non_rms' ? 'Non-RMS' : entry.classification === 'partial' ? 'Partial' : ''
+          row['Status'] = entry.status === 'wip' ? 'WIP' : entry.status === 'completed' ? 'Completed' : ''
+          row['Replied'] = entry.reply_sent_at ? 'Yes' : 'No'
+          row['Remarks'] = entry.remarks ?? ''
+          return row
+        })
+        const rmsWs = XLSX.utils.json_to_sheet(rmsRows)
+        rmsWs['!cols'] = Object.keys(rmsRows[0] ?? {}).map(key => ({ wch: Math.max(key.length, ...rmsRows.map(r => String(r[key] ?? '').length)) + 2 }))
+        const rmsWb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(rmsWb, rmsWs, 'Responses')
+        const rmsXlsxBase64 = XLSX.write(rmsWb, { type: 'base64', bookType: 'xlsx' }) as string
+        const rmsFileName = `poll-responses-${poll.topic.slice(0, 30).replace(/\s+/g, '-').toLowerCase()}.xlsx`
+        // TODO: POST rmsXlsxBase64 / rmsFileName to RMS Koenig News panel — API format to be configured
+        void rmsXlsxBase64; void rmsFileName
+        await createAuditLog(id, 'PUSHED_TO_RMS', userEmail)
+        break
+      }
+
+      case 'REPLY_TO_RESPONDENT': {
+        const entryIndex = body.entryIndex as number
+        const replyMessage = (body.replyMessage as string)?.trim()
+        if (!replyMessage) {
+          return NextResponse.json({ error: 'Reply message is required.' }, { status: 400 })
+        }
+        if (!process.env.PRIYA_EMAIL) {
+          return NextResponse.json({ error: 'Email not configured.' }, { status: 500 })
+        }
+        const pollResp = await getPollResponse(id)
+        if (!pollResp?.response_data) {
+          return NextResponse.json({ error: 'No responses found.' }, { status: 400 })
+        }
+        const replyEntries = JSON.parse(pollResp.response_data) as Record<string, unknown>[]
+        if (entryIndex < 0 || entryIndex >= replyEntries.length) {
+          return NextResponse.json({ error: 'Invalid entry index.' }, { status: 400 })
+        }
+        const replyEntry = replyEntries[entryIndex] as { email?: string; respondent?: string; answers?: { question: string; answer: string }[] }
+        if (!replyEntry.email) {
+          return NextResponse.json({ error: 'Respondent email not found.' }, { status: 400 })
+        }
+        const respondentName = replyEntry.respondent ?? (replyEntry.email.split('@')[0].split('.').map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' '))
+        const answers = (replyEntry.answers ?? []) as { question: string; answer: string }[]
+        await sendEmail({
+          from: process.env.PRIYA_EMAIL,
+          to: replyEntry.email,
+          cc: process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com',
+          subject: `Re: Your response to "${poll.topic}"`,
+          htmlBody: buildReplyToRespondentHtml({ name: respondentName, topic: poll.topic, replyMessage, answers }),
+        })
+        replyEntries[entryIndex] = { ...replyEntries[entryIndex], reply_message: replyMessage, reply_sent_at: new Date().toISOString() }
+        await upsertPollResponse(id, JSON.stringify(replyEntries))
+        await createAuditLog(id, 'RESPONDENT_REPLIED', userEmail, { entryIndex, email: replyEntry.email })
+        break
+      }
+
+      case 'EXTEND_DEADLINE': {
+        const newDeadlineStr = body.new_deadline as string
+        if (!newDeadlineStr) {
+          return NextResponse.json({ error: 'new_deadline is required.' }, { status: 400 })
+        }
+        const newDeadline = new Date(newDeadlineStr)
+        if (isNaN(newDeadline.getTime())) {
+          return NextResponse.json({ error: 'Invalid date.' }, { status: 400 })
+        }
+
+        const formattedDeadline = formatDate(newDeadline.toISOString())
+        await updatePoll(id, { deadline: newDeadline.toISOString() })
+        await createAuditLog(id, 'DEADLINE_EXTENDED', userEmail, { new_deadline: newDeadlineStr })
+
+        // Notify audience if the poll has already been released
+        const releaseEmails: string[] = poll.release_emails ? JSON.parse(poll.release_emails) : []
+        if (releaseEmails.length > 0 && poll.ms_form_link && process.env.PRIYA_EMAIL) {
+          const audienceHtml = buildDeadlineExtensionAudienceHtml({
+            topic: poll.topic,
+            newDeadline: formattedDeadline,
+            msFormLink: poll.ms_form_link,
+          })
+          if (poll.release_message_id) {
+            await replyToMessageWithHtml(process.env.PRIYA_EMAIL, poll.release_message_id, {
+              subject: `Re: ${poll.subject ?? `Poll – ${poll.topic}`}`,
+              htmlBody: audienceHtml,
+              to: releaseEmails,
+            })
+          } else {
+            await sendEmail({
+              from: process.env.PRIYA_EMAIL,
+              to: releaseEmails,
+              subject: poll.subject ?? `Poll – ${poll.topic}`,
+              htmlBody: audienceHtml,
+            })
+          }
+        }
+
+        // Notify requester
+        const reqMatch = poll.requested_by?.match(/^(.+?)\s*<([^>]+)>$/)
+        const requesterEmail = reqMatch ? reqMatch[2].trim() : poll.requested_by?.trim()
+        const requesterName = reqMatch ? reqMatch[1].trim() : 'there'
+        if (requesterEmail?.includes('@') && process.env.PRIYA_EMAIL) {
+          await sendEmail({
+            from: process.env.PRIYA_EMAIL,
+            to: requesterEmail,
+            subject: `Deadline Extended: ${poll.topic}`,
+            htmlBody: buildDeadlineExtensionRequesterHtml({
+              topic: poll.topic,
+              newDeadline: formattedDeadline,
+              requesterName,
+            }),
+          })
+        }
         break
       }
 

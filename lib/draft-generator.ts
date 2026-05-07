@@ -46,23 +46,40 @@ function detectCategory(topic: string, keywords?: string): Category | null {
   return null
 }
 
-// ─── Category-specific context lines ─────────────────────────────────────────
+// ─── Category-specific email content ─────────────────────────────────────────
 
-const CATEGORY_CONTEXT: Record<Category, string> = {
-  satisfaction:   'understanding your overall job satisfaction and workplace experience',
-  engagement:     'gauging employee engagement and identifying what drives motivation at work',
-  training:       'evaluating the effectiveness of our training programs and identifying skill development needs',
-  feedback:       'collecting feedback on performance management, communication, and growth opportunities',
-  policy:         'understanding employee awareness and comfort with our current policies and procedures',
-  wellbeing:      'assessing employee wellbeing and ensuring we are providing adequate support',
-  remote:         'evaluating our remote and hybrid work setup and understanding what works best for our teams',
-  onboarding:     'improving the onboarding experience for new joiners at Koenig Solutions',
-  culture:        'understanding how our workplace culture, values, and inclusion initiatives are being experienced',
-  communication:  'improving internal communication, collaboration, and information-sharing practices',
-  compensation:   'gathering feedback on compensation, benefits, and recognition at Koenig Solutions',
-  leadership:     'assessing leadership effectiveness and management practices across the organisation',
-  event:          'collecting feedback on our recent event to help us plan even better experiences in the future',
-  exit:           'understanding your experience at Koenig Solutions and gathering insights to improve for others',
+const CATEGORY_OPENERS: Record<Category, (topic: string) => string> = {
+  satisfaction:  (t) => `We are conducting a quick poll to gather your feedback on "${t}" and understand your overall satisfaction and experience.`,
+  engagement:    (t) => `We would like to understand your current engagement levels and motivation in the context of "${t}" at Koenig Solutions.`,
+  training:      (t) => `We are assessing the effectiveness of "${t}" and would like to gather your honest feedback to help improve future sessions.`,
+  feedback:      (t) => `We are conducting a poll to gather your inputs on "${t}" and evaluate current processes and practices at Koenig Solutions.`,
+  policy:        (t) => `We are conducting a quick poll to understand your awareness, experience, and comfort with "${t}".`,
+  wellbeing:     (t) => `As part of our ongoing efforts to support employee wellbeing, we would like to gather your feedback on "${t}".`,
+  remote:        (t) => `We are assessing your experience with "${t}" to understand what is working well and where improvements can be made.`,
+  onboarding:    (t) => `We would like to gather your feedback on the "${t}" experience to help us improve the process for future joiners.`,
+  culture:       (t) => `We would like to understand your experience of "${t}" at Koenig Solutions and gather your honest feedback.`,
+  communication: (t) => `We are conducting a poll to assess the effectiveness of "${t}" and understand where we can do better.`,
+  compensation:  (t) => `We are conducting a quick poll to gather your feedback on "${t}" and ensure it aligns with your expectations.`,
+  leadership:    (t) => `We would like to gather your feedback on "${t}" and understand how leadership can better support you.`,
+  event:         (t) => `We are gathering your feedback on "${t}" to understand what worked well and how we can improve future experiences.`,
+  exit:          (t) => `As part of our continuous improvement efforts, we would like to gather your honest feedback on your experience related to "${t}".`,
+}
+
+const CATEGORY_VALUE: Record<Category, string> = {
+  satisfaction:  'Your inputs will help us identify areas for improvement and enhance the overall experience at Koenig Solutions.',
+  engagement:    'Your honest responses will directly support our efforts to create a more engaging and fulfilling workplace.',
+  training:      'Your inputs will directly help us enhance training quality and ensure better learning outcomes.',
+  feedback:      'Your responses will contribute to improving our processes and overall organisational effectiveness.',
+  policy:        'Your inputs will directly support evidence-based improvements to our policies and procedures.',
+  wellbeing:     'Your responses will help us provide better support and improve the overall work experience at Koenig Solutions.',
+  remote:        'Your inputs will directly support decision-making on our work model and flexible arrangements.',
+  onboarding:    'Your honest responses will directly contribute to enhancing the onboarding journey at Koenig Solutions.',
+  culture:       'Your inputs will help us strengthen our culture, diversity, and inclusion efforts across the organisation.',
+  communication: 'Your feedback will directly contribute to improving information sharing and collaboration across teams.',
+  compensation:  'Your inputs will directly support decisions on compensation, benefits, and recognition at Koenig Solutions.',
+  leadership:    'Your honest inputs will help us strengthen leadership effectiveness and management practices across the organisation.',
+  event:         'Your inputs will directly help us plan more impactful and engaging events going forward.',
+  exit:          'Your inputs will contribute to improving the overall employee experience at Koenig Solutions.',
 }
 
 // ─── Typed question generation ────────────────────────────────────────────────
@@ -162,8 +179,11 @@ function buildTypedQuestions(topic: string, keywords: string, category: Category
 
 // ─── Email body builder ───────────────────────────────────────────────────────
 
-export function generateSubject(topic: string): string {
-  return `Poll: ${topic}`
+export function generateSubject(topic: string, department?: string): string {
+  if (!department || department === 'All Departments') {
+    return `Poll – ${topic}`
+  }
+  return `Poll of ${department} – ${topic}`
 }
 
 function buildEmailBody(
@@ -174,59 +194,45 @@ function buildEmailBody(
   keywords: string,
   category: Category | null
 ): string {
-  const audience = department === 'All Departments' ? 'all team members' : `the ${department} team`
-  const context = category ? CATEGORY_CONTEXT[category] : `gathering your valuable feedback on "${topic}"`
+  const audience = department === 'All Departments' ? 'Team' : `${department} Team`
   const kws = keywords ? keywords.split(',').map(k => k.trim()).filter(Boolean) : []
   const kwSentence = kws.length > 0
-    ? ` We are particularly keen to understand your views on: **${kws.join(', ')}**.`
+    ? ` In particular, we would like to understand your views on: ${kws.join(', ')}.`
     : ''
 
+  const opener = category
+    ? CATEGORY_OPENERS[category](topic)
+    : `We are conducting a quick poll to gather your inputs on "${topic}".`
+  const value = category
+    ? CATEGORY_VALUE[category]
+    : 'Your honest responses will directly support decision-making and help us implement meaningful improvements.'
+
+  let actionLine: string
   switch (tone) {
     case 'friendly':
-      return `Hi ${audience}! 👋
-
-We would love to hear from you! As part of our ongoing efforts focused on ${context}, we have put together a short poll on "${topic}".${kwSentence}
-
-It will only take 2–3 minutes and every response makes a real difference. Please share your honest thoughts before ${deadline}.
-
-Thanks so much — your feedback truly matters to us!
-HR Team, Koenig Solutions`
-
+      actionLine = `Please take a moment to share your feedback via the below poll by ${deadline}.`
+      break
     case 'formal':
-      return `Dear ${audience},
-
-Koenig Solutions HR Department is conducting an official survey with the objective of ${context}. You are requested to participate in the poll on "${topic}".${kwSentence}
-
-Your participation is mandatory to ensure the organisation receives comprehensive insights necessary for evidence-based decision-making. Kindly ensure your response is submitted no later than ${deadline}.
-
-All responses are strictly confidential and will be used solely for organisational improvement purposes.
-
-Yours sincerely,
-Human Resources Department, Koenig Solutions`
-
+      actionLine = `You are requested to submit your response via the below poll by ${deadline}.`
+      break
     case 'urgent':
-      return `Dear ${audience},
-
-⚡ Action Required — Please respond by ${deadline}.
-
-We are conducting a time-sensitive poll on "${topic}" aimed at ${context}.${kwSentence} Your input is critical and we need responses from all team members urgently.
-
-The poll takes less than 2 minutes. Please do not delay — responses received after ${deadline} may not be considered in our analysis.
-
-HR Team, Koenig Solutions`
-
-    default: // professional
-      return `Dear ${audience},
-
-As part of our commitment to ${context}, we are conducting a short poll on "${topic}".${kwSentence}
-
-Your honest feedback is invaluable and will directly inform decisions that benefit the entire team at Koenig Solutions. Please take 2–3 minutes to share your thoughts before ${deadline}.
-
-We appreciate your time and participation.
-
-Regards,
-HR Team, Koenig Solutions`
+      actionLine = `This is time-sensitive — request you to share your inputs via the below poll by ${deadline} without delay.`
+      break
+    default:
+      actionLine = `Request you to share your inputs via the below poll by ${deadline}.`
   }
+
+  return `Dear ${audience},
+
+${opener}${kwSentence}
+
+${actionLine}
+
+${value}
+
+Warm Regards,
+Team HR
+Poll Dashboard`
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -240,7 +246,7 @@ export function generatePollDraft(
   keywords?: string,
   tone: 'professional' | 'friendly' | 'formal' | 'urgent' = 'professional'
 ): DraftPollContent {
-  const subject = generateSubject(topic)
+  const subject = generateSubject(topic, department)
   const category = detectCategory(topic, keywords)
   const emailBody = buildEmailBody(topic, department, deadlineDate, tone, keywords ?? '', category)
 

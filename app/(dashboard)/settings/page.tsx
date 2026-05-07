@@ -15,8 +15,8 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-white">Settings</h2>
-        <p className="text-sm text-white/50">System configuration and user management</p>
+        <h2 className="text-xl font-bold text-slate-800">Settings</h2>
+        <p className="text-sm text-slate-500">System configuration and user management</p>
       </div>
 
       <RequestLink />

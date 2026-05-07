@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
     )
 
     await updatePoll(poll.id, {
+      subject: draft.subject,
       draft_email_body: draft.emailBody,
       questions: JSON.stringify(draft.questions),
       status: 'DRAFT',

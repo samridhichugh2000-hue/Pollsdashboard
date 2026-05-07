@@ -229,16 +229,16 @@ export default function RegularPollsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-white">Regular Polls</h2>
-          <p className="text-sm text-white/50">{polls.length} template{polls.length !== 1 ? 's' : ''} · auto-releases daily at 9 AM</p>
+          <h2 className="text-xl font-bold text-slate-800">Regular Polls</h2>
+          <p className="text-sm text-slate-500">{polls.length} template{polls.length !== 1 ? 's' : ''} · auto-releases daily at 9 AM</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm"
-            className="border-white/20 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+            className="border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm"
             onClick={fetchPolls}>
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
           </Button>
-          <Button size="sm" className="bg-white text-cyan-700 hover:bg-white/90 font-semibold shadow-lg"
+          <Button size="sm" className="bg-teal-600 text-white hover:bg-teal-700 font-semibold shadow-sm"
             onClick={openCreate}>
             <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Regular Poll
           </Button>
@@ -247,25 +247,25 @@ export default function RegularPollsPage() {
 
       {/* Upcoming auto-release alert banner */}
       {upcomingPolls.length > 0 && (
-        <div className="rounded-2xl bg-amber-500/20 border border-amber-400/30 px-5 py-4 backdrop-blur-sm">
+        <div className="rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
           <div className="flex items-center gap-2 mb-1">
-            <CalendarClock className="h-4 w-4 text-amber-300" />
-            <span className="font-semibold text-amber-200">
+            <CalendarClock className="h-4 w-4 text-amber-600" />
+            <span className="font-semibold text-amber-800">
               {upcomingPolls.length} poll{upcomingPolls.length > 1 ? 's' : ''} will auto-release {upcomingPolls.some(p => isDueTomorrow(p.next_run_date)) ? 'tomorrow' : 'today'} at 9 AM
             </span>
           </div>
-          <p className="text-xs text-amber-300/80 mb-3">Pause a poll now if you want to skip this cycle.</p>
+          <p className="text-xs text-amber-600 mb-3">Pause a poll now if you want to skip this cycle.</p>
           <div className="flex flex-wrap gap-2">
             {upcomingPolls.map(p => (
-              <div key={p.id} className="inline-flex items-center gap-2 rounded-lg bg-amber-400/20 border border-amber-400/30 px-3 py-1.5">
-                <CalendarClock className="h-3 w-3 text-amber-300" />
-                <span className="text-sm font-medium text-amber-100">{p.name}</span>
-                <span className="text-xs text-amber-300/70">
+              <div key={p.id} className="inline-flex items-center gap-2 rounded-lg bg-amber-100 border border-amber-200 px-3 py-1.5">
+                <CalendarClock className="h-3 w-3 text-amber-600" />
+                <span className="text-sm font-medium text-amber-800">{p.name}</span>
+                <span className="text-xs text-amber-600">
                   {isDueTomorrow(p.next_run_date) ? 'tomorrow' : 'today'}
                 </span>
                 <button
                   onClick={() => void toggleActive(p)}
-                  className="ml-1 rounded-md bg-amber-400/30 hover:bg-amber-400/50 px-2 py-0.5 text-xs font-medium text-amber-100 transition-colors">
+                  className="ml-1 rounded-md bg-amber-200 hover:bg-amber-300 px-2 py-0.5 text-xs font-medium text-amber-800 transition-colors">
                   Pause
                 </button>
               </div>

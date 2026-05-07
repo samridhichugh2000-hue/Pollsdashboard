@@ -67,8 +67,15 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const [shareRecipients, setShareRecipients] = useState<string[]>([])
   const [shareRecipientInput, setShareRecipientInput] = useState('')
 
-  // Per-entry remarks state (index → text)
+  // Extend deadline state
+  const [extendDeadlineDate, setExtendDeadlineDate] = useState('')
+
+  // Per-entry review state
   const [entryRemarks, setEntryRemarks] = useState<Record<number, string>>({})
+  const [entryClassifications, setEntryClassifications] = useState<Record<number, 'rms' | 'non_rms' | 'partial' | null>>({})
+  const [entryStatuses, setEntryStatuses] = useState<Record<number, 'wip' | 'completed' | null>>({})
+  const [entryReplies, setEntryReplies] = useState<Record<number, string>>({})
+  const [sendingReply, setSendingReply] = useState<number | null>(null)
   const [savingEntry, setSavingEntry] = useState<number | null>(null)
 
   const [, setTick] = useState(0)
@@ -162,30 +169,88 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     }
   }
 
-  const saveEntry = async (index: number, actionable: boolean | null) => {
+  const saveEntry = async (index: number, actionable: boolean | null, classification?: 'rms' | 'non_rms' | 'partial' | null) => {
     if (!response?.response_data) return
     setSavingEntry(index)
-    type EntryType = { email?: string; respondent?: string; submitted_at: string; answers: { question: string; answer: string }[]; actionable?: boolean | null; remarks?: string }
+    type EntryType = { email?: string; respondent?: string; submitted_at: string; answers: { question: string; answer: string }[]; actionable?: boolean | null; remarks?: string; classification?: string | null }
     const entries = JSON.parse(response.response_data) as EntryType[]
     const remarks = entryRemarks[index] ?? entries[index]?.remarks ?? ''
+    const cls = classification !== undefined ? classification : (entryClassifications[index] !== undefined ? entryClassifications[index] : (entries[index]?.classification ?? null))
     try {
       const res = await fetch(`/api/polls/${poll.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'UPDATE_ENTRY_ACTIONABLE', entryIndex: index, actionable, remarks }),
+        body: JSON.stringify({ action: 'UPDATE_ENTRY_ACTIONABLE', entryIndex: index, actionable, remarks, classification: cls }),
       })
       if (!res.ok) {
         const d = await res.json() as { error: string }
         throw new Error(d.error)
       }
-      // Optimistically update local response state
-      const updated = entries.map((e, i) => i === index ? { ...e, actionable, remarks } : e)
+      const updated = entries.map((e, i) => i === index ? { ...e, actionable, remarks, classification: cls } : e)
       setResponse(prev => prev ? { ...prev, response_data: JSON.stringify(updated) } : prev)
-      toast.success('Entry saved')
+      toast.success('Saved')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed')
     } finally {
       setSavingEntry(null)
+    }
+  }
+
+  const saveStatus = async (index: number, value: 'wip' | 'completed') => {
+    if (!response?.response_data) return
+    type EntryType = { email?: string; respondent?: string; submitted_at: string; answers: { question: string; answer: string }[]; actionable?: boolean | null; remarks?: string; classification?: string | null; status?: string | null }
+    const entries = JSON.parse(response.response_data) as EntryType[]
+    const prev: 'wip' | 'completed' | null = entryStatuses[index] !== undefined ? entryStatuses[index] : ((entries[index]?.status as 'wip' | 'completed' | null) ?? null)
+    const next = prev === value ? null : value
+    setSavingEntry(index)
+    setEntryStatuses(p => ({ ...p, [index]: next }))
+    try {
+      const cls = entryClassifications[index] !== undefined ? entryClassifications[index] : (entries[index]?.classification ?? null)
+      const remarks = entryRemarks[index] ?? entries[index]?.remarks ?? ''
+      const res = await fetch(`/api/polls/${poll.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPDATE_ENTRY_ACTIONABLE', entryIndex: index, actionable: entries[index]?.actionable ?? null, remarks, classification: cls, status: next }),
+      })
+      if (!res.ok) {
+        const d = await res.json() as { error: string }
+        throw new Error(d.error)
+      }
+      const updated = entries.map((e, i) => i === index ? { ...e, status: next } : e)
+      setResponse(prev => prev ? { ...prev, response_data: JSON.stringify(updated) } : prev)
+      toast.success('Saved')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Save failed')
+      setEntryStatuses(p => ({ ...p, [index]: prev }))
+    } finally {
+      setSavingEntry(null)
+    }
+  }
+
+  const sendReply = async (index: number) => {
+    const replyMessage = (entryReplies[index] ?? '').trim()
+    if (!replyMessage) { toast.error('Reply message cannot be empty.'); return }
+    if (!response?.response_data) return
+    setSendingReply(index)
+    try {
+      const res = await fetch(`/api/polls/${poll.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'REPLY_TO_RESPONDENT', entryIndex: index, replyMessage }),
+      })
+      if (!res.ok) {
+        const d = await res.json() as { error: string }
+        throw new Error(d.error)
+      }
+      type EntryType = Record<string, unknown>
+      const entries = JSON.parse(response.response_data) as EntryType[]
+      const updated = entries.map((e, i) => i === index ? { ...e, reply_message: replyMessage, reply_sent_at: new Date().toISOString() } : e)
+      setResponse(prev => prev ? { ...prev, response_data: JSON.stringify(updated) } : prev)
+      toast.success('Reply sent')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send reply')
+    } finally {
+      setSendingReply(null)
     }
   }
 
@@ -744,6 +809,31 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 </>
               )}
 
+              {['SENT', 'REMINDER_SENT'].includes(poll.status) && (
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Extend Deadline</Label>
+                  <Input
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={extendDeadlineDate}
+                    onChange={e => setExtendDeadlineDate(e.target.value)}
+                  />
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    variant="outline"
+                    disabled={!extendDeadlineDate || !!loading}
+                    onClick={() => {
+                      if (!confirm(`Extend deadline to ${extendDeadlineDate}? An email will be sent to all poll recipients and the requester.`)) return
+                      void runAction('EXTEND_DEADLINE', { new_deadline: extendDeadlineDate }).then(() => setExtendDeadlineDate(''))
+                    }}
+                  >
+                    {loading === 'EXTEND_DEADLINE' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Extend & Notify
+                  </Button>
+                </div>
+              )}
+
               {['SENT', 'REMINDER_SENT', 'AWAITING_APPROVAL', 'APPROVED'].includes(poll.status) && (
                 <Button
                   className="w-full"
@@ -813,7 +903,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
         </div>
       </div>
 
-      {/* Results & Follow-up — full width */}
+      {/* Poll Responses — full width */}
       {['SENT', 'REMINDER_SENT', 'CLOSED', 'RESULTS_UPLOADED', 'ARCHIVED'].includes(poll.status) && (() => {
         type EntryType = {
           email?: string
@@ -822,15 +912,30 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
           answers: { question: string; answer: string }[]
           actionable?: boolean | null
           remarks?: string
+          classification?: 'rms' | 'non_rms' | 'partial' | null
+          status?: 'wip' | 'completed' | null
+          reply_message?: string
+          reply_sent_at?: string
         }
         const entries: EntryType[] = response?.response_data ? JSON.parse(response.response_data) as EntryType[] : []
+
+        const stats = {
+          total: entries.length,
+          actionable: entries.filter(e => e.actionable === true).length,
+          notActionable: entries.filter(e => e.actionable === false).length,
+          pending: entries.filter(e => e.actionable === null || e.actionable === undefined).length,
+          rms: entries.filter(e => e.classification === 'rms').length,
+          nonRms: entries.filter(e => e.classification === 'non_rms').length,
+          partial: entries.filter(e => e.classification === 'partial').length,
+        }
+
         return (
           <Card className="mt-6">
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle>
-                  Results & Follow-up{' '}
-                  <span className="text-sm font-normal text-gray-400">
+                  Poll Responses
+                  <span className="ml-2 text-sm font-normal text-gray-400">
                     ({entries.length} {entries.length === 1 ? 'response' : 'responses'})
                   </span>
                 </CardTitle>
@@ -846,94 +951,276 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 </div>
               </div>
             </CardHeader>
+
             <CardContent className="space-y-5">
+              {/* Summary stats */}
+              {entries.length > 0 && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { label: 'Total', value: stats.total, cls: 'bg-gray-100 text-gray-700' },
+                      { label: 'Actionable', value: stats.actionable, cls: 'bg-emerald-100 text-emerald-700' },
+                      { label: 'Not Actionable', value: stats.notActionable, cls: 'bg-slate-100 text-slate-600' },
+                      { label: 'Pending Review', value: stats.pending, cls: 'bg-amber-100 text-amber-700' },
+                    ].map(s => (
+                      <div key={s.label} className={`rounded-xl px-3 py-2.5 text-center ${s.cls}`}>
+                        <p className="text-2xl font-bold leading-none">{s.value}</p>
+                        <p className="mt-1 text-xs font-medium">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: 'RMS', value: stats.rms, cls: 'bg-blue-100 text-blue-700' },
+                      { label: 'Non-RMS', value: stats.nonRms, cls: 'bg-purple-100 text-purple-700' },
+                      { label: 'Partial', value: stats.partial, cls: 'bg-orange-100 text-orange-700' },
+                    ].map(s => (
+                      <div key={s.label} className={`rounded-xl px-3 py-2.5 text-center ${s.cls}`}>
+                        <p className="text-2xl font-bold leading-none">{s.value}</p>
+                        <p className="mt-1 text-xs font-medium">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {entries.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-200 px-6 py-10 text-center">
                   <p className="text-sm font-medium text-gray-400">No responses yet</p>
                   <p className="mt-1 text-xs text-gray-300">Responses will appear here as employees fill out the poll. Auto-refreshes every 30 s.</p>
                 </div>
-              ) : entries.map((entry, i) => (
-                <div key={i} className="rounded-xl border border-gray-200">
-                  {/* Entry header */}
-                  <div className="flex items-center justify-between bg-gray-50 px-5 py-3 border-b border-gray-200 rounded-t-xl">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">{entry.respondent ?? 'Anonymous'}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{entry.email ?? ''} · {formatDateTime(entry.submitted_at)}</p>
-                    </div>
-                    {entry.actionable === true && (
-                      <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">Actionable</span>
-                    )}
-                    {entry.actionable === false && (
-                      <span className="text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-600">Not Actionable</span>
-                    )}
-                  </div>
+              ) : entries.map((entry, i) => {
+                const currentCls = entryClassifications[i] !== undefined
+                  ? entryClassifications[i]
+                  : (entry.classification ?? null)
 
-                  {/* Answers */}
-                  <div className="px-5 py-4 space-y-3">
-                    {entry.answers.map((a, ai) => (
-                      <div key={ai} className="text-sm">
-                        <p className="font-semibold text-gray-500">{ai + 1}. {a.question}</p>
-                        <p className="mt-1 pl-4 text-gray-800">
-                          {a.answer ? a.answer : <span className="italic text-gray-400">No answer</span>}
-                        </p>
+                const clsConfig = {
+                  rms:     { label: 'RMS',     active: 'bg-blue-500 text-white border-blue-500',     hover: 'hover:border-blue-400 hover:text-blue-600' },
+                  non_rms: { label: 'Non-RMS', active: 'bg-purple-500 text-white border-purple-500', hover: 'hover:border-purple-400 hover:text-purple-600' },
+                  partial: { label: 'Partial', active: 'bg-orange-500 text-white border-orange-500', hover: 'hover:border-orange-400 hover:text-orange-600' },
+                } as const
+
+                return (
+                  <div key={i} className="rounded-xl border border-gray-200 overflow-hidden">
+                    {/* Header */}
+                    <div className="flex items-center justify-between bg-gray-50 px-5 py-3 border-b border-gray-200">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{entry.respondent ?? 'Anonymous'}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{entry.email ?? ''} · {formatDateTime(entry.submitted_at)}</p>
                       </div>
-                    ))}
-                  </div>
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        {entry.actionable === true && (
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">Actionable</span>
+                        )}
+                        {entry.actionable === false && (
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">Not Actionable</span>
+                        )}
+                        {currentCls === 'rms' && (
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">RMS</span>
+                        )}
+                        {currentCls === 'non_rms' && (
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-100 text-purple-700">Non-RMS</span>
+                        )}
+                        {currentCls === 'partial' && (
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-100 text-orange-700">Partial</span>
+                        )}
+                        {(entryStatuses[i] !== undefined ? entryStatuses[i] : entry.status) === 'wip' && (
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">WIP</span>
+                        )}
+                        {(entryStatuses[i] !== undefined ? entryStatuses[i] : entry.status) === 'completed' && (
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">Completed</span>
+                        )}
+                        {entry.reply_sent_at && (
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">Replied</span>
+                        )}
+                      </div>
+                    </div>
 
-                  {/* Actionable / Remarks / Save */}
-                  <div className="border-t border-gray-100 px-5 py-4 space-y-3 bg-gray-50 rounded-b-xl">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Follow-up</p>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void saveEntry(i, true)}
-                        disabled={savingEntry === i}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                          entry.actionable === true
-                            ? 'bg-emerald-500 text-white border-emerald-500'
-                            : 'border-gray-300 text-gray-600 hover:border-emerald-400 hover:text-emerald-600'
-                        }`}
-                      >
-                        Actionable
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void saveEntry(i, false)}
-                        disabled={savingEntry === i}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                          entry.actionable === false
-                            ? 'bg-gray-500 text-white border-gray-500'
-                            : 'border-gray-300 text-gray-600 hover:border-gray-400'
-                        }`}
-                      >
-                        Not Actionable
-                      </button>
+                    {/* Answers */}
+                    <div className="px-5 py-4 space-y-3 bg-white">
+                      {entry.answers.map((a, ai) => (
+                        <div key={ai} className="text-sm">
+                          <p className="font-medium text-gray-500 mb-0.5">{ai + 1}. {a.question}</p>
+                          <p className="pl-4 text-gray-800">
+                            {a.answer ? a.answer : <span className="italic text-gray-400">No answer</span>}
+                          </p>
+                        </div>
+                      ))}
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-gray-500">Remarks</label>
-                      <textarea
-                        placeholder="Add internal remarks about this response..."
-                        value={entryRemarks[i] ?? entry.remarks ?? ''}
-                        onChange={e => setEntryRemarks(p => ({ ...p, [i]: e.target.value }))}
-                        rows={3}
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition resize-none"
-                      />
+
+                    {/* Review footer */}
+                    <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 space-y-4">
+                      {/* Actionable */}
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Mark As</p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={savingEntry === i}
+                            onClick={() => void saveEntry(i, true, currentCls)}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                              entry.actionable === true
+                                ? 'bg-emerald-500 text-white border-emerald-500'
+                                : 'border-gray-300 text-gray-600 hover:border-emerald-400 hover:text-emerald-600'
+                            }`}
+                          >
+                            Actionable
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingEntry === i}
+                            onClick={() => void saveEntry(i, false, currentCls)}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                              entry.actionable === false
+                                ? 'bg-slate-500 text-white border-slate-500'
+                                : 'border-gray-300 text-gray-600 hover:border-slate-400'
+                            }`}
+                          >
+                            Not Actionable
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Classification */}
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Classify</p>
+                        <div className="flex gap-2">
+                          {(Object.keys(clsConfig) as Array<keyof typeof clsConfig>).map(key => {
+                            const isActive = currentCls === key
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                disabled={savingEntry === i}
+                                onClick={() => {
+                                  const next = isActive ? null : key
+                                  setEntryClassifications(p => ({ ...p, [i]: next }))
+                                  void saveEntry(i, entry.actionable ?? null, next)
+                                }}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                                  isActive
+                                    ? clsConfig[key].active
+                                    : `border-gray-300 text-gray-600 ${clsConfig[key].hover}`
+                                }`}
+                              >
+                                {clsConfig[key].label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+
+                      {/* RMS Task Links */}
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">RMS Actions</p>
+                        <div className="flex gap-2 flex-wrap">
+                          <a
+                            href="https://rms.koenig-solutions.com/RMS_Feedback/RMSF.aspx"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" /> Add RMS Task
+                          </a>
+                          <a
+                            href="https://rms.koenig-solutions.com/RMS_Feedback/RMSF.aspx"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-100 transition-colors"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" /> Add Non-RMS Task
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Progress */}
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Progress</p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={savingEntry === i}
+                            onClick={() => void saveStatus(i, 'wip')}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                              (entryStatuses[i] !== undefined ? entryStatuses[i] : entry.status) === 'wip'
+                                ? 'bg-amber-500 text-white border-amber-500'
+                                : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                            }`}
+                          >
+                            WIP
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingEntry === i}
+                            onClick={() => void saveStatus(i, 'completed')}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                              (entryStatuses[i] !== undefined ? entryStatuses[i] : entry.status) === 'completed'
+                                ? 'bg-green-500 text-white border-green-500'
+                                : 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
+                            }`}
+                          >
+                            Completed
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Reply to Respondent */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Reply to Respondent</p>
+                          {entry.reply_sent_at && (
+                            <span className="text-xs text-indigo-600 font-medium">
+                              Replied {formatRelative(entry.reply_sent_at)}
+                            </span>
+                          )}
+                        </div>
+                        {entry.reply_sent_at && !entryReplies[i] && (
+                          <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-800 whitespace-pre-wrap">
+                            {entry.reply_message}
+                          </div>
+                        )}
+                        <textarea
+                          placeholder={`Hi ${entry.respondent ?? 'there'},\n\nThank you for submitting your response with us.\n\n[Your reply here]\n\nRegards,\nPriya\nPoll Dashboard`}
+                          value={entryReplies[i] ?? ''}
+                          onChange={e => setEntryReplies(p => ({ ...p, [i]: e.target.value }))}
+                          rows={4}
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition resize-none"
+                        />
+                        <button
+                          type="button"
+                          disabled={sendingReply === i || !entryReplies[i]?.trim()}
+                          onClick={() => void sendReply(i)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                        >
+                          {sendingReply === i ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                          {entry.reply_sent_at ? 'Send Again' : 'Send Reply'}
+                        </button>
+                      </div>
+
+                      {/* Remarks */}
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Remarks</p>
+                        <textarea
+                          placeholder="Add internal remarks about this response..."
+                          value={entryRemarks[i] ?? entry.remarks ?? ''}
+                          onChange={e => setEntryRemarks(p => ({ ...p, [i]: e.target.value }))}
+                          rows={2}
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition resize-none"
+                        />
+                        <button
+                          type="button"
+                          disabled={savingEntry === i}
+                          onClick={() => void saveEntry(i, entry.actionable ?? null, currentCls)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-1.5 text-xs font-semibold text-gray-700 hover:border-cyan-400 hover:text-cyan-600 transition-colors disabled:opacity-50"
+                        >
+                          {savingEntry === i ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                          Save Remarks
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void saveEntry(i, entry.actionable ?? null)}
-                      disabled={savingEntry === i}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-1.5 text-xs font-semibold text-gray-700 hover:border-cyan-400 hover:text-cyan-600 transition-colors disabled:opacity-50"
-                    >
-                      {savingEntry === i
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        : <Save className="h-3.5 w-3.5" />
-                      }
-                      Save
-                    </button>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </CardContent>
           </Card>
         )

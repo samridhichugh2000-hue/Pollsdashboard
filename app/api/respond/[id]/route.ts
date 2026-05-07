@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPollById } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
+import { sendEmail } from '@/lib/graph'
+import { buildAutoResponseHtml } from '@/lib/utils'
 import { v4 as uuidv4 } from 'uuid'
 
 const CLOSED_STATUSES = ['CLOSED', 'ARCHIVED', 'RESULTS_UPLOADED']
@@ -90,6 +92,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       sql: 'INSERT INTO poll_responses (id, poll_id, response_data) VALUES (?, ?, ?)',
       args: [uuidv4(), id, JSON.stringify([newEntry])],
     })
+  }
+
+  // Auto-response confirmation email — non-fatal if it fails
+  try {
+    if (process.env.PRIYA_EMAIL) {
+      await sendEmail({
+        from: process.env.PRIYA_EMAIL,
+        to: email,
+        subject: `Your response has been recorded – ${poll.topic}`,
+        htmlBody: buildAutoResponseHtml({ topic: poll.topic, answers: body.answers }),
+      })
+    }
+  } catch (emailErr) {
+    console.error('Auto-response email failed (non-fatal):', emailErr)
   }
 
   return NextResponse.json({ success: true })

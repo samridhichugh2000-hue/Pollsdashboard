@@ -147,7 +147,7 @@ export async function getKPIData() {
     awaitingApproval: Number(approvalRes.rows[0]?.count ?? 0),
     active: Number(activeRes.rows[0]?.count ?? 0),
     closedThisMonth: Number(closedRes.rows[0]?.count ?? 0),
-    rmsTasksCreatedPct: rmsTotal > 0 ? Math.round((rmsCreated / rmsTotal) * 100) : 0,
+    rmsTasksCreated: rmsCreated,
     resultsUploaded: resUploaded,
   }
 }

@@ -171,36 +171,36 @@ function PollsContent() {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-white">Polls</h2>
+          <h2 className="text-xl font-bold text-slate-800">Polls</h2>
           {searchQuery ? (
-            <p className="text-sm text-white/50">
+            <p className="text-sm text-slate-500">
               Results for &quot;{searchQuery}&quot; — {filterByTab('all').length} found
             </p>
           ) : (
-            <p className="text-sm text-white/50">{polls.filter(p => active(p)).length} total polls</p>
+            <p className="text-sm text-slate-500">{polls.filter(p => active(p)).length} total polls</p>
           )}
         </div>
         <div className="flex gap-2">
           {searchQuery && (
             <Button variant="outline" size="sm"
-              className="border-white/20 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+              className="border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm"
               onClick={clearSearch}>
               <X className="mr-1.5 h-3.5 w-3.5" /> Clear Search
             </Button>
           )}
           <Button variant="outline" size="sm"
-            className="border-white/20 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+            className="border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm"
             onClick={copyRequestLink}>
             <Copy className="mr-1.5 h-3.5 w-3.5" /> Copy Request Link
           </Button>
           <Button variant="outline" size="sm"
-            className="border-white/20 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+            className="border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm"
             onClick={() => void handleRefresh()}>
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="bg-white text-cyan-700 hover:bg-white/90 font-semibold shadow-lg">
+              <Button size="sm" className="bg-teal-600 text-white hover:bg-teal-700 font-semibold shadow-sm">
                 <Plus className="mr-1.5 h-3.5 w-3.5" /> New Poll
               </Button>
             </DialogTrigger>
@@ -213,25 +213,25 @@ function PollsContent() {
       </div>
 
       {/* Date range filter */}
-      <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 py-2.5">
-        <CalendarRange className="h-4 w-4 text-white/60 flex-shrink-0" />
-        <span className="text-xs text-white/60 flex-shrink-0">From</span>
+      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white shadow-sm px-4 py-2.5">
+        <CalendarRange className="h-4 w-4 text-slate-400 flex-shrink-0" />
+        <span className="text-xs text-slate-400 flex-shrink-0">From</span>
         <input
           type="date"
           value={dateFrom}
           onChange={e => setDateFrom(e.target.value)}
-          className="bg-transparent text-sm text-white [color-scheme:dark] outline-none cursor-pointer"
+          className="bg-transparent text-sm text-slate-700 [color-scheme:light] outline-none cursor-pointer"
         />
-        <span className="text-xs text-white/60 flex-shrink-0">To</span>
+        <span className="text-xs text-slate-400 flex-shrink-0">To</span>
         <input
           type="date"
           value={dateTo}
           onChange={e => setDateTo(e.target.value)}
           min={dateFrom || undefined}
-          className="bg-transparent text-sm text-white [color-scheme:dark] outline-none cursor-pointer"
+          className="bg-transparent text-sm text-slate-700 [color-scheme:light] outline-none cursor-pointer"
         />
         {hasDateFilter && (
-          <button onClick={clearDateFilter} className="ml-auto flex items-center gap-1 text-xs text-white/50 hover:text-white transition-colors">
+          <button onClick={clearDateFilter} className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
             <X className="h-3.5 w-3.5" /> Clear
           </button>
         )}
@@ -239,9 +239,9 @@ function PollsContent() {
 
       {/* Search active banner */}
       {searchQuery && (
-        <div className="flex items-center gap-2 rounded-xl bg-white/10 backdrop-blur-sm px-4 py-2.5 text-sm text-white/80">
+        <div className="flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm text-slate-600">
           Showing results across all tabs for &quot;{searchQuery}&quot;
-          <button onClick={clearSearch} className="ml-auto text-white/50 hover:text-white transition-colors">
+          <button onClick={clearSearch} className="ml-auto text-slate-400 hover:text-slate-600 transition-colors">
             <X className="h-3.5 w-3.5" />
           </button>
         </div>

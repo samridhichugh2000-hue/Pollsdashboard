@@ -15,6 +15,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ message: 'Weekend — no reminders today', sent: 0 })
   }
 
+  // Normalize to start-of-day so time-of-send doesn't block the cron from firing
+  const todayStart = new Date(today)
+  todayStart.setHours(0, 0, 0, 0)
+
   const sentPolls = await getPollsByStatus('SENT')
   let sent = 0
 
@@ -25,7 +29,11 @@ export async function GET(req: Request) {
     const sendDate = new Date(poll.sent_at)
     const reminderDate = poll.reminder_at ? new Date(poll.reminder_at) : getNextWorkingDay(sendDate)
 
-    if (today < reminderDate) continue
+    // Compare dates only — cron run time must not prevent reminder from firing
+    const reminderStart = new Date(reminderDate)
+    reminderStart.setHours(0, 0, 0, 0)
+
+    if (todayStart < reminderStart) continue
 
     // Must have stored release recipients — skip polls released before this feature
     const releaseEmails: string[] = poll.release_emails ? JSON.parse(poll.release_emails) : []

@@ -15,12 +15,12 @@ const defaultKPI: KPIData = {
   awaitingApproval: 0,
   active: 0,
   closedThisMonth: 0,
-  rmsTasksCreatedPct: 0,
+  rmsTasksCreated: 0,
   resultsUploaded: 0,
 }
 
 function SkeletonCard({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded-2xl bg-white/20 ${className}`} />
+  return <div className={`animate-pulse rounded-2xl bg-slate-200 ${className}`} />
 }
 
 export default function DashboardPage() {
@@ -70,6 +70,15 @@ export default function DashboardPage() {
     const d = new Date(p.next_run_date); d.setHours(0, 0, 0, 0)
     return d <= tomorrow
   })
+  const filteredKpi: KPIData = hasDateFilter ? {
+    totalThisMonth: filteredPolls.filter(p => p.status !== 'ARCHIVED').length,
+    awaitingApproval: filteredPolls.filter(p => p.status === 'AWAITING_APPROVAL').length,
+    active: filteredPolls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)).length,
+    closedThisMonth: filteredPolls.filter(p => ['CLOSED', 'RESULTS_UPLOADED'].includes(p.status)).length,
+    rmsTasksCreated: filteredPolls.filter(p => p.rms_task_id != null).length,
+    resultsUploaded: filteredPolls.filter(p => p.results_uploaded_at != null).length,
+  } : kpi
+
   const recentPolls = filteredPolls.filter(p => p.status !== 'ARCHIVED').slice(0, 6)
   const overdueApprovals = filteredPolls.filter(
     (p) => p.status === 'AWAITING_APPROVAL' && isApprovalOverdue(p.updated_at)
@@ -106,30 +115,30 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* KPI row */}
-      <KPICards data={kpi} />
+      <KPICards data={filteredKpi} filtered={!!hasDateFilter} />
 
       {/* Date range filter */}
-      <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 backdrop-blur-sm px-4 py-2.5">
-        <CalendarRange className="h-4 w-4 text-white/60 flex-shrink-0" />
-        <span className="text-xs text-white/60 flex-shrink-0">From</span>
+      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white shadow-sm px-4 py-2.5">
+        <CalendarRange className="h-4 w-4 text-slate-400 flex-shrink-0" />
+        <span className="text-xs text-slate-400 flex-shrink-0">From</span>
         <input
           type="date"
           value={dateFrom}
           onChange={e => setDateFrom(e.target.value)}
-          className="bg-transparent text-sm text-white [color-scheme:dark] outline-none cursor-pointer"
+          className="bg-transparent text-sm text-slate-700 [color-scheme:light] outline-none cursor-pointer"
         />
-        <span className="text-xs text-white/60 flex-shrink-0">To</span>
+        <span className="text-xs text-slate-400 flex-shrink-0">To</span>
         <input
           type="date"
           value={dateTo}
           onChange={e => setDateTo(e.target.value)}
           min={dateFrom || undefined}
-          className="bg-transparent text-sm text-white [color-scheme:dark] outline-none cursor-pointer"
+          className="bg-transparent text-sm text-slate-700 [color-scheme:light] outline-none cursor-pointer"
         />
         {hasDateFilter && (
           <button
             onClick={() => { setDateFrom(''); setDateTo('') }}
-            className="ml-auto flex items-center gap-1 text-xs text-white/50 hover:text-white transition-colors"
+            className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors"
           >
             <X className="h-3.5 w-3.5" /> Clear
           </button>
@@ -138,22 +147,22 @@ export default function DashboardPage() {
 
       {/* Due regular polls alert */}
       {dueRegularPolls.length > 0 && (
-        <div className="rounded-2xl bg-amber-500/20 border border-amber-400/30 px-5 py-4 backdrop-blur-sm">
+        <div className="rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
           <div className="flex items-center gap-2 mb-2">
-            <CalendarClock className="h-4 w-4 text-amber-300" />
-            <span className="font-semibold text-amber-100">
+            <CalendarClock className="h-4 w-4 text-amber-600" />
+            <span className="font-semibold text-amber-800">
               {dueRegularPolls.length} regular poll{dueRegularPolls.length > 1 ? 's' : ''} auto-releasing soon — pause to skip
             </span>
-            <Link href="/regular-polls" className="ml-auto text-xs text-amber-200 hover:text-white underline">
+            <Link href="/regular-polls" className="ml-auto text-xs text-amber-700 hover:text-amber-900 underline">
               Go to Regular Polls →
             </Link>
           </div>
           <div className="flex flex-wrap gap-2">
             {dueRegularPolls.map(p => (
               <Link key={p.id} href="/regular-polls"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/30 px-3 py-1.5 text-sm font-medium text-amber-100 transition-colors">
+                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-200 px-3 py-1.5 text-sm font-medium text-amber-800 transition-colors">
                 <CalendarClock className="h-3 w-3" /> {p.name}
-                <span className="text-amber-300/70 text-xs">({p.frequency})</span>
+                <span className="text-amber-600 text-xs">({p.frequency})</span>
               </Link>
             ))}
           </div>

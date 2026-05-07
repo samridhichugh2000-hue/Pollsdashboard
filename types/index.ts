@@ -108,7 +108,7 @@ export interface KPIData {
   awaitingApproval: number
   active: number
   closedThisMonth: number
-  rmsTasksCreatedPct: number
+  rmsTasksCreated: number
   resultsUploaded: number
 }
 

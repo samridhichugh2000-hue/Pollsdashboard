@@ -26,15 +26,15 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="flex h-full w-52 flex-col bg-cyan-800/40 py-4 backdrop-blur-sm">
+    <aside className="flex h-full w-52 flex-col bg-slate-900 py-4">
       {/* Logo */}
       <div className="mb-8 flex items-center gap-3 px-4">
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/20">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-teal-600">
           <CheckSquare className="h-5 w-5 text-white" />
         </div>
         <div>
           <p className="text-sm font-bold text-white leading-tight">Polls</p>
-          <p className="text-xs text-white/50 leading-tight">Dashboard</p>
+          <p className="text-xs text-slate-400 leading-tight">Dashboard</p>
         </div>
       </div>
 
@@ -53,11 +53,11 @@ export function Sidebar() {
               className={cn(
                 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
                 isActive
-                  ? 'bg-white/25 text-white shadow-lg'
-                  : 'text-white/60 hover:bg-white/15 hover:text-white'
+                  ? 'bg-teal-600 text-white shadow-lg'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               )}
             >
-              <Icon className="h-4.5 w-4.5 flex-shrink-0 h-[18px] w-[18px]" />
+              <Icon className="h-[18px] w-[18px] flex-shrink-0" />
               <span>{item.label}</span>
             </Link>
           )
@@ -65,9 +65,9 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom status */}
-      <div className="flex items-center gap-2 px-4 pt-4 border-t border-white/10">
-        <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_2px_rgba(52,211,153,0.5)]" />
-        <span className="text-xs text-white/40">Connected</span>
+      <div className="flex items-center gap-2 px-4 pt-4 border-t border-slate-700/50">
+        <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_2px_rgba(52,211,153,0.4)]" />
+        <span className="text-xs text-slate-500">Connected</span>
       </div>
     </aside>
   )

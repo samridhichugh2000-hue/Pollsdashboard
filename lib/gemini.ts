@@ -15,36 +15,62 @@ export async function generateDraftWithGemini(params: {
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured')
 
   const { topic, department, deadline, tone = 'professional', keywords, useKeywords = true } = params
-  const audienceLabel = department === 'All Departments' ? 'all employees' : `${department} team`
-  const kwLine = useKeywords && keywords?.trim() ? `\nKeywords to highlight: ${keywords.trim()}` : ''
+  const audience = department === 'All Departments' ? 'Team' : `${department} Team`
+  const subjectLine = department === 'All Departments' ? `Poll – ${topic}` : `Poll of ${department} – ${topic}`
+  const kwLine = useKeywords && keywords?.trim() ? `Keywords to highlight: ${keywords.trim()}` : ''
 
   const genAI = new GoogleGenerativeAI(apiKey)
   const model = genAI.getGenerativeModel({ model: MODEL })
 
-  const prompt = `You are an expert HR communications professional at Koenig Solutions, a leading IT training company in India. Generate a complete poll email draft.
+  const prompt = `You are an HR communications professional at Koenig Solutions, a leading IT training company in India.
+Generate a concise poll email draft in the Koenig Solutions HR house style.
 
 Topic: ${topic}
-Target Audience: ${audienceLabel}
+Audience: ${audience}
+Department: ${department}
 Response Deadline: ${deadline}
-Tone: ${tone}${kwLine}
+Tone: ${tone}
+${kwLine}
 
-Return ONLY a valid JSON object — no markdown fences, no explanation, just the JSON:
+SUBJECT: Use exactly — "${subjectLine}"
+
+EMAIL BODY RULES (follow strictly):
+1. Salutation: "Dear ${audience},"
+2. Paragraph 1 (1–2 sentences): State specifically what we are assessing and why — no generic filler, no "as part of our commitment to" boilerplate
+3. Paragraph 2 (1 sentence): Action line — "${tone === 'formal' ? `You are requested to submit your response via the below poll by ${deadline}.` : tone === 'urgent' ? `This is time-sensitive — request you to share your inputs via the below poll by ${deadline} without delay.` : `Request you to share your inputs via the below poll by ${deadline}.`}"
+4. Paragraph 3 (1 sentence): Specific outcome — how this feedback will be used
+5. Sign-off: exactly "Warm Regards,\\nTeam HR\\nPoll Dashboard"
+6. NO emojis, NO bullet points, NO URLs, NO markdown formatting
+7. Indian corporate English — "Request you to", "Kindly", short and direct sentences
+
+STYLE REFERENCE (match this brevity and directness):
+Subject: Poll of Sales – PLI Accuracy & Timely Payout
+Dear Sales Team,
+
+We are conducting a quick poll to ensure that PLI is being calculated correctly and paid on time.
+
+Request you to share your response through the below poll by 13th April 2026.
+
+Thank you.
+
+Warm Regards,
+Team HR
+Poll Dashboard
+
+QUESTIONS: Generate 3–4 questions highly specific to "${topic}":
+- 2 rating questions with scale e.g. "(1 = Very Poor, 5 = Excellent)"
+- 1–2 open-ended questions
+- Zero generic questions — every question must be specific to the exact topic
+
+Return ONLY valid JSON with no markdown fences:
 {
-  "subject": "Poll: <concise subject based on topic>",
-  "emailBody": "<full professional email body>",
+  "subject": "${subjectLine}",
+  "emailBody": "<full email body>",
   "questions": [
-    {"text": "<specific question text> (1 = Very Poor, 5 = Excellent)", "type": "rating"},
-    {"text": "<specific open ended question>", "type": "open_ended"}
+    {"text": "<question>", "type": "rating"},
+    {"text": "<question>", "type": "open_ended"}
   ]
-}
-
-Strict rules:
-- Email body: ${tone} tone, 2–3 focused paragraphs, no subject line, sign off "HR Team, Koenig Solutions"
-- Exactly 3–4 questions: 2 rating (include scale hint like "(1 = Very Poor, 5 = Excellent)") + 1–2 open_ended
-- Questions MUST be highly specific to the topic — zero generic questions
-- ${useKeywords && keywords?.trim() ? `Naturally and prominently weave in these keywords: ${keywords.trim()}` : 'Make every question and sentence specific to the exact topic'}
-- Context: Koenig Solutions is an IT training company, professional Indian corporate environment
-- Return only the JSON object, nothing else`
+}`
 
   const result = await model.generateContent(prompt)
   const raw = result.response.text().trim()
