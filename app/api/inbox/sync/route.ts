@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { getUnreadPollEmails, markEmailAsRead, isSystemNotificationEmail } from '@/lib/graph'
+import { getInboxMessages, getUnreadPollEmails, markEmailAsRead, isSystemNotificationEmail } from '@/lib/graph'
 import { createPoll, updatePoll, pollEmailAlreadyProcessed, createAuditLog } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { generatePollDraft } from '@/lib/draft-generator'
@@ -23,19 +23,23 @@ export async function POST() {
 
   try {
     const AUTHORIZED_EMAILS = await getAuthorizedEmails()
+
+    // First pass: mark all RMS system notification emails as read so they disappear from the inbox view
+    const allUnread = await getInboxMessages(priyaEmail, 'isRead eq false')
+    for (const msg of allUnread) {
+      if (isSystemNotificationEmail(msg.subject)) {
+        await markEmailAsRead(priyaEmail, msg.id)
+        skipped++
+      }
+    }
+
+    // Second pass: process actual poll emails
     const messages = await getUnreadPollEmails(priyaEmail)
 
     for (const msg of messages) {
       const senderEmail = msg.from.emailAddress.address.toLowerCase()
 
       if (!AUTHORIZED_EMAILS.has(senderEmail)) { skipped++; continue }
-
-      // RMS system notification — mark as read and skip
-      if (isSystemNotificationEmail(msg.subject)) {
-        await markEmailAsRead(priyaEmail, msg.id)
-        skipped++
-        continue
-      }
 
       const alreadyProcessed = await pollEmailAlreadyProcessed(msg.conversationId)
       if (alreadyProcessed) { skipped++; await markEmailAsRead(priyaEmail, msg.id); continue }
