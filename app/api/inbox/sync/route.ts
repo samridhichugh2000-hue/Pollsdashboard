@@ -24,7 +24,7 @@ export async function POST() {
   try {
     const AUTHORIZED_EMAILS = await getAuthorizedEmails()
 
-    // First pass: mark all RMS system notification emails as read so they disappear from the inbox view
+    // First pass: mark all RMS system notification emails as read so they disappear from Outlook
     const allUnread = await getInboxMessages(priyaEmail, 'isRead eq false')
     for (const msg of allUnread) {
       if (isSystemNotificationEmail(msg.subject)) {
@@ -32,6 +32,17 @@ export async function POST() {
         skipped++
       }
     }
+
+    // Clean up existing DB polls that were created from RMS notification emails before this filter was added
+    await getDb().execute(`
+      UPDATE polls SET status = 'ARCHIVED', updated_at = CURRENT_TIMESTAMP
+      WHERE source = 'email'
+        AND status IN ('DRAFT', 'DETECTED')
+        AND (
+          LOWER(topic) LIKE '%acknowledgment of new task%'
+          OR LOWER(topic) LIKE '%feedback by user for rms%'
+        )
+    `)
 
     // Second pass: process actual poll emails
     const messages = await getUnreadPollEmails(priyaEmail)
