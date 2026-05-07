@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getInboxMessages, markEmailAsRead } from '@/lib/graph'
+import { getInboxMessages, markEmailAsRead, isSystemNotificationEmail } from '@/lib/graph'
 import { createPoll, updatePoll, pollEmailAlreadyProcessed, createAuditLog } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { generatePollDraft } from '@/lib/draft-generator'
@@ -13,8 +13,8 @@ const POLL_KEYWORDS = ['poll', 'survey', 'questionnaire', 'feedback form', 'run 
 function filterPollRelatedEmails(messages: GraphMessage[]): GraphMessage[] {
   const pollsMailbox = (process.env.POLLS_MAILBOX ?? '').toLowerCase()
   return messages.filter(m => {
-    // Exclude emails sent by the polls mailbox itself (released poll notifications)
     if (pollsMailbox && m.from.emailAddress.address.toLowerCase() === pollsMailbox) return false
+    if (isSystemNotificationEmail(m.subject)) return false
     const text = `${m.subject} ${m.bodyPreview}`.toLowerCase()
     return POLL_KEYWORDS.some(kw => text.includes(kw))
   })

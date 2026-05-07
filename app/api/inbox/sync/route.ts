@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { getUnreadPollEmails, markEmailAsRead } from '@/lib/graph'
+import { getUnreadPollEmails, markEmailAsRead, isSystemNotificationEmail } from '@/lib/graph'
 import { createPoll, updatePoll, pollEmailAlreadyProcessed, createAuditLog } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { generatePollDraft } from '@/lib/draft-generator'
@@ -29,6 +29,13 @@ export async function POST() {
       const senderEmail = msg.from.emailAddress.address.toLowerCase()
 
       if (!AUTHORIZED_EMAILS.has(senderEmail)) { skipped++; continue }
+
+      // RMS system notification — mark as read and skip
+      if (isSystemNotificationEmail(msg.subject)) {
+        await markEmailAsRead(priyaEmail, msg.id)
+        skipped++
+        continue
+      }
 
       const alreadyProcessed = await pollEmailAlreadyProcessed(msg.conversationId)
       if (alreadyProcessed) { skipped++; await markEmailAsRead(priyaEmail, msg.id); continue }
