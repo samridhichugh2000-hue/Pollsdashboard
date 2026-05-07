@@ -82,15 +82,15 @@ export async function getInboxMessages(userEmail: string, filter?: string): Prom
 const POLL_KEYWORDS = ['poll', 'survey', 'questionnaire', 'feedback form', 'run a poll', 'create a poll', 'conduct a poll', 'conduct a survey']
 const EXCLUDE_SENDERS = [process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com']
 
-// Subjects that start with these prefixes are RMS system notifications — never poll requests
-const EXCLUDE_SUBJECT_PREFIXES = [
+// Subjects containing these phrases are RMS system notifications — never poll requests
+const EXCLUDE_SUBJECT_PHRASES = [
   'acknowledgment of new task',
   'feedback by user for rms',
 ]
 
 export function isSystemNotificationEmail(subject: string): boolean {
   const s = subject.toLowerCase()
-  return EXCLUDE_SUBJECT_PREFIXES.some(prefix => s.startsWith(prefix))
+  return EXCLUDE_SUBJECT_PHRASES.some(phrase => s.includes(phrase))
 }
 
 export async function getUnreadPollEmails(userEmail: string): Promise<GraphMessage[]> {
