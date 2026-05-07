@@ -5,11 +5,23 @@ import {
   updatePoll,
   createAuditLog,
 } from '@/lib/db/queries'
+import { getDb } from '@/lib/db/client'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { formatDate } from '@/lib/utils'
 import type { CreatePollInput } from '@/types'
 
+const NOTIFICATION_PHRASES = ['acknowledgment of new task', 'feedback by user for rms']
+
 export async function GET() {
+  // Silently archive any RMS notification emails that slipped through as polls
+  try {
+    const conditions = NOTIFICATION_PHRASES.map(() => `LOWER(topic) LIKE ?`).join(' OR ')
+    await getDb().execute({
+      sql: `UPDATE polls SET status = 'ARCHIVED' WHERE source = 'email' AND status IN ('DRAFT', 'DETECTED') AND (${conditions})`,
+      args: NOTIFICATION_PHRASES.map(p => `%${p}%`),
+    })
+  } catch { /* non-blocking */ }
+
   const polls = await getAllPolls()
   return NextResponse.json(polls)
 }
