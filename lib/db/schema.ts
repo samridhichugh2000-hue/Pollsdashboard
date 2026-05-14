@@ -42,6 +42,14 @@ export async function runMigrations() {
     await db.execute(`ALTER TABLE polls ADD COLUMN release_message_id TEXT`)
   } catch { /* already exists */ }
 
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN second_reminder_sent_at DATETIME`)
+  } catch { /* already exists */ }
+
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN closure_alert_sent_at DATETIME`)
+  } catch { /* already exists */ }
+
   // One-time approval tokens sent via email
   try {
     await db.execute(`

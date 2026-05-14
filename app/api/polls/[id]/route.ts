@@ -618,6 +618,35 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break
       }
 
+      case 'SEND_MANUAL_REMINDER': {
+        if (!['SENT', 'REMINDER_SENT'].includes(poll.status)) {
+          return NextResponse.json({ error: 'Poll is not in an active state.' }, { status: 400 })
+        }
+        if (!poll.ms_form_link) {
+          return NextResponse.json({ error: 'Poll has no form link.' }, { status: 400 })
+        }
+        if (!poll.release_message_id) {
+          return NextResponse.json({ error: 'No release thread found — cannot send threaded reminder.' }, { status: 400 })
+        }
+        const manualReleaseEmails: string[] = poll.release_emails ? JSON.parse(poll.release_emails) : []
+        if (!manualReleaseEmails.length) {
+          return NextResponse.json({ error: 'No release recipients found.' }, { status: 400 })
+        }
+        const manualReminderHtml = buildPollEmailHtml({
+          emailBody: `<p>This is a friendly reminder to participate in our poll: <strong>${poll.topic}</strong></p>`,
+          msFormLink: poll.ms_form_link,
+          deadline: poll.deadline ? formatDate(poll.deadline) : 'today',
+        })
+        const manualPollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
+        await replyToMessageWithHtml(manualPollsMailbox, poll.release_message_id, {
+          subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
+          htmlBody: manualReminderHtml,
+          to: manualReleaseEmails,
+        })
+        await createAuditLog(id, 'MANUAL_REMINDER_SENT', userEmail, { emails: manualReleaseEmails })
+        break
+      }
+
       default:
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }

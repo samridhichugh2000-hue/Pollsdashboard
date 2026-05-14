@@ -4,6 +4,12 @@ import { replyToMessageWithHtml } from '@/lib/graph'
 import { buildPollEmailHtml, formatDate, getNextWorkingDay } from '@/lib/utils'
 import { isWeekend } from 'date-fns'
 
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
+
+function toISTDateStr(date: Date): string {
+  return new Date(date.getTime() + IST_OFFSET_MS).toISOString().split('T')[0]
+}
+
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -15,65 +21,98 @@ export async function GET(req: Request) {
     return NextResponse.json({ message: 'Weekend — no reminders today', sent: 0 })
   }
 
-  // Normalize to start-of-day so time-of-send doesn't block the cron from firing
   const todayStart = new Date(today)
   todayStart.setHours(0, 0, 0, 0)
+  const todayISTDate = toISTDateStr(today)
 
-  const sentPolls = await getPollsByStatus('SENT')
+  const pollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
   let sent = 0
 
-  for (const poll of sentPolls) {
-    if (!poll.sent_at || !poll.ms_form_link) continue
+  // ── 1st reminder: next working day after release ──────────────────────────
+  {
+    const sentPolls = await getPollsByStatus('SENT')
 
-    // Check if reminder is due (next working day after send)
-    const sendDate = new Date(poll.sent_at)
-    const reminderDate = poll.reminder_at ? new Date(poll.reminder_at) : getNextWorkingDay(sendDate)
+    for (const poll of sentPolls) {
+      if (!poll.sent_at || !poll.ms_form_link) continue
 
-    // Compare dates only — cron run time must not prevent reminder from firing
-    const reminderStart = new Date(reminderDate)
-    reminderStart.setHours(0, 0, 0, 0)
+      const sendDate = new Date(poll.sent_at)
+      const reminderDate = poll.reminder_at ? new Date(poll.reminder_at) : getNextWorkingDay(sendDate)
 
-    if (todayStart < reminderStart) continue
+      const reminderStart = new Date(reminderDate)
+      reminderStart.setHours(0, 0, 0, 0)
 
-    // Must have stored release recipients — skip polls released before this feature
+      if (todayStart < reminderStart) continue
+
+      const releaseEmails: string[] = poll.release_emails ? JSON.parse(poll.release_emails) : []
+      if (!releaseEmails.length) {
+        console.warn(`Poll ${poll.id} has no stored release_emails — skipping 1st reminder`)
+        continue
+      }
+
+      if (!poll.release_message_id) {
+        console.warn(`Poll ${poll.id} has no release_message_id — skipping 1st reminder (cannot thread)`)
+        continue
+      }
+
+      try {
+        const deadline = poll.deadline ? formatDate(poll.deadline) : 'today'
+        const htmlBody = buildPollEmailHtml({
+          emailBody: `<p>This is a friendly reminder to participate in our poll: <strong>${poll.topic}</strong></p>`,
+          msFormLink: poll.ms_form_link,
+          deadline,
+        })
+
+        await replyToMessageWithHtml(pollsMailbox, poll.release_message_id, {
+          subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
+          htmlBody,
+          to: releaseEmails,
+        })
+
+        await updatePollStatus(poll.id, 'REMINDER_SENT', {
+          reminder_sent_at: new Date().toISOString(),
+        })
+        await createAuditLog(poll.id, 'REMINDER_SENT', 'cron', { emails: releaseEmails })
+        sent++
+      } catch (err) {
+        console.error(`Failed to send 1st reminder for poll ${poll.id}:`, err)
+      }
+    }
+  }
+
+  // ── 2nd reminder: deadline day at 8 AM IST ───────────────────────────────
+  const reminderSentPolls = await getPollsByStatus('REMINDER_SENT')
+
+  for (const poll of reminderSentPolls) {
+    if (!poll.deadline || !poll.ms_form_link || !poll.release_message_id) continue
+    if (poll.second_reminder_sent_at) continue
+    if (toISTDateStr(new Date(poll.deadline)) !== todayISTDate) continue
+
     const releaseEmails: string[] = poll.release_emails ? JSON.parse(poll.release_emails) : []
     if (!releaseEmails.length) {
-      console.warn(`Poll ${poll.id} has no stored release_emails — skipping reminder`)
-      continue
-    }
-
-    // Reminders must go as a reply on the original release thread — never as a new email.
-    if (!poll.release_message_id) {
-      console.warn(`Poll ${poll.id} has no release_message_id — skipping reminder (cannot thread)`)
+      console.warn(`Poll ${poll.id} has no stored release_emails — skipping 2nd reminder`)
       continue
     }
 
     try {
-      const deadline = poll.deadline ? formatDate(poll.deadline) : 'today'
       const htmlBody = buildPollEmailHtml({
-        emailBody: `<p>This is a friendly reminder to participate in our poll: <strong>${poll.topic}</strong></p>`,
+        emailBody: `<p>A gentle reminder — today is the <strong>last day</strong> to complete our poll: <strong>${poll.topic}</strong>. Please share your response before end of day.</p>`,
         msFormLink: poll.ms_form_link,
-        deadline,
+        deadline: formatDate(poll.deadline),
       })
 
-      await replyToMessageWithHtml(
-        process.env.PRIYA_EMAIL!,
-        poll.release_message_id,
-        {
-          subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
-          htmlBody,
-          to: releaseEmails,
-        }
-      )
+      await replyToMessageWithHtml(pollsMailbox, poll.release_message_id, {
+        subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
+        htmlBody,
+        to: releaseEmails,
+      })
 
       await updatePollStatus(poll.id, 'REMINDER_SENT', {
-        reminder_sent_at: new Date().toISOString(),
+        second_reminder_sent_at: new Date().toISOString(),
       })
-
-      await createAuditLog(poll.id, 'REMINDER_SENT', 'cron', { emails: releaseEmails })
+      await createAuditLog(poll.id, 'SECOND_REMINDER_SENT', 'cron', { emails: releaseEmails })
       sent++
     } catch (err) {
-      console.error(`Failed to send reminder for poll ${poll.id}:`, err)
+      console.error(`Failed to send 2nd reminder for poll ${poll.id}:`, err)
     }
   }
 

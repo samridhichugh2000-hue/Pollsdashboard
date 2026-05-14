@@ -45,6 +45,8 @@ export interface Poll {
   sent_at?: string | null
   reminder_at?: string | null
   reminder_sent_at?: string | null
+  second_reminder_sent_at?: string | null
+  closure_alert_sent_at?: string | null
   approved_at?: string | null
   closed_at?: string | null
   results_uploaded_at?: string | null

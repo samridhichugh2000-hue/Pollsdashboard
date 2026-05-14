@@ -6,7 +6,11 @@
     },
     {
       "path": "/api/cron/reminder-scheduler",
-      "schedule": "0 9 * * 1-5"
+      "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/cron/closure-alert",
+      "schedule": "30 11 * * *"
     },
     {
       "path": "/api/cron/poll-closure",

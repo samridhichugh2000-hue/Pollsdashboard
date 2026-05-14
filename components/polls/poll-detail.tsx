@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download, RefreshCw, Save, X, ChevronDown, Paperclip, MessageSquare } from 'lucide-react'
+import { ArrowLeft, ExternalLink, CheckCircle, XCircle, Edit, Send, AlertCircle, Loader2, Download, RefreshCw, Save, X, ChevronDown, Paperclip, MessageSquare, Bell } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -807,6 +807,22 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                     Archive Poll
                   </Button>
                 </>
+              )}
+
+              {['SENT', 'REMINDER_SENT'].includes(poll.status) && (
+                <Button
+                  className="w-full"
+                  size="sm"
+                  variant="outline"
+                  disabled={!!loading}
+                  onClick={() => {
+                    if (!confirm('Send a reminder to all poll recipients now?')) return
+                    void runAction('SEND_MANUAL_REMINDER')
+                  }}
+                >
+                  {loading === 'SEND_MANUAL_REMINDER' ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Bell className="mr-1.5 h-3.5 w-3.5" />}
+                  Send Reminder Now
+                </Button>
               )}
 
               {['SENT', 'REMINDER_SENT'].includes(poll.status) && (
