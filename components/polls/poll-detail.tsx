@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { StatusBadge } from './status-badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { formatDate, formatDateTime, formatRelative, isApprovalOverdue } from '@/lib/utils'
+import { formatDate, formatDateTime, formatRelative, isApprovalOverdue, normalizeBodyForEditor } from '@/lib/utils'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import type { Poll, PollApproval, AuditLog, PollResponse } from '@/types'
 import { QuestionBuilder, parseQuestions } from './question-builder'
 import type { Question } from './question-builder'
@@ -36,7 +37,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
 
   // Draft edit state
   const [editSubject, setEditSubject] = useState(initialPoll.subject || `Poll: ${initialPoll.topic}`)
-  const [editEmailBody, setEditEmailBody] = useState(initialPoll.draft_email_body || '')
+  const [editEmailBody, setEditEmailBody] = useState(() => normalizeBodyForEditor(initialPoll.draft_email_body || ''))
   const [editQuestions, setEditQuestions] = useState<Question[]>(parseQuestions(initialPoll.questions ?? ''))
   const defaultDeadline = (() => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString().split('T')[0] })()
   const [editDeadline, setEditDeadline] = useState(
@@ -91,7 +92,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   useEffect(() => {
     if (poll.status === 'DRAFT') {
       setEditSubject(poll.subject || `Poll: ${poll.topic}`)
-      setEditEmailBody(poll.draft_email_body || '')
+      setEditEmailBody(normalizeBodyForEditor(poll.draft_email_body || ''))
       setEditQuestions(parseQuestions(poll.questions ?? ''))
       setEditDeadline(poll.deadline ? poll.deadline.split('T')[0] : defaultDeadline)
     }
@@ -597,12 +598,11 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                       Redraft Email
                     </Button>
                   </div>
-                  <Textarea
+                  <RichTextEditor
                     value={editEmailBody}
-                    onChange={(e) => setEditEmailBody(e.target.value)}
-                    rows={8}
-                    className="font-mono text-sm"
-                    placeholder="Email body will appear here..."
+                    onChange={setEditEmailBody}
+                    placeholder="Email body will appear here… paste any format including tables"
+                    minHeight="200px"
                   />
                 </CardContent>
               </Card>

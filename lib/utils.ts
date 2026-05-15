@@ -51,6 +51,24 @@ export function isApprovalOverdue(sentAt: string | null | undefined): boolean {
   return hoursElapsed > 24
 }
 
+function isHtmlContent(s: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(s.trim())
+}
+
+/** Convert plain-text draft bodies to HTML paragraphs for the rich editor.
+ *  Already-HTML content is returned unchanged. */
+export function normalizeBodyForEditor(body: string): string {
+  if (!body) return ''
+  if (isHtmlContent(body)) return body
+  return body
+    .split(/\n{2,}/)
+    .map(paragraph => {
+      const lines = paragraph.split('\n').map(l => l || '&nbsp;').join('<br>')
+      return `<p>${lines}</p>`
+    })
+    .join('')
+}
+
 export function buildApprovalEmailHtml(params: {
   topic: string
   department: string
@@ -89,7 +107,7 @@ export function buildApprovalEmailHtml(params: {
 
   <h3 style="font-size:14px; color:#374151; margin-bottom:8px; text-transform:uppercase; letter-spacing:.05em;">Draft Email Body</h3>
   <div style="background:#f8fafc; padding:14px; border-left:4px solid #3b82f6; border-radius:4px; font-size:14px; line-height:1.6; margin-bottom:16px;">
-    ${params.emailBody.replace(/\n/g, '<br>')}
+    ${isHtmlContent(params.emailBody) ? params.emailBody : params.emailBody.replace(/\n/g, '<br>')}
   </div>
 
   <h3 style="font-size:14px; color:#374151; margin-bottom:8px; text-transform:uppercase; letter-spacing:.05em;">Poll Questions</h3>
@@ -138,7 +156,7 @@ export function buildPollEmailHtml(params: {
 }): string {
   return `
 <div style="font-family: Arial, sans-serif; max-width: 600px;">
-  <div>${params.emailBody.replace(/\n/g, '<br>')}</div>
+  <div>${isHtmlContent(params.emailBody) ? params.emailBody : params.emailBody.replace(/\n/g, '<br>')}</div>
   <p><strong>Please fill out the poll by ${params.deadline}:</strong></p>
   <p><a href="${params.msFormLink}" style="background:#1e40af;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;">Take the Poll</a></p>
 </div>
