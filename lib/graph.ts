@@ -145,6 +145,11 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     message.ccRecipients = ccList.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
   }
 
+  if (options.bcc) {
+    const bccList = Array.isArray(options.bcc) ? options.bcc : [options.bcc]
+    message.bccRecipients = bccList.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
+  }
+
   if (options.attachments?.length) {
     message.attachments = options.attachments.map((a) => ({
       '@odata.type': '#microsoft.graph.fileAttachment',
@@ -213,7 +218,7 @@ export async function sendEmailGetId(options: SendEmailOptions): Promise<string>
 export async function replyToMessageWithHtml(
   from: string,
   internetMessageId: string, // RFC Message-ID stored from sendEmailGetId
-  options: { subject: string; htmlBody: string; to: string[]; attachments?: EmailAttachment[] }
+  options: { subject: string; htmlBody: string; to: string[]; bcc?: string[]; attachments?: EmailAttachment[] }
 ): Promise<void> {
   const filter = `internetMessageId eq '${internetMessageId.replace(/'/g, "''")}'`
   // $count=true is required alongside ConsistencyLevel:eventual for advanced query capabilities
@@ -255,6 +260,9 @@ export async function replyToMessageWithHtml(
   const message: Record<string, unknown> = {
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
+  }
+  if (options.bcc?.length) {
+    message.bccRecipients = options.bcc.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
   }
   if (options.attachments?.length) {
     message.attachments = options.attachments.map((a) => ({

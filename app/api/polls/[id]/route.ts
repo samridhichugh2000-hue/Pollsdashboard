@@ -595,16 +595,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             newDeadline: formattedDeadline,
             msFormLink: poll.ms_form_link,
           })
+          const pollsMailboxExt = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
           if (poll.release_message_id) {
             await replyToMessageWithHtml(process.env.PRIYA_EMAIL, poll.release_message_id, {
               subject: `Re: ${poll.subject ?? `Poll – ${poll.topic}`}`,
               htmlBody: audienceHtml,
-              to: releaseEmails,
+              to: [pollsMailboxExt],
+              bcc: releaseEmails,
             })
           } else {
             await sendEmail({
               from: process.env.PRIYA_EMAIL,
-              to: releaseEmails,
+              to: pollsMailboxExt,
+              bcc: releaseEmails,
               subject: poll.subject ?? `Poll – ${poll.topic}`,
               htmlBody: audienceHtml,
             })
@@ -653,7 +656,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await replyToMessageWithHtml(manualPollsMailbox, poll.release_message_id, {
           subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
           htmlBody: manualReminderHtml,
-          to: manualReleaseEmails,
+          to: [manualPollsMailbox],
+          bcc: manualReleaseEmails,
         })
         await createAuditLog(id, 'MANUAL_REMINDER_SENT', userEmail, { emails: manualReleaseEmails })
         break

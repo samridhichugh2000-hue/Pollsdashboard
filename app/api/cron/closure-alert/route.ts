@@ -48,7 +48,8 @@ export async function GET(req: Request) {
       await replyToMessageWithHtml(pollsMailbox, poll.release_message_id, {
         subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
         htmlBody,
-        to: releaseEmails,
+        to: [pollsMailbox],
+        bcc: releaseEmails,
       })
 
       await updatePollStatus(poll.id, 'REMINDER_SENT', {
