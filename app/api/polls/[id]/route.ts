@@ -16,6 +16,7 @@ import { sendEmail, sendEmailGetId, replyToMessageWithHtml } from '@/lib/graph'
 import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, formatDate } from '@/lib/utils'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
+import { pushPollToKites, buildResponsesHtml } from '@/lib/kites-api'
 import * as XLSX from 'xlsx'
 import type { Poll } from '@/types'
 
@@ -517,11 +518,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         rmsWs['!cols'] = Object.keys(rmsRows[0] ?? {}).map(key => ({ wch: Math.max(key.length, ...rmsRows.map(r => String(r[key] ?? '').length)) + 2 }))
         const rmsWb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(rmsWb, rmsWs, 'Responses')
-        const rmsXlsxBase64 = XLSX.write(rmsWb, { type: 'base64', bookType: 'xlsx' }) as string
-        const rmsFileName = `poll-responses-${poll.topic.slice(0, 30).replace(/\s+/g, '-').toLowerCase()}.xlsx`
-        // TODO: POST rmsXlsxBase64 / rmsFileName to RMS Koenig News panel — API format to be configured
-        void rmsXlsxBase64; void rmsFileName
-        await createAuditLog(id, 'PUSHED_TO_RMS', userEmail)
+        void XLSX.write(rmsWb, { type: 'base64', bookType: 'xlsx' })
+
+        const responsesHtml = buildResponsesHtml(rmsEntries)
+        const para = `<p><strong>Topic:</strong> ${poll.topic}</p><p><strong>Department:</strong> ${poll.department}</p><p><strong>Total responses:</strong> ${rmsEntries.length}</p>`
+
+        const kitesResult = await pushPollToKites(poll, { htmlContent: responsesHtml, para })
+
+        if (kitesResult.success) {
+          const newsId = kitesResult.newsId ? String(kitesResult.newsId) : null
+          await updatePollStatus(id, 'RMS_PUBLISHED', newsId ? { rms_news_id: newsId } : undefined)
+          await createAuditLog(id, 'PUSHED_TO_RMS', userEmail, { rms_news_id: newsId, responses: rmsEntries.length })
+        } else {
+          await updatePollStatus(id, 'RMS_PUBLISH_FAILED')
+          await createAuditLog(id, 'RMS_PUSH_FAILED', userEmail, { error: kitesResult.error })
+          return NextResponse.json({ error: `Kites API push failed: ${kitesResult.error}` }, { status: 502 })
+        }
         break
       }
 

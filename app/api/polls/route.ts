@@ -8,6 +8,7 @@ import {
 import { getDb } from '@/lib/db/client'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { formatDate } from '@/lib/utils'
+import { pushPollToKites } from '@/lib/kites-api'
 import type { CreatePollInput } from '@/types'
 
 const NOTIFICATION_PHRASES = ['acknowledgment of new task', 'feedback by user for rms']
@@ -74,6 +75,16 @@ export async function POST(req: NextRequest) {
       'dashboard',
       { source: body.source, topic: body.topic }
     )
+
+    // Fire-and-forget push to Kites RMS — non-blocking
+    pushPollToKites({
+      ...poll,
+      subject: draft.subject,
+      draft_email_body: draft.emailBody,
+    }).then(result => {
+      if (!result.success) console.error('[Kites] push failed on creation:', result.error)
+      else console.log('[Kites] poll pushed on creation, newsId:', result.newsId)
+    }).catch(err => console.error('[Kites] push error:', err))
 
     return NextResponse.json({ ...poll, status: 'DRAFT', draft }, { status: 201 })
   } catch (err) {

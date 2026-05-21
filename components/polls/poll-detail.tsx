@@ -62,6 +62,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const huntGroupDropdownRef = useRef<HTMLDivElement>(null)
   const [releaseAttachments, setReleaseAttachments] = useState<File[]>([])
   const releaseFileInputRef = useRef<HTMLInputElement>(null)
+  const draftFileInputRef = useRef<HTMLInputElement>(null)
 
   // Share results state
   const [showShareDialog, setShowShareDialog] = useState(false)
@@ -624,6 +625,58 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                     onChange={setEditQuestions}
                     maxQuestions={6}
                   />
+                </CardContent>
+              </Card>
+
+              {/* Section D: Attachments for release email */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Paperclip className="h-4 w-4 text-gray-400" />
+                    Attachments
+                    <span className="text-xs font-normal text-gray-400">(optional · max 5 files · 5 MB each)</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {releaseAttachments.length > 0 && (
+                    <div className="space-y-1.5">
+                      {releaseAttachments.map((file, i) => (
+                        <div key={i} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                            <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                            <span className="text-xs text-gray-400 flex-shrink-0">
+                              {file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
+                            </span>
+                          </div>
+                          <button type="button" onClick={() => setReleaseAttachments(prev => prev.filter((_, j) => j !== i))}
+                            className="ml-2 flex-shrink-0 text-gray-400 hover:text-rose-500 transition-colors">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {releaseAttachments.length < 5 && (
+                    <>
+                      <input
+                        ref={draftFileInputRef}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={handleReleaseFileChange}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => draftFileInputRef.current?.click()}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-2.5 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      >
+                        <Paperclip className="h-4 w-4" />
+                        {releaseAttachments.length === 0 ? 'Attach files' : 'Attach more files'}
+                      </button>
+                    </>
+                  )}
+                  <p className="text-xs text-gray-400">These files will be included when the poll email is sent.</p>
                 </CardContent>
               </Card>
 
