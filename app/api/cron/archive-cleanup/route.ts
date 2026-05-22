@@ -27,6 +27,8 @@ export async function GET(req: Request) {
   for (const id of ids) {
     await db.execute({ sql: `DELETE FROM audit_logs WHERE poll_id = ?`, args: [id] })
     await db.execute({ sql: `DELETE FROM poll_responses WHERE poll_id = ?`, args: [id] })
+    await db.execute({ sql: `DELETE FROM poll_approvals WHERE poll_id = ?`, args: [id] })
+    await db.execute({ sql: `DELETE FROM poll_approval_tokens WHERE poll_id = ?`, args: [id] })
     await db.execute({ sql: `DELETE FROM polls WHERE id = ?`, args: [id] })
   }
 
