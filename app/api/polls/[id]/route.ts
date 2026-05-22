@@ -421,7 +421,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             '#': String(i + 1),
             Email: entry.email ?? 'Not provided',
             Name: entry.respondent ?? 'Anonymous',
-            'Submitted At': new Date(entry.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
           }
           entry.answers.forEach((a, qi) => {
             row[`Q${qi + 1}: ${a.question}`] = a.answer

@@ -814,7 +814,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 </>
               )}
 
-              {poll.status === 'CLOSED' && (
+              {['CLOSED', 'RESULTS_UPLOADED'].includes(poll.status) && (
                 <>
                   <Button
                     className="w-full"

@@ -163,12 +163,14 @@ export function buildPollEmailHtml(params: {
 `
 }
 
-export function buildResultsEmailHtml(topic: string): string {
+export function buildResultsEmailHtml(topic: string, hasResponses = true): string {
   return `
 <div style="font-family: Arial, sans-serif; max-width: 600px;">
   <p>Hi Team,</p>
   <p>PFA the results for the poll — <strong>${topic}</strong></p>
-  <p>Please find the poll response export attached.</p>
+  ${hasResponses
+    ? '<p>Please find the poll response export attached.</p>'
+    : '<p>No responses received on this poll.</p>'}
   <br>
   <p>Regards,<br>polls@koenig-solutions.com</p>
 </div>
