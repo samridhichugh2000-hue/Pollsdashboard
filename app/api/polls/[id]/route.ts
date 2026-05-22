@@ -427,8 +427,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           })
           return row
         })
-        const ws = XLSX.utils.json_to_sheet(rows)
-        ws['!cols'] = Object.keys(rows[0] ?? {}).map((key) => ({
+        const headers = Object.keys(rows[0] ?? {})
+        const ws = XLSX.utils.aoa_to_sheet([
+          [`Poll: ${poll.topic}`],
+          [],
+          headers,
+          ...rows.map(r => headers.map(h => r[h] ?? '')),
+        ])
+        ws['!cols'] = headers.map((key) => ({
           wch: Math.max(key.length, ...rows.map((r) => String(r[key] ?? '').length)) + 2,
         }))
         const wb = XLSX.utils.book_new()
