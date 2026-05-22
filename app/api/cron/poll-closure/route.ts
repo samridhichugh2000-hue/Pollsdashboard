@@ -43,7 +43,6 @@ export async function GET(req: Request) {
         const rows = entries.map((entry, i) => {
           const row: Record<string, string> = {
             '#': String(i + 1),
-            Email: entry.email ?? 'Not provided',
             Name: entry.respondent ?? 'Anonymous',
           }
           entry.answers.forEach((a, qi) => { row[`Q${qi + 1}: ${a.question}`] = a.answer })

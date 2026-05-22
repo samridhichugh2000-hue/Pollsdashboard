@@ -8,14 +8,17 @@ import { formatDate } from '@/lib/utils'
 import type { GraphMessage } from '@/lib/graph'
 
 // Keyword filter — no AI needed; mailbox access is via Microsoft Graph (Azure AD creds)
-const POLL_KEYWORDS = ['poll', 'survey', 'questionnaire', 'feedback form', 'run a poll', 'create a poll', 'sending a poll', 'conduct a poll', 'conduct a survey']
+const POLL_KEYWORDS = ['poll', 'survey', 'questionnaire', 'run a poll', 'create a poll', 'conduct a poll', 'conduct a survey']
+const EXCLUDE_BODY_PHRASES = ['fill out the poll', 'take the poll']
 
 function filterPollRelatedEmails(messages: GraphMessage[]): GraphMessage[] {
   const pollsMailbox = (process.env.POLLS_MAILBOX ?? '').toLowerCase()
   return messages.filter(m => {
     if (pollsMailbox && m.from.emailAddress.address.toLowerCase() === pollsMailbox) return false
     if (isSystemNotificationEmail(m.subject)) return false
-    const text = `${m.subject} ${m.bodyPreview}`.toLowerCase()
+    const body = (m.bodyPreview ?? '').toLowerCase()
+    if (EXCLUDE_BODY_PHRASES.some(phrase => body.includes(phrase))) return false
+    const text = `${m.subject} ${body}`
     return POLL_KEYWORDS.some(kw => text.includes(kw))
   })
 }

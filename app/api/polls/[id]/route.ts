@@ -419,7 +419,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const rows = entries.map((entry, i) => {
           const row: Record<string, string> = {
             '#': String(i + 1),
-            Email: entry.email ?? 'Not provided',
             Name: entry.respondent ?? 'Anonymous',
           }
           entry.answers.forEach((a, qi) => {

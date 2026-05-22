@@ -79,13 +79,23 @@ export async function getInboxMessages(userEmail: string, filter?: string): Prom
   return messages
 }
 
-const POLL_KEYWORDS = ['poll', 'survey', 'questionnaire', 'feedback form', 'run a poll', 'create a poll', 'conduct a poll', 'conduct a survey']
+const POLL_KEYWORDS = ['poll', 'survey', 'questionnaire', 'run a poll', 'create a poll', 'conduct a poll', 'conduct a survey']
 const EXCLUDE_SENDERS = [process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com']
 
-// Subjects containing these phrases are RMS system notifications — never poll requests
+// Subjects containing these phrases are system/dashboard-generated — never poll requests
 const EXCLUDE_SUBJECT_PHRASES = [
   'acknowledgment of new task',
   'feedback by user for rms',
+  'poll approval required',   // approval notification emails sent by the dashboard
+  'automatic reply:',         // out-of-office / auto-reply emails
+  'accepted:',                // calendar acceptance emails
+  'reminder: for rms task',   // RMS system reminders
+]
+
+// Body phrases that indicate a dashboard-released poll email or a reply to one
+const EXCLUDE_BODY_PHRASES = [
+  'fill out the poll',
+  'take the poll',
 ]
 
 export function isSystemNotificationEmail(subject: string): boolean {
@@ -98,7 +108,9 @@ export async function getUnreadPollEmails(userEmail: string): Promise<GraphMessa
   return messages.filter((m) => {
     if (EXCLUDE_SENDERS.some(s => m.from.emailAddress.address.toLowerCase() === s.toLowerCase())) return false
     if (isSystemNotificationEmail(m.subject)) return false
-    const text = `${m.subject} ${m.bodyPreview}`.toLowerCase()
+    const body = (m.bodyPreview ?? '').toLowerCase()
+    if (EXCLUDE_BODY_PHRASES.some(phrase => body.includes(phrase))) return false
+    const text = `${m.subject} ${body}`
     return POLL_KEYWORDS.some(kw => text.includes(kw))
   })
 }
