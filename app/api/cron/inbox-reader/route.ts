@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getUnreadPollEmails, markEmailAsRead } from '@/lib/graph'
-import { createPoll, updatePoll, pollEmailAlreadyProcessed, createAuditLog } from '@/lib/db/queries'
+import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
         continue
       }
 
-      // Dedup check — don't process same thread twice in 7 days
+      // Dedup by conversation thread
       const alreadyProcessed = await pollEmailAlreadyProcessed(msg.conversationId)
       if (alreadyProcessed) {
         skipped++
@@ -50,7 +50,15 @@ export async function GET(req: Request) {
       const deptMatch = emailText.match(/(?:department|team|audience)[:\s]+([A-Za-z\s&]+?)(?:\.|,|\n|$)/i)
       const department = deptMatch?.[1]?.trim() ?? 'All Departments'
 
-      const topic = msg.subject.replace(/^re:\s*/i, '').trim()
+      // Strip all Fw:/Re:/Fwd: prefixes for a clean topic
+      const topic = msg.subject.replace(/^(fw|fwd|re|tr):\s*/gi, '').replace(/^(fw|fwd|re|tr):\s*/gi, '').trim()
+
+      // Dedup by topic — catches forwarded duplicates with a different conversationId
+      if (await pollTopicAlreadyExists(topic)) {
+        skipped++
+        await markEmailAsRead(priyaEmail, msg.id)
+        continue
+      }
 
       // Create poll record
       const poll = await createPoll({

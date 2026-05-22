@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getInboxMessages, markEmailAsRead, isSystemNotificationEmail } from '@/lib/graph'
-import { createPoll, updatePoll, pollEmailAlreadyProcessed, createAuditLog } from '@/lib/db/queries'
+import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
@@ -71,9 +71,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'A poll has already been created from this email thread.' }, { status: 409 })
     }
 
-    const topic = body.subject.replace(/^re:\s*/i, '').trim()
+    const topic = body.subject.replace(/^(fw|fwd|re|tr):\s*/gi, '').replace(/^(fw|fwd|re|tr):\s*/gi, '').trim()
     const deptMatch = body.bodyPreview.match(/(?:department|team|audience)[:\s]+([A-Za-z\s&]+?)(?:\.|,|\n|$)/i)
     const department = deptMatch?.[1]?.trim() ?? 'All Departments'
+
+    if (await pollTopicAlreadyExists(topic)) {
+      return NextResponse.json({ error: 'A poll for this topic already exists (possibly from a forwarded copy of the same email).' }, { status: 409 })
+    }
 
     const poll = await createPoll({
       topic,

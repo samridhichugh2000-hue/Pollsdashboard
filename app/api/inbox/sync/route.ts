@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getInboxMessages, getUnreadPollEmails, markEmailAsRead, isSystemNotificationEmail } from '@/lib/graph'
-import { createPoll, updatePoll, pollEmailAlreadyProcessed, createAuditLog } from '@/lib/db/queries'
+import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
@@ -58,7 +58,10 @@ export async function POST() {
       const emailText = msg.body.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
       const deptMatch = emailText.match(/(?:department|team|audience)[:\s]+([A-Za-z\s&]+?)(?:\.|,|\n|$)/i)
       const department = deptMatch?.[1]?.trim() ?? 'All Departments'
-      const topic = msg.subject.replace(/^re:\s*/i, '').trim()
+      const topic = msg.subject.replace(/^(fw|fwd|re|tr):\s*/gi, '').replace(/^(fw|fwd|re|tr):\s*/gi, '').trim()
+
+      // Dedup by topic — catches forwarded duplicates with a different conversationId
+      if (await pollTopicAlreadyExists(topic)) { skipped++; await markEmailAsRead(priyaEmail, msg.id); continue }
 
       const poll = await createPoll({
         topic, department,

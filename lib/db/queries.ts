@@ -334,3 +334,25 @@ export async function pollEmailAlreadyProcessed(emailThreadId: string): Promise<
   })
   return result.rows.length > 0
 }
+
+// Strip Fw:/Re:/Fwd: prefixes (all levels) and trailing punctuation for comparison
+function normalizeTopic(s: string): string {
+  let prev = ''
+  s = s.trim()
+  while (s !== prev) {
+    prev = s
+    s = s.replace(/^(fw|fwd|re|tr|ant):\s*/i, '').trim()
+  }
+  return s.replace(/\.$/, '').toLowerCase()
+}
+
+// Returns true if a non-archived poll with the same normalized topic was created in the last 30 days.
+// Catches forwarded duplicates that would otherwise bypass the conversationId dedup.
+export async function pollTopicAlreadyExists(rawTopic: string): Promise<boolean> {
+  const normalized = normalizeTopic(rawTopic)
+  const result = await getDb().execute({
+    sql: `SELECT topic FROM polls WHERE status != 'ARCHIVED' AND created_at > datetime('now', '-30 days')`,
+    args: [],
+  })
+  return result.rows.some(row => normalizeTopic(String(row.topic ?? '')) === normalized)
+}
