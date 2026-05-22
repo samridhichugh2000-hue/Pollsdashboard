@@ -55,6 +55,28 @@ function isHtmlContent(s: string): boolean {
   return /<[a-z][\s\S]*>/i.test(s.trim())
 }
 
+/** Strip Word/Outlook clipboard overhead from pasted or stored HTML.
+ *  Extracts the StartFragment…EndFragment region when present, then removes
+ *  <meta>, <link>, <style> blocks, MSO conditional comments, and Office
+ *  namespace tags (o:p, w:*), leaving only the readable content HTML. */
+export function sanitizeWordHtml(html: string): string {
+  if (!html) return html
+  // Extract the clipboard fragment region if Word markers are present
+  const startMarker = '<!--StartFragment-->'
+  const endMarker = '<!--EndFragment-->'
+  const si = html.indexOf(startMarker)
+  const ei = html.indexOf(endMarker)
+  if (si !== -1 && ei !== -1) html = html.slice(si + startMarker.length, ei)
+  return html
+    .replace(/<!--\[if[^\]]*\]>[\s\S]*?<!\[endif\]-->/gi, '') // MSO conditionals
+    .replace(/<!--[\s\S]*?-->/g, '')                            // remaining comments
+    .replace(/<style[\s\S]*?<\/style>/gi, '')                   // style blocks
+    .replace(/<meta[^>]*\/?>/gi, '')                            // meta tags
+    .replace(/<link[^>]*\/?>/gi, '')                            // link tags
+    .replace(/<\/?[ow]:[a-z]+[^>]*>/gi, '')                     // o:p, w:* namespace tags
+    .trim()
+}
+
 /** Convert plain-text draft bodies to HTML paragraphs for the rich editor.
  *  Already-HTML content is returned unchanged. */
 export function normalizeBodyForEditor(body: string): string {

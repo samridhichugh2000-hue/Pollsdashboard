@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useCallback } from 'react'
-import { cn } from '@/lib/utils'
+import { cn, sanitizeWordHtml } from '@/lib/utils'
 
 interface RichTextEditorProps {
   value: string
@@ -61,8 +61,9 @@ export function RichTextEditor({
     e.preventDefault()
     const html = e.clipboardData.getData('text/html')
     const text = e.clipboardData.getData('text/plain')
-    // Prefer rich HTML from clipboard; fall back to plain text with line breaks preserved
-    const content = html || text.replace(/\n/g, '<br>')
+    // Strip Word/Outlook overhead when HTML contains MSO markers, then fall back to plain text
+    const isWord = /mso-|ProgId=|<!--\[if gte mso/i.test(html)
+    const content = html ? (isWord ? sanitizeWordHtml(html) : html) : text.replace(/\n/g, '<br>')
     insertHtmlAtCursor(content)
     if (editorRef.current) onChange(editorRef.current.innerHTML)
   }, [onChange])

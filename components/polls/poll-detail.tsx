@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { StatusBadge } from './status-badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { formatDate, formatDateTime, formatRelative, isApprovalOverdue, normalizeBodyForEditor } from '@/lib/utils'
+import { formatDate, formatDateTime, formatRelative, isApprovalOverdue, normalizeBodyForEditor, sanitizeWordHtml } from '@/lib/utils'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import type { Poll, PollApproval, AuditLog, PollResponse } from '@/types'
 import { QuestionBuilder, parseQuestions } from './question-builder'
@@ -403,8 +403,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-xl font-bold text-white">{poll.topic}</h2>
-            <p className="text-sm text-white/50">Poll ID: {poll.id.slice(0, 8)}...</p>
+            <h2 className="text-xl font-bold text-gray-900">{poll.topic}</h2>
+            <p className="text-sm text-gray-500">Poll ID: {poll.id.slice(0, 8)}...</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -705,9 +705,10 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 <Card>
                   <CardHeader><CardTitle>Draft Email Body</CardTitle></CardHeader>
                   <CardContent>
-                    <div className="rounded-md bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-wrap">
-                      {poll.draft_email_body}
-                    </div>
+                    <div
+                      className="rounded-md bg-gray-50 p-3 text-sm text-gray-700 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5"
+                      dangerouslySetInnerHTML={{ __html: sanitizeWordHtml(poll.draft_email_body) }}
+                    />
                   </CardContent>
                 </Card>
               )}
@@ -1535,9 +1536,10 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               {poll.draft_email_body && (
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Draft Email Body</p>
-                  <div className="rounded bg-white border border-gray-200 p-3 text-sm text-gray-700 whitespace-pre-wrap">
-                    {poll.draft_email_body}
-                  </div>
+                  <div
+                    className="rounded bg-white border border-gray-200 p-3 text-sm text-gray-700 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5"
+                    dangerouslySetInnerHTML={{ __html: sanitizeWordHtml(poll.draft_email_body) }}
+                  />
                 </div>
               )}
 
