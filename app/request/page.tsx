@@ -18,7 +18,7 @@ const TIMELINE_STEPS = [
 
 const ALLOWED_DOMAIN = 'koenig-solutions.com'
 const MAX_FILES = 5
-const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
+const MAX_FILE_BYTES = 20 * 1024 * 1024 // 20 MB
 
 function parseEmails(text: string): string[] {
   return text.split(/[\s,;]+/).map(e => e.trim().toLowerCase()).filter(e => e.includes('@'))

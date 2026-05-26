@@ -318,9 +318,9 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
 
   const handleReleaseFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files ?? [])
-    const tooBig = selected.filter(f => f.size > 5 * 1024 * 1024)
+    const tooBig = selected.filter(f => f.size > 20 * 1024 * 1024)
     if (tooBig.length) {
-      toast.error(`File(s) exceed 5 MB: ${tooBig.map(f => f.name).join(', ')}`)
+      toast.error(`File(s) exceed 20 MB: ${tooBig.map(f => f.name).join(', ')}`)
       e.target.value = ''
       return
     }
