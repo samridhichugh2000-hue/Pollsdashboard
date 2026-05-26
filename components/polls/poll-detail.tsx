@@ -634,7 +634,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   <CardTitle className="flex items-center gap-2">
                     <Paperclip className="h-4 w-4 text-gray-400" />
                     Attachments
-                    <span className="text-xs font-normal text-gray-400">(optional · max 5 files · 5 MB each)</span>
+                    <span className="text-xs font-normal text-gray-400">(optional · max 5 files · 20 MB each)</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
@@ -1399,7 +1399,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
           {/* Attachments */}
           <div className="space-y-2 pt-1 border-t border-gray-100">
             <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Attachments <span className="normal-case font-normal text-gray-400">(optional · max 5 files · 5 MB each)</span>
+              Attachments <span className="normal-case font-normal text-gray-400">(optional · max 5 files · 20 MB each)</span>
             </Label>
 
             {releaseAttachments.length > 0 && (

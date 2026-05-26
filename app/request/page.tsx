@@ -559,7 +559,7 @@ export default function PublicRequestPage() {
             {/* Attachments */}
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Attachments <span className="normal-case font-normal text-gray-400">(optional, max {MAX_FILES} files · 5 MB each)</span>
+                Attachments <span className="normal-case font-normal text-gray-400">(optional, max {MAX_FILES} files · 20 MB each)</span>
               </label>
 
               {/* Attached file chips */}
