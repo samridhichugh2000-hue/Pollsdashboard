@@ -115,7 +115,7 @@ export function buildApprovalEmailHtml(params: {
   <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:14px;">
     <tr>
       <td style="padding:6px 12px 6px 0; color:#6b7280; width:120px;">Department</td>
-      <td style="padding:6px 0; font-weight:600;">${params.department}</td>
+      <td style="padding:6px 0; font-weight:600;">${params.department?.includes('@') ? 'Custom Recipients' : params.department}</td>
     </tr>
     <tr>
       <td style="padding:6px 12px 6px 0; color:#6b7280;">Deadline</td>

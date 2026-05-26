@@ -67,7 +67,7 @@ export function PollForm({ onSuccess }: PollFormProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: form.topic,
-          department: recipientEmails.join(', '),
+          department: 'All Departments',
           recipient_email: recipientEmails.join(', '),
           requested_by: requestedBy,
           source: 'dashboard',
