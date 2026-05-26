@@ -1629,9 +1629,24 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               Cancel
             </Button>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 setShowApprovalPreview(false)
-                void runAction('SEND_FOR_APPROVAL', { recipients: approvalRecipients })
+                let attachments: { name: string; contentType: string; contentBytes: string }[] = []
+                if (releaseAttachments.length > 0) {
+                  try {
+                    attachments = await Promise.all(
+                      releaseAttachments.map(async (f) => ({
+                        name: f.name,
+                        contentType: f.type || 'application/octet-stream',
+                        contentBytes: await fileToBase64(f),
+                      }))
+                    )
+                  } catch {
+                    toast.error('Failed to process attachments.')
+                    return
+                  }
+                }
+                void runAction('SEND_FOR_APPROVAL', { recipients: approvalRecipients, attachments })
               }}
               disabled={approvalRecipients.length === 0 || !!loading}
             >

@@ -82,12 +82,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           ? (body.recipients as string[])
           : [poll.requested_by]
 
+        const approvalAttachments = Array.isArray(body.attachments)
+          ? (body.attachments as { name: string; contentType: string; contentBytes: string }[])
+          : []
+
         const pollSubject = poll.subject ?? (poll.department && poll.department !== 'All Departments' ? `Poll of ${poll.department} – ${poll.topic}` : `Poll – ${poll.topic}`)
         await sendEmail({
           from: process.env.PRIYA_EMAIL!,
           to: recipients,
           subject: `Poll Approval Required: ${pollSubject}`,
           htmlBody: approvalHtml,
+          ...(approvalAttachments.length > 0 && { attachments: approvalAttachments }),
         })
 
         await updatePollStatus(id, 'AWAITING_APPROVAL')
