@@ -8,7 +8,6 @@ interface PollData {
   id: string
   topic: string
   subject?: string | null
-  department: string
   deadline: string | null
   questions: Array<string | { text: string; type: string; options?: string[] }>
 }
@@ -197,7 +196,7 @@ export default function RespondPage() {
           </div>
           <h1 className="text-2xl font-bold text-white">{poll.subject || poll.topic}</h1>
           <p className="mt-1.5 text-sm text-white/60">
-            {poll.department} · {poll.deadline
+            {poll.deadline
               ? `Due ${new Date(poll.deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
               : 'Open poll'}
           </p>
