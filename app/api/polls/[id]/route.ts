@@ -643,7 +643,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'SEND_MANUAL_REMINDER': {
-        if (!['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(poll.status)) {
+        if (poll.status !== 'SENT') {
           return NextResponse.json({ error: 'Poll is not in an active state.' }, { status: 400 })
         }
         if (!poll.ms_form_link) {
