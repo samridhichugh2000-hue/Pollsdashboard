@@ -863,7 +863,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 </>
               )}
 
-              {poll.status === 'SENT' && (
+              {['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(poll.status) && (
                 <Button
                   className="w-full"
                   size="sm"
