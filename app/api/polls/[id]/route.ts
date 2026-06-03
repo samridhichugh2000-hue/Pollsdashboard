@@ -664,7 +664,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await replyToMessageWithHtml(process.env.PRIYA_EMAIL!, poll.release_message_id, {
           subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
           htmlBody: manualReminderHtml,
-          to: [manualPollsMailbox],
+          to: [process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!],
           bcc: manualReleaseEmails,
         })
         await createAuditLog(id, 'MANUAL_REMINDER_SENT', userEmail, { emails: manualReleaseEmails })
