@@ -25,7 +25,6 @@ export async function GET(req: Request) {
   todayStart.setHours(0, 0, 0, 0)
   const todayISTDate = toISTDateStr(today)
 
-  const pollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
   let sent = 0
 
   // ── 1st reminder: next working day after release ──────────────────────────
@@ -62,10 +61,11 @@ export async function GET(req: Request) {
           deadline,
         })
 
-        await replyToMessageWithHtml(pollsMailbox, poll.release_message_id, {
+        const priyaEmail = process.env.PRIYA_EMAIL!
+        await replyToMessageWithHtml(priyaEmail, poll.release_message_id, {
           subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
           htmlBody,
-          to: [pollsMailbox],
+          to: [process.env.POLLS_MAILBOX ?? priyaEmail],
           bcc: releaseEmails,
         })
 
@@ -101,10 +101,11 @@ export async function GET(req: Request) {
         deadline: formatDate(poll.deadline),
       })
 
-      await replyToMessageWithHtml(pollsMailbox, poll.release_message_id, {
+      const priyaEmail2 = process.env.PRIYA_EMAIL!
+      await replyToMessageWithHtml(priyaEmail2, poll.release_message_id, {
         subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
         htmlBody,
-        to: [pollsMailbox],
+        to: [process.env.POLLS_MAILBOX ?? priyaEmail2],
         bcc: releaseEmails,
       })
 

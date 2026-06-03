@@ -22,7 +22,6 @@ export async function GET(req: Request) {
   }
 
   const todayISTDate = toISTDateStr(today)
-  const pollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
   let sent = 0
 
   const reminderSentPolls = await getPollsByStatus('REMINDER_SENT')
@@ -45,10 +44,11 @@ export async function GET(req: Request) {
         deadline: formatDate(poll.deadline),
       })
 
-      await replyToMessageWithHtml(pollsMailbox, poll.release_message_id, {
+      const priyaEmail = process.env.PRIYA_EMAIL!
+      await replyToMessageWithHtml(priyaEmail, poll.release_message_id, {
         subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
         htmlBody,
-        to: [pollsMailbox],
+        to: [process.env.POLLS_MAILBOX ?? priyaEmail],
         bcc: releaseEmails,
       })
 

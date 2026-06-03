@@ -643,7 +643,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'SEND_MANUAL_REMINDER': {
-        if (!['SENT', 'REMINDER_SENT'].includes(poll.status)) {
+        if (!['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(poll.status)) {
           return NextResponse.json({ error: 'Poll is not in an active state.' }, { status: 400 })
         }
         if (!poll.ms_form_link) {
@@ -661,8 +661,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           msFormLink: poll.ms_form_link,
           deadline: poll.deadline ? formatDate(poll.deadline) : 'today',
         })
-        const manualPollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
-        await replyToMessageWithHtml(manualPollsMailbox, poll.release_message_id, {
+        await replyToMessageWithHtml(process.env.PRIYA_EMAIL!, poll.release_message_id, {
           subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
           htmlBody: manualReminderHtml,
           to: [manualPollsMailbox],

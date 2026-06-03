@@ -269,9 +269,11 @@ export async function replyToMessageWithHtml(
   console.log(`[replyToMessageWithHtml] Found message ${sentMessageId} in ${foundInMailbox}, sending reply`)
 
   const toRecipients = options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
+  const pollsSender = process.env.POLLS_MAILBOX ?? from
   const message: Record<string, unknown> = {
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
+    from: { emailAddress: { address: pollsSender } },
   }
   if (options.bcc?.length) {
     message.bccRecipients = options.bcc.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
