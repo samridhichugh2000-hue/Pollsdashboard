@@ -1,7 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/Users/ragha/OneDrive/Desktop/polls-dashboard/**)"
+      "Read(//c/Users/ragha/OneDrive/Desktop/polls-dashboard/**)",
+      "Bash(npx tsc *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(node -e \"const p=require\\('./node_modules/next/package.json'\\); console.log\\(p.version\\)\")",
+      "mcp__claude_ai_Vercel__list_deployments",
+      "mcp__claude_ai_Vercel__deploy_to_vercel",
+      "mcp__claude_ai_Vercel__list_teams",
+      "mcp__claude_ai_Vercel__list_projects",
+      "mcp__claude_ai_Vercel__get_deployment_build_logs",
+      "Bash(git commit -m 'fix: resolve manualPollsMailbox reference after variable removal *)",
+      "Bash(git commit -m 'fix: show Send Reminder Now button only while poll is in SENT status *)",
+      "Bash(git commit -m 'fix: restore Send Reminder Now visibility for SENT/REMINDER_SENT/RMS_PUBLISHED *)"
     ]
   }
 }
