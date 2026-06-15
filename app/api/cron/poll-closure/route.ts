@@ -5,6 +5,11 @@ import { buildResultsEmailHtml } from '@/lib/utils'
 import * as XLSX from 'xlsx'
 
 const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
+
+function toISTDateStr(date: Date): string {
+  return new Date(date.getTime() + IST_OFFSET_MS).toISOString().split('T')[0]
+}
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
@@ -13,15 +18,18 @@ export async function GET(req: Request) {
   }
 
   const activePolls = await getPollsByStatus(['SENT', 'REMINDER_SENT'] as Parameters<typeof getPollsByStatus>[0])
+  const todayISTDate = toISTDateStr(new Date())
   let closed = 0
 
   for (const poll of activePolls) {
-    if (!poll.sent_at) continue
-
-    const sentAt = new Date(poll.sent_at).getTime()
-    const now = Date.now()
-
-    if (now - sentAt < FORTY_EIGHT_HOURS) continue
+    // Close at the end of the deadline day. This cron runs at 23:59 IST, so a poll
+    // whose deadline falls today gets closed (and results auto-sent) at end of that day.
+    // Legacy polls with no deadline fall back to a 48h-after-send guard so they never hang open.
+    if (poll.deadline) {
+      if (toISTDateStr(new Date(poll.deadline)) > todayISTDate) continue
+    } else {
+      if (!poll.sent_at || Date.now() - new Date(poll.sent_at).getTime() < FORTY_EIGHT_HOURS) continue
+    }
 
     try {
       // Fetch responses from MS Forms
