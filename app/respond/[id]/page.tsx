@@ -104,7 +104,9 @@ export default function RespondPage() {
         const data = await r.json() as PollData & { error?: string }
         if (!r.ok) { setLoadError(data.error ?? 'Failed to load poll.'); return }
         setPoll(data)
-        const normalized = data.questions.map(normalizeQuestion)
+        const normalized = data.questions
+          .map(normalizeQuestion)
+          .filter((q) => q.text.trim().length > 0)
         setPollQuestions(normalized)
         setAnswers(normalized.map((q) => ({ question: q.text, answer: '' })))
       })

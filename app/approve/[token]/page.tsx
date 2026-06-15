@@ -3,21 +3,11 @@
 import { use, useEffect, useState } from 'react'
 import { CheckCircle2, ClipboardCheck, Loader2, Pencil, XCircle, MessageSquare } from 'lucide-react'
 import type { Poll } from '@/types'
+import { QuestionBuilder, parseQuestions } from '@/components/polls/question-builder'
+import type { Question } from '@/components/polls/question-builder'
 
 type PageStatus = 'loading' | 'error' | 'ready' | 'submitting' | 'done'
 type DoneAction = 'approve' | 'reject' | 'feedback' | null
-
-interface PollQuestion { text: string; type: 'rating' | 'open_ended' }
-
-function parseQuestions(raw: string | null | undefined): PollQuestion[] {
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw) as Array<string | PollQuestion>
-    return parsed.map((q) =>
-      typeof q === 'string' ? { text: q, type: 'open_ended' as const } : q
-    )
-  } catch { return [] }
-}
 
 const gradient = 'linear-gradient(135deg, #0e7490 0%, #0c6478 50%, #0a5568 100%)'
 
@@ -41,7 +31,7 @@ export default function ApprovePage({
 
   const [editSubject, setEditSubject] = useState('')
   const [editEmailBody, setEditEmailBody] = useState('')
-  const [editQuestions, setEditQuestions] = useState<PollQuestion[]>([])
+  const [editQuestions, setEditQuestions] = useState<Question[]>([])
   const [rejectReason, setRejectReason] = useState('')
   const [feedbackRemarks, setFeedbackRemarks] = useState('')
 
@@ -53,7 +43,7 @@ export default function ApprovePage({
         setPoll(data)
         setEditSubject(data.subject ?? `Poll: ${data.topic}`)
         setEditEmailBody(data.draft_email_body ?? '')
-        setEditQuestions(parseQuestions(data.questions))
+        setEditQuestions(parseQuestions(data.questions ?? ''))
         setStatus('ready')
       })
       .catch(() => { setErrorMsg('Could not load the approval page.'); setStatus('error') })
@@ -66,7 +56,11 @@ export default function ApprovePage({
       if (action === 'save_and_approve') {
         body.subject = editSubject
         body.draft_email_body = editEmailBody
-        body.questions = JSON.stringify(editQuestions)
+        // Drop any blank questions so an emptied-out row never reaches the released poll.
+        const cleaned = editQuestions
+          .map((q) => ({ ...q, text: q.text.trim() }))
+          .filter((q) => q.text.length > 0)
+        body.questions = JSON.stringify(cleaned)
       }
       if (action === 'reject') body.reason = rejectReason
       if (action === 'feedback') body.remarks = feedbackRemarks
@@ -128,7 +122,7 @@ export default function ApprovePage({
     )
   }
 
-  const questions = parseQuestions(poll.questions)
+  const questions = parseQuestions(poll.questions ?? '')
 
   return (
     <div className="min-h-screen px-4 py-10" style={{ background: gradient }}>
@@ -219,16 +213,11 @@ export default function ApprovePage({
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">Poll Questions</label>
-                <div className="space-y-2">
-                  {editQuestions.map((q, i) => (
-                    <div key={i} className="flex gap-2 items-start">
-                      <span className="mt-2.5 text-xs font-bold text-cyan-600 w-5 shrink-0">{i + 1}.</span>
-                      <textarea value={q.text} rows={2}
-                        onChange={(e) => { const u = [...editQuestions]; u[i] = { ...u[i], text: e.target.value }; setEditQuestions(u) }}
-                        className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition resize-none" />
-                    </div>
-                  ))}
-                </div>
+                <QuestionBuilder
+                  questions={editQuestions}
+                  onChange={setEditQuestions}
+                  maxQuestions={6}
+                />
               </div>
             </>
           )}
