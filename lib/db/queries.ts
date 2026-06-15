@@ -121,6 +121,47 @@ export async function updatePoll(id: string, fields: Partial<Poll>): Promise<voi
   })
 }
 
+// ─── Poll Attachments ──────────────────────────────────────────────────────
+export type PollAttachment = { name: string; contentType: string; contentBytes: string }
+
+// Replace the full set of stored attachments for a poll.
+export async function replacePollAttachments(pollId: string, attachments: PollAttachment[]): Promise<void> {
+  const db = getDb()
+  await db.execute({ sql: 'DELETE FROM poll_attachments WHERE poll_id = ?', args: [pollId] })
+  for (const a of attachments) {
+    await db.execute({
+      sql: 'INSERT INTO poll_attachments (id, poll_id, name, content_type, content_bytes) VALUES (?, ?, ?, ?, ?)',
+      args: [uuidv4(), pollId, a.name, a.contentType, a.contentBytes],
+    })
+  }
+}
+
+// Full attachments (including base64 bytes) — used when sending email.
+export async function getPollAttachments(pollId: string): Promise<PollAttachment[]> {
+  const result = await getDb().execute({
+    sql: 'SELECT name, content_type, content_bytes FROM poll_attachments WHERE poll_id = ? ORDER BY created_at ASC',
+    args: [pollId],
+  })
+  return result.rows.map((r) => ({
+    name: r.name as string,
+    contentType: r.content_type as string,
+    contentBytes: r.content_bytes as string,
+  }))
+}
+
+// Lightweight metadata (no bytes) — used to list attachments in the UI.
+export async function getPollAttachmentsMeta(pollId: string): Promise<{ name: string; size: number }[]> {
+  const result = await getDb().execute({
+    sql: 'SELECT name, length(content_bytes) AS b64len FROM poll_attachments WHERE poll_id = ? ORDER BY created_at ASC',
+    args: [pollId],
+  })
+  return result.rows.map((r) => {
+    const b64len = Number(r.b64len ?? 0)
+    // Approximate decoded byte size from base64 length (4 base64 chars ≈ 3 bytes).
+    return { name: r.name as string, size: Math.floor((b64len * 3) / 4) }
+  })
+}
+
 export async function getKPIData() {
   const startOfMonth = new Date()
   startOfMonth.setDate(1)

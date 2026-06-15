@@ -61,6 +61,9 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const [huntGroupDropdownOpen, setHuntGroupDropdownOpen] = useState(false)
   const huntGroupDropdownRef = useRef<HTMLDivElement>(null)
   const [releaseAttachments, setReleaseAttachments] = useState<File[]>([])
+  // Attachments already saved server-side (carried over from the approval step).
+  const [existingAttachments, setExistingAttachments] = useState<{ name: string; size: number }[]>([])
+  const [removedAttachmentNames, setRemovedAttachmentNames] = useState<string[]>([])
   const releaseFileInputRef = useRef<HTMLInputElement>(null)
   const draftFileInputRef = useRef<HTMLInputElement>(null)
 
@@ -340,7 +343,16 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     setCustomReleaseText('')
     setHuntGroupDropdownOpen(false)
     setReleaseAttachments([])
+    setRemovedAttachmentNames([])
     setHuntGroupsLoading(true)
+    // Load any attachments saved during approval so they carry into the release email.
+    try {
+      const pollRes = await fetch(`/api/polls/${poll.id}`)
+      const pollData = await pollRes.json() as { attachments?: { name: string; size: number }[] }
+      setExistingAttachments(pollData.attachments ?? [])
+    } catch {
+      setExistingAttachments([])
+    }
     try {
       const res = await fetch('/api/hunt-groups')
       const data = await res.json() as { id: string; name: string; email: string }[]
@@ -375,7 +387,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     }
 
     setShowReleaseDialog(false)
-    void runAction('RELEASE_POLL', { allEmails, attachments })
+    void runAction('RELEASE_POLL', { allEmails, attachments, removeAttachmentNames: removedAttachmentNames })
   }
 
   const addShareRecipient = () => {
@@ -1401,6 +1413,30 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
               Attachments <span className="normal-case font-normal text-gray-400">(optional · max 5 files · 20 MB each)</span>
             </Label>
+
+            {/* Files carried over from the approval step (saved server-side) */}
+            {existingAttachments.filter(a => !removedAttachmentNames.includes(a.name)).length > 0 && (
+              <div className="space-y-1.5">
+                {existingAttachments
+                  .filter(a => !removedAttachmentNames.includes(a.name))
+                  .map((file) => (
+                    <div key={file.name} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                        <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                        <span className="text-xs text-gray-400 flex-shrink-0">
+                          {file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
+                        </span>
+                        <span className="text-[10px] uppercase tracking-wide text-gray-400 flex-shrink-0">from approval</span>
+                      </div>
+                      <button type="button" onClick={() => setRemovedAttachmentNames(prev => [...prev, file.name])}
+                        className="ml-2 flex-shrink-0 text-gray-400 hover:text-rose-500 transition-colors">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
 
             {releaseAttachments.length > 0 && (
               <div className="space-y-1.5">

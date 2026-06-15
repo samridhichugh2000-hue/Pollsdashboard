@@ -11,7 +11,11 @@ import {
   getPollResponse,
   updateResponseActionable,
   upsertPollResponse,
+  replacePollAttachments,
+  getPollAttachments,
+  getPollAttachmentsMeta,
 } from '@/lib/db/queries'
+import type { PollAttachment } from '@/lib/db/queries'
 import { sendEmail, sendEmailGetId, replyToMessageWithHtml } from '@/lib/graph'
 import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, formatDate } from '@/lib/utils'
 import { generatePollDraft } from '@/lib/draft-generator'
@@ -25,13 +29,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const poll = await getPollById(id)
   if (!poll) return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
 
-  const [approvals, auditLogs, response] = await Promise.all([
+  const [approvals, auditLogs, response, attachments] = await Promise.all([
     getApprovalsByPoll(id),
     getAuditLogsByPoll(id),
     getPollResponse(id),
+    getPollAttachmentsMeta(id),
   ])
 
-  return NextResponse.json({ poll, approvals, auditLogs, response })
+  return NextResponse.json({ poll, approvals, auditLogs, response, attachments })
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -83,8 +88,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           : [poll.requested_by]
 
         const approvalAttachments = Array.isArray(body.attachments)
-          ? (body.attachments as { name: string; contentType: string; contentBytes: string }[])
+          ? (body.attachments as PollAttachment[])
           : []
+
+        // Persist the attachments so they survive through to release (and a page
+        // refresh / approval from another device). Only overwrite when files were
+        // actually supplied — re-sending for approval without re-picking files must
+        // not wipe previously stored attachments.
+        if (approvalAttachments.length > 0) {
+          await replacePollAttachments(id, approvalAttachments)
+        }
 
         const pollSubject = poll.subject ?? (poll.department && poll.department !== 'All Departments' ? `Poll of ${poll.department} – ${poll.topic}` : `Poll – ${poll.topic}`)
         await sendEmail({
@@ -126,9 +139,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           deadline: pollDeadline,
         })
 
-        const releaseAttachments = Array.isArray(body.attachments)
-          ? (body.attachments as { name: string; contentType: string; contentBytes: string }[])
+        // Newly uploaded files from the release dialog (base64).
+        const newAttachments = Array.isArray(body.attachments)
+          ? (body.attachments as PollAttachment[])
           : []
+
+        // Attachments stored at approval time. The client sends only the names the
+        // user explicitly removed in the release dialog, so the safe default — no
+        // list, or a failed metadata load on the client — keeps everything stored.
+        const stored = await getPollAttachments(id)
+        const removeNames = Array.isArray(body.removeAttachmentNames)
+          ? new Set(body.removeAttachmentNames as string[])
+          : new Set<string>()
+        const keptStored = stored.filter((a) => !removeNames.has(a.name))
+
+        // New uploads win on a name clash.
+        const newNames = new Set(newAttachments.map((a) => a.name))
+        const releaseAttachments: PollAttachment[] = [
+          ...keptStored.filter((a) => !newNames.has(a.name)),
+          ...newAttachments,
+        ]
 
         const pollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
         const releaseMessageId = await sendEmailGetId({
@@ -139,6 +169,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           htmlBody: pollHtml,
           attachments: releaseAttachments,
         })
+
+        // Persist the final released set so it reflects what actually went out.
+        await replacePollAttachments(id, releaseAttachments)
 
         await updatePollStatus(id, 'SENT', {
           sent_at: new Date().toISOString(),

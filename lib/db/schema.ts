@@ -62,6 +62,21 @@ export async function runMigrations() {
       )
     `)
   } catch { /* already exists */ }
+
+  // Email attachments persisted per poll, so they survive from approval through to release
+  // (previously they lived only in browser memory and were lost between the two steps).
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS poll_attachments (
+        id TEXT PRIMARY KEY,
+        poll_id TEXT NOT NULL REFERENCES polls(id),
+        name TEXT NOT NULL,
+        content_type TEXT NOT NULL,
+        content_bytes TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
 }
 
 export async function initializeDatabase() {
