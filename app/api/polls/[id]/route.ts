@@ -189,17 +189,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break
       }
 
-      case 'BACK_TO_DRAFT': {
-        // Move an approved (not yet released) poll back to DRAFT so its
-        // questions / email / deadline can be edited again before sending.
-        if (poll.status !== 'APPROVED') {
-          return NextResponse.json({ error: 'Only approved polls can be moved back to draft.' }, { status: 400 })
-        }
-        await updatePollStatus(id, 'DRAFT', { approved_at: null })
-        await createAuditLog(id, 'EDIT_REQUESTED', userEmail, { from: 'APPROVED', via: 'back-to-draft' })
-        break
-      }
-
       case 'MARK_CLOSED': {
         await updatePollStatus(id, 'CLOSED', { closed_at: new Date().toISOString() })
         await createAuditLog(id, 'POLL_CLOSED', userEmail)
@@ -437,6 +426,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           ...(body.deadline ? { deadline: new Date(body.deadline as string).toISOString() } : {}),
         })
         await createAuditLog(id, 'DRAFT_UPDATED', userEmail)
+        break
+      }
+
+      case 'UPDATE_QUESTIONS': {
+        // Edit poll questions in place without changing status (e.g. fixing
+        // questions on an already-approved poll before release — no re-approval).
+        await updatePoll(id, { questions: body.questions as string })
+        await createAuditLog(id, 'DRAFT_UPDATED', userEmail, { section: 'questions', inPlace: true })
         break
       }
 

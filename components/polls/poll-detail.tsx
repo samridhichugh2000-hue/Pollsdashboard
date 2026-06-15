@@ -99,6 +99,9 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
       setEditEmailBody(normalizeBodyForEditor(poll.draft_email_body || ''))
       setEditQuestions(parseQuestions(poll.questions ?? ''))
       setEditDeadline(poll.deadline ? poll.deadline.split('T')[0] : defaultDeadline)
+    } else if (poll.status === 'APPROVED') {
+      // Approved polls allow in-place question editing before release.
+      setEditQuestions(parseQuestions(poll.questions ?? ''))
     }
   }, [poll]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -304,6 +307,33 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
       const updated = await res.json() as Poll
       setPoll(updated)
       toast.success('Draft saved successfully')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  // Save edited questions in place on an approved poll — no status change,
+  // no re-approval. Blank questions are dropped so they never reach the form.
+  const saveQuestions = async () => {
+    setLoading('UPDATE_QUESTIONS')
+    try {
+      const cleaned = editQuestions
+        .map(q => ({ ...q, text: q.text.trim() }))
+        .filter(q => q.text.length > 0)
+      const res = await fetch(`/api/polls/${poll.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPDATE_QUESTIONS', questions: JSON.stringify(cleaned) }),
+      })
+      if (!res.ok) {
+        const data = await res.json() as { error: string }
+        throw new Error(data.error)
+      }
+      const updated = await res.json() as Poll
+      setPoll(updated)
+      toast.success('Questions updated')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed')
     } finally {
@@ -725,7 +755,33 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 </Card>
               )}
 
-              {questions.length > 0 && (
+              {/* APPROVED: edit questions in place (no re-approval needed) */}
+              {poll.status === 'APPROVED' ? (
+                <Card>
+                  <CardHeader><CardTitle>Poll Questions</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    <QuestionBuilder
+                      questions={editQuestions}
+                      onChange={setEditQuestions}
+                      maxQuestions={6}
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        onClick={saveQuestions}
+                        disabled={!!loading || JSON.stringify(editQuestions) === JSON.stringify(questions)}
+                        className="gap-2"
+                      >
+                        {loading === 'UPDATE_QUESTIONS' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Save Questions
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      Edits apply immediately to the poll form — no re-approval required.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : questions.length > 0 && (
                 <Card>
                   <CardHeader><CardTitle>Poll Questions</CardTitle></CardHeader>
                   <CardContent>
@@ -770,30 +826,15 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               )}
 
               {poll.status === 'APPROVED' && (
-                <>
-                  <Button
-                    className="w-full"
-                    size="sm"
-                    onClick={openReleaseDialog}
-                    disabled={!!loading}
-                  >
-                    {loading === 'RELEASE_POLL' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                    <Send className="mr-1.5 h-3.5 w-3.5" /> Release Poll
-                  </Button>
-                  <Button
-                    className="w-full"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (!confirm('Move this poll back to draft to edit questions, email or deadline? You can re-approve and release after editing.')) return
-                      void runAction('BACK_TO_DRAFT')
-                    }}
-                    disabled={!!loading}
-                  >
-                    {loading === 'BACK_TO_DRAFT' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                    <Edit className="mr-1.5 h-3.5 w-3.5" /> Edit Draft
-                  </Button>
-                </>
+                <Button
+                  className="w-full"
+                  size="sm"
+                  onClick={openReleaseDialog}
+                  disabled={!!loading}
+                >
+                  {loading === 'RELEASE_POLL' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                  <Send className="mr-1.5 h-3.5 w-3.5" /> Release Poll
+                </Button>
               )}
 
               {poll.status === 'AWAITING_APPROVAL' && (
