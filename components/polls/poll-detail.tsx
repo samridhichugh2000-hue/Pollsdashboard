@@ -99,8 +99,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
       setEditEmailBody(normalizeBodyForEditor(poll.draft_email_body || ''))
       setEditQuestions(parseQuestions(poll.questions ?? ''))
       setEditDeadline(poll.deadline ? poll.deadline.split('T')[0] : defaultDeadline)
-    } else if (poll.status === 'APPROVED') {
-      // Approved polls allow in-place question editing before release.
+    } else if (poll.status === 'APPROVED' || poll.status === 'AWAITING_APPROVAL') {
+      // Approved and awaiting-approval polls allow in-place question editing.
       setEditQuestions(parseQuestions(poll.questions ?? ''))
     }
   }, [poll]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -755,8 +755,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 </Card>
               )}
 
-              {/* APPROVED: edit questions in place (no re-approval needed) */}
-              {poll.status === 'APPROVED' ? (
+              {/* APPROVED / AWAITING_APPROVAL: edit questions in place (no re-approval needed) */}
+              {(poll.status === 'APPROVED' || poll.status === 'AWAITING_APPROVAL') ? (
                 <Card>
                   <CardHeader><CardTitle>Poll Questions</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
@@ -777,7 +777,9 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                       </Button>
                     </div>
                     <p className="text-xs text-gray-400">
-                      Edits apply immediately to the poll form — no re-approval required.
+                      {poll.status === 'AWAITING_APPROVAL'
+                        ? 'Edits apply immediately to the poll form — no need to send back to draft.'
+                        : 'Edits apply immediately to the poll form — no re-approval required.'}
                     </p>
                   </CardContent>
                 </Card>
