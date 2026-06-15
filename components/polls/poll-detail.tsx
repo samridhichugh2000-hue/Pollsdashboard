@@ -770,15 +770,30 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               )}
 
               {poll.status === 'APPROVED' && (
-                <Button
-                  className="w-full"
-                  size="sm"
-                  onClick={openReleaseDialog}
-                  disabled={!!loading}
-                >
-                  {loading === 'RELEASE_POLL' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                  <Send className="mr-1.5 h-3.5 w-3.5" /> Release Poll
-                </Button>
+                <>
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    onClick={openReleaseDialog}
+                    disabled={!!loading}
+                  >
+                    {loading === 'RELEASE_POLL' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                    <Send className="mr-1.5 h-3.5 w-3.5" /> Release Poll
+                  </Button>
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (!confirm('Move this poll back to draft to edit questions, email or deadline? You can re-approve and release after editing.')) return
+                      void runAction('BACK_TO_DRAFT')
+                    }}
+                    disabled={!!loading}
+                  >
+                    {loading === 'BACK_TO_DRAFT' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                    <Edit className="mr-1.5 h-3.5 w-3.5" /> Edit Draft
+                  </Button>
+                </>
               )}
 
               {poll.status === 'AWAITING_APPROVAL' && (
