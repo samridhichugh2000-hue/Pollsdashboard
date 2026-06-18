@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '*/15 * * * *'   # inbox-reader: every 15 min
     - cron: '*/30 * * * *'   # rms-retry: every 30 min
-    - cron: '0 * * * *'      # poll-closure: every hour
+    - cron: '28 18 * * *'    # poll-closure: 11:58 PM IST (18:28 UTC) daily
     - cron: '30 3 * * 1-5'   # reminder-scheduler: 9 AM IST (3:30 UTC) weekdays
   workflow_dispatch:
     inputs:
@@ -59,7 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'poll-closure' ||
-      github.event_name == 'schedule' && github.event.schedule == '0 * * * *'
+      github.event_name == 'schedule' && github.event.schedule == '28 18 * * *'
     steps:
       - name: Call poll-closure endpoint
         run: |

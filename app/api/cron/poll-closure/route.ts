@@ -22,9 +22,9 @@ export async function GET(req: Request) {
   let closed = 0
 
   for (const poll of activePolls) {
-    // Close at the end of the deadline day. This cron runs at 23:59 IST, so a poll
-    // whose deadline falls today gets closed (and results auto-sent) at end of that day.
-    // Legacy polls with no deadline fall back to a 48h-after-send guard so they never hang open.
+    // Cron fires at 11:58 PM IST daily. A poll whose deadline is today closes at that
+    // moment and results are sent immediately. Legacy polls with no deadline fall back
+    // to a 48h-after-send guard so they never hang open.
     if (poll.deadline) {
       if (toISTDateStr(new Date(poll.deadline)) > todayISTDate) continue
     } else {
