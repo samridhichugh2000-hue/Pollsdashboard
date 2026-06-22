@@ -59,6 +59,11 @@ export async function GET(req: Request) {
       }
 
       try {
+        // Mark as sent FIRST so a failed email never causes repeated sends.
+        await updatePollStatus(poll.id, 'REMINDER_SENT', {
+          reminder_sent_at: new Date().toISOString(),
+        })
+
         const deadline = poll.deadline ? formatDate(poll.deadline) : 'today'
         const htmlBody = buildPollEmailHtml({
           emailBody: `<p>This is a friendly reminder to participate in our poll: <strong>${poll.topic}</strong></p>`,
@@ -74,9 +79,6 @@ export async function GET(req: Request) {
           bcc: releaseEmails,
         })
 
-        await updatePollStatus(poll.id, 'REMINDER_SENT', {
-          reminder_sent_at: new Date().toISOString(),
-        })
         await createAuditLog(poll.id, 'REMINDER_SENT', 'cron', { emails: releaseEmails })
         sent++
       } catch (err) {
@@ -98,6 +100,11 @@ export async function GET(req: Request) {
     }
 
     try {
+      // Mark as sent FIRST so a failed email never causes repeated sends.
+      await updatePollStatus(poll.id, 'REMINDER_SENT', {
+        second_reminder_sent_at: new Date().toISOString(),
+      })
+
       const htmlBody = buildPollEmailHtml({
         emailBody: `<p>A gentle reminder — today is the <strong>last day</strong> to complete our poll: <strong>${poll.topic}</strong>. Please share your response before end of day.</p>`,
         msFormLink: poll.ms_form_link,
@@ -112,9 +119,6 @@ export async function GET(req: Request) {
         bcc: releaseEmails,
       })
 
-      await updatePollStatus(poll.id, 'REMINDER_SENT', {
-        second_reminder_sent_at: new Date().toISOString(),
-      })
       await createAuditLog(poll.id, 'SECOND_REMINDER_SENT', 'cron', { emails: releaseEmails })
       sent++
     } catch (err) {
