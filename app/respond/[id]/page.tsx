@@ -104,7 +104,7 @@ export default function RespondPage() {
   const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem(`poll_responded_${id}`)) {
+    if (typeof window !== 'undefined' && localStorage.getItem(`poll_responded_v2_${id}`)) {
       setSubmitted(true)
       return
     }
@@ -151,7 +151,7 @@ export default function RespondPage() {
       const data = await res.json() as { error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Submission failed.')
 
-      localStorage.setItem(`poll_responded_${id}`, '1')
+      localStorage.setItem(`poll_responded_v2_${id}`, '1')
       setSubmitted(true)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Something went wrong.')
