@@ -122,7 +122,7 @@ export function QuestionBuilder({ questions, onChange, maxQuestions = 10 }: Ques
               <p className="text-xs text-gray-500 font-medium">Answer options:</p>
               {(q.options ?? []).map((opt, oi) => (
                 <div key={oi} className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-purple-400" />
+                  <span className="h-3 w-3 flex-shrink-0 rounded-sm border-2 border-purple-400" />
                   <input
                     type="text"
                     value={opt}
@@ -150,7 +150,7 @@ export function QuestionBuilder({ questions, onChange, maxQuestions = 10 }: Ques
             {q.type === 'open_ended' && <p className="text-xs text-gray-400">Respondents will type a free-text answer.</p>}
             {q.type === 'rating' && <p className="text-xs text-gray-400">Respondents pick 1–5 stars (Very Poor → Excellent).</p>}
             {q.type === 'yes_no' && <p className="text-xs text-gray-400">Respondents choose Yes or No.</p>}
-            {q.type === 'multiple_choice' && <p className="text-xs text-gray-400">Respondents pick one of the options above.</p>}
+            {q.type === 'multiple_choice' && <p className="text-xs text-gray-400">Respondents can select one or more options above.</p>}
           </div>
         </div>
       ))}
