@@ -64,20 +64,30 @@ function YesNoInput({ value, onChange }: { value: string; onChange: (v: string) 
 }
 
 function MultipleChoiceInput({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
+  const selected = value ? value.split(', ').filter(Boolean) : []
+
+  function toggle(opt: string) {
+    const next = selected.includes(opt) ? selected.filter(s => s !== opt) : [...selected, opt]
+    onChange(next.join(', '))
+  }
+
   return (
     <div className="space-y-2">
-      {options.filter(Boolean).map(opt => (
-        <label key={opt} className="flex items-center gap-3 cursor-pointer rounded-xl border-2 px-4 py-2.5 transition-all hover:border-purple-300"
-          style={{ borderColor: value === opt ? '#9333ea' : '#e5e7eb', backgroundColor: value === opt ? '#faf5ff' : 'white' }}>
-          <div className={`h-4 w-4 flex-shrink-0 rounded-full border-2 flex items-center justify-center transition-colors ${
-            value === opt ? 'border-purple-600 bg-purple-600' : 'border-gray-300'
-          }`}>
-            {value === opt && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
-          </div>
-          <input type="radio" name="mc" value={opt} checked={value === opt} onChange={() => onChange(opt)} className="sr-only" />
-          <span className={`text-sm font-medium ${value === opt ? 'text-purple-700' : 'text-gray-700'}`}>{opt}</span>
-        </label>
-      ))}
+      {options.filter(Boolean).map(opt => {
+        const checked = selected.includes(opt)
+        return (
+          <label key={opt} className="flex items-center gap-3 cursor-pointer rounded-xl border-2 px-4 py-2.5 transition-all hover:border-purple-300"
+            style={{ borderColor: checked ? '#9333ea' : '#e5e7eb', backgroundColor: checked ? '#faf5ff' : 'white' }}>
+            <div className={`h-4 w-4 flex-shrink-0 rounded-md border-2 flex items-center justify-center transition-colors ${
+              checked ? 'border-purple-600 bg-purple-600' : 'border-gray-300'
+            }`}>
+              {checked && <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 10 10" fill="none"><path d="M1.5 5l2.5 2.5 4.5-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            </div>
+            <input type="checkbox" value={opt} checked={checked} onChange={() => toggle(opt)} className="sr-only" />
+            <span className={`text-sm font-medium ${checked ? 'text-purple-700' : 'text-gray-700'}`}>{opt}</span>
+          </label>
+        )
+      })}
     </div>
   )
 }
