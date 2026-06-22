@@ -27,10 +27,15 @@ export async function GET(req: Request) {
 
   let sent = 0
 
+  // Snapshot both query results BEFORE any updates so Block 2 never picks up
+  // a poll that Block 1 just promoted from SENT → REMINDER_SENT in this same run.
+  const [sentPolls, reminderSentPolls] = await Promise.all([
+    getPollsByStatus('SENT'),
+    getPollsByStatus('REMINDER_SENT'),
+  ])
+
   // ── 1st reminder: next working day after release ──────────────────────────
   {
-    const sentPolls = await getPollsByStatus('SENT')
-
     for (const poll of sentPolls) {
       if (!poll.sent_at || !poll.ms_form_link) continue
 
@@ -81,8 +86,6 @@ export async function GET(req: Request) {
   }
 
   // ── 2nd reminder: deadline day at 8 AM IST ───────────────────────────────
-  const reminderSentPolls = await getPollsByStatus('REMINDER_SENT')
-
   for (const poll of reminderSentPolls) {
     if (!poll.deadline || !poll.ms_form_link || !poll.release_message_id) continue
     if (poll.second_reminder_sent_at) continue
