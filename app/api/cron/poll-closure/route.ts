@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse } from '@/lib/db/queries'
-import { sendEmail, getFormResponses } from '@/lib/graph'
-import { buildResultsEmailHtml } from '@/lib/utils'
-import * as XLSX from 'xlsx'
+import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse } from '@/lib/db/queries'
+import { getFormResponses } from '@/lib/graph'
 
 const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
@@ -23,8 +21,7 @@ export async function GET(req: Request) {
 
   for (const poll of activePolls) {
     // Cron fires at 11:58 PM IST daily. A poll whose deadline is today closes at that
-    // moment and results are sent immediately. Legacy polls with no deadline fall back
-    // to a 48h-after-send guard so they never hang open.
+    // moment. Legacy polls with no deadline fall back to a 48h-after-send guard.
     if (poll.deadline) {
       if (toISTDateStr(new Date(poll.deadline)) > todayISTDate) continue
     } else {
@@ -32,7 +29,8 @@ export async function GET(req: Request) {
     }
 
     try {
-      // Fetch responses from MS Forms
+      // Snapshot latest responses from MS Forms into DB so they are ready
+      // when results are shared manually from the dashboard.
       if (poll.ms_form_id) {
         const responses = await getFormResponses(poll.ms_form_id)
         if (responses.length > 0) {
@@ -40,49 +38,7 @@ export async function GET(req: Request) {
         }
       }
 
-      // Build Excel attachment from stored responses
-      const pollResponse = await getPollResponse(poll.id)
-      let attachments: { name: string; contentType: string; contentBytes: string }[] = []
-      if (pollResponse?.response_data) {
-        const entries = JSON.parse(pollResponse.response_data) as Array<{
-          respondent?: string; email?: string; submitted_at: string;
-          answers: { question: string; answer: string }[]
-        }>
-        const rows = entries.map((entry, i) => {
-          const row: Record<string, string> = {
-            '#': String(i + 1),
-            Name: entry.respondent ?? 'Anonymous',
-          }
-          entry.answers.forEach((a, qi) => { row[`Q${qi + 1}: ${a.question}`] = a.answer })
-          return row
-        })
-        const headers = Object.keys(rows[0] ?? {})
-        const ws = XLSX.utils.aoa_to_sheet([
-          [`Poll: ${poll.topic}`],
-          [],
-          headers,
-          ...rows.map(r => headers.map(h => r[h] ?? '')),
-        ])
-        ws['!cols'] = headers.map((key) => ({
-          wch: Math.max(key.length, ...rows.map((r) => String(r[key] ?? '').length)) + 2,
-        }))
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, 'Responses')
-        const xlsxBase64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }) as string
-        const filename = `poll-responses-${poll.topic.slice(0, 30).replace(/\s+/g, '-').toLowerCase()}.xlsx`
-        attachments = [{ name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }]
-      }
-
-      // Send results email to EA
-      const htmlBody = buildResultsEmailHtml(poll.topic, attachments.length > 0)
-      await sendEmail({
-        from: process.env.PRIYA_EMAIL!,
-        to: process.env.RESULTS_RECIPIENT_EMAIL ?? 'ea@koenig-solutions.com',
-        subject: `Poll Results: ${poll.topic}`,
-        htmlBody,
-        ...(attachments.length > 0 && { attachments }),
-      })
-
+      // Close the poll — results are NOT auto-sent. Share manually via the dashboard.
       await updatePollStatus(poll.id, 'CLOSED', {
         closed_at: new Date().toISOString(),
       })
