@@ -9,19 +9,30 @@ function toISTDateStr(date: Date): string {
   return new Date(date.getTime() + IST_OFFSET_MS).toISOString().split('T')[0]
 }
 
+function istHour(date: Date): number {
+  return new Date(date.getTime() + IST_OFFSET_MS).getUTCHours()
+}
+
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const now = new Date()
+
+  // Hard gate: never close polls before 11:50 PM IST regardless of when the cron fires.
+  // This protects against midnight-IST false-closes if the cron ever runs off-schedule
+  // (e.g. GitHub Actions delay, manual trigger at wrong time).
+  if (istHour(now) < 23) {
+    return NextResponse.json({ closed: 0, message: 'Too early — polls only close after 11:50 PM IST' })
+  }
+
   const activePolls = await getPollsByStatus(['SENT', 'REMINDER_SENT'] as Parameters<typeof getPollsByStatus>[0])
-  const todayISTDate = toISTDateStr(new Date())
+  const todayISTDate = toISTDateStr(now)
   let closed = 0
 
   for (const poll of activePolls) {
-    // Cron fires at 11:58 PM IST daily. A poll whose deadline is today closes at that
-    // moment. Legacy polls with no deadline fall back to a 48h-after-send guard.
     if (poll.deadline) {
       if (toISTDateStr(new Date(poll.deadline)) > todayISTDate) continue
     } else {
@@ -29,8 +40,6 @@ export async function GET(req: Request) {
     }
 
     try {
-      // Snapshot latest responses from MS Forms into DB so they are ready
-      // when results are shared manually from the dashboard.
       if (poll.ms_form_id) {
         const responses = await getFormResponses(poll.ms_form_id)
         if (responses.length > 0) {
@@ -38,7 +47,6 @@ export async function GET(req: Request) {
         }
       }
 
-      // Close the poll — results are NOT auto-sent. Share manually via the dashboard.
       await updatePollStatus(poll.id, 'CLOSED', {
         closed_at: new Date().toISOString(),
       })
