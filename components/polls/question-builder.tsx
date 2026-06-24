@@ -1,6 +1,6 @@
 'use client'
 
-import { Plus, Trash2, X } from 'lucide-react'
+import { Plus, Trash2, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export type QuestionType = 'open_ended' | 'rating' | 'yes_no' | 'multiple_choice'
@@ -39,6 +39,14 @@ export function QuestionBuilder({ questions, onChange, maxQuestions = 10 }: Ques
 
   const removeQuestion = (i: number) => {
     onChange(questions.filter((_, idx) => idx !== i))
+  }
+
+  const moveQuestion = (i: number, dir: -1 | 1) => {
+    const next = i + dir
+    if (next < 0 || next >= questions.length) return
+    const reordered = [...questions]
+    ;[reordered[i], reordered[next]] = [reordered[next], reordered[i]]
+    onChange(reordered)
   }
 
   const updateText = (i: number, text: string) => {
@@ -93,6 +101,16 @@ export function QuestionBuilder({ questions, onChange, maxQuestions = 10 }: Ques
               placeholder={`Question ${i + 1}`}
               className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
             />
+            <div className="flex flex-col gap-0.5 flex-shrink-0">
+              <button type="button" onClick={() => moveQuestion(i, -1)} disabled={i === 0}
+                className="flex h-3.5 w-6 items-center justify-center rounded text-gray-300 hover:text-cyan-600 disabled:opacity-20 disabled:cursor-not-allowed transition-colors">
+                <ChevronUp className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" onClick={() => moveQuestion(i, 1)} disabled={i === questions.length - 1}
+                className="flex h-3.5 w-6 items-center justify-center rounded text-gray-300 hover:text-cyan-600 disabled:opacity-20 disabled:cursor-not-allowed transition-colors">
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
             <Button type="button" variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0"
               onClick={() => removeQuestion(i)}>
               <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-rose-500" />
