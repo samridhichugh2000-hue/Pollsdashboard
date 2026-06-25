@@ -75,11 +75,11 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                 <td className="px-5 py-3.5 text-xs">
                   {['CLOSED', 'ARCHIVED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(poll.status) && poll.closed_at ? (
                     <span className="text-gray-500" title={formatDateTime(poll.closed_at)}>
-                      {new Date(poll.closed_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
+                      Closed on {new Date(poll.closed_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                     </span>
                   ) : poll.deadline ? (
                     <span className="text-amber-600" title="Scheduled close date">
-                      {new Date(poll.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
+                      Closes on {new Date(poll.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                     </span>
                   ) : (
                     <span className="text-gray-300">—</span>
