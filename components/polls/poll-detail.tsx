@@ -683,7 +683,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   {releaseAttachments.length > 0 && (
                     <div className="space-y-1.5">
                       {releaseAttachments.map((file, i) => (
-                        <div key={i} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                        <div key={i} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 overflow-hidden">
                           <div className="flex items-center gap-2 min-w-0">
                             <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
                             <span className="text-sm text-gray-700 truncate">{file.name}</span>
@@ -1478,7 +1478,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 {existingAttachments
                   .filter(a => !removedAttachmentNames.includes(a.name))
                   .map((file) => (
-                    <div key={file.name} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                    <div key={file.name} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 overflow-hidden">
                       <div className="flex items-center gap-2 min-w-0">
                         <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
                         <span className="text-sm text-gray-700 truncate">{file.name}</span>
@@ -1499,7 +1499,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             {releaseAttachments.length > 0 && (
               <div className="space-y-1.5">
                 {releaseAttachments.map((file, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <div key={i} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 overflow-hidden">
                     <div className="flex items-center gap-2 min-w-0">
                       <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
                       <span className="text-sm text-gray-700 truncate">{file.name}</span>
