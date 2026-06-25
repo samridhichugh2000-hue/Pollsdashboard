@@ -42,6 +42,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Source</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Status</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Created</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Closes / Closed</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Form</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400"></th>
           </tr>
@@ -70,6 +71,19 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                 <td className="px-5 py-3.5"><StatusBadge status={poll.status} /></td>
                 <td className="px-5 py-3.5 text-gray-400 text-xs">
                   <span title={formatDateTime(poll.created_at)}>{formatRelative(poll.created_at)}</span>
+                </td>
+                <td className="px-5 py-3.5 text-xs">
+                  {['CLOSED', 'ARCHIVED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(poll.status) && poll.closed_at ? (
+                    <span className="text-gray-500" title={formatDateTime(poll.closed_at)}>
+                      {new Date(poll.closed_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
+                    </span>
+                  ) : poll.deadline ? (
+                    <span className="text-amber-600" title="Scheduled close date">
+                      {new Date(poll.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
+                    </span>
+                  ) : (
+                    <span className="text-gray-300">—</span>
+                  )}
                 </td>
                 <td className="px-5 py-3.5">
                   {poll.ms_form_link ? (
