@@ -73,7 +73,9 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                   <span title={formatDateTime(poll.created_at)}>{formatRelative(poll.created_at)}</span>
                 </td>
                 <td className="px-5 py-3.5 text-xs">
-                  {['CLOSED', 'ARCHIVED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(poll.status) && poll.closed_at ? (
+                  {poll.status === 'DRAFT' ? (
+                    <span className="text-gray-300">—</span>
+                  ) : ['CLOSED', 'ARCHIVED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(poll.status) && poll.closed_at ? (
                     <span className="text-gray-500" title={formatDateTime(poll.closed_at)}>
                       Closed on {new Date(poll.closed_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                     </span>
