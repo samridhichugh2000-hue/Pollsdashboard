@@ -81,6 +81,13 @@ export async function GET(req: Request) {
         attachments = [{ name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }]
       }
 
+      // Mark CLOSED first — prevents duplicate sends if the email call fails
+      // and the cron retries tomorrow night.
+      await updatePollStatus(poll.id, 'CLOSED', {
+        closed_at: new Date().toISOString(),
+      })
+      await createAuditLog(poll.id, 'AUTO_CLOSED', 'cron')
+
       // Send results to EA
       const htmlBody = buildResultsEmailHtml(poll.topic, attachments.length > 0)
       await sendEmail({
@@ -90,12 +97,6 @@ export async function GET(req: Request) {
         htmlBody,
         ...(attachments.length > 0 && { attachments }),
       })
-
-      await updatePollStatus(poll.id, 'CLOSED', {
-        closed_at: new Date().toISOString(),
-      })
-
-      await createAuditLog(poll.id, 'AUTO_CLOSED', 'cron')
       closed++
     } catch (err) {
       console.error(`Failed to close poll ${poll.id}:`, err)

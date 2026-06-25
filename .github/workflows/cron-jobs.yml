@@ -55,7 +55,7 @@ jobs:
           [ "$STATUS" = "200" ] || exit 1
 
   poll-closure:
-    name: Poll Closure (every hour)
+    name: Poll Closure (11:58 PM IST daily)
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'poll-closure' ||
