@@ -78,6 +78,23 @@ export default function PollRequestsPage() {
     void fetchPolls()
   }
 
+  const notSentForApproval = polls.filter(p => ['DETECTED', 'DRAFT', 'FORM_CREATED'].includes(p.status)).length
+  const approvalPending = polls.filter(p => p.status === 'AWAITING_APPROVAL').length
+  const activePolls = polls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)).length
+  const pollsClosed = polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status)).length
+  const resultNotSentSir = polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED'].includes(p.status) && !p.rms_task_id).length
+  const resultNotSentVoter = polls.filter(p => p.status === 'CLOSED').length
+
+  const statCards = [
+    { label: 'Not Sent for Approval', value: notSentForApproval, color: 'text-cyan-700', bg: 'bg-cyan-50', border: 'border-cyan-200' },
+    { label: 'Approval Pending',       value: approvalPending,    color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-200' },
+    { label: 'Active Polls',           value: activePolls,        color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+    { label: 'Polls Closed',           value: pollsClosed,        color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200' },
+    { label: 'Result Not Sent (Sir)',  value: resultNotSentSir,   color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
+    { label: 'Result Not Sent (Voter)',value: resultNotSentVoter, color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
+    { label: 'Total Polls',            value: polls.length,       color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200' },
+  ]
+
   const filterByTab = (tab: string): Poll[] => {
     switch (tab) {
       case 'inbox':    return polls.filter(p => p.source === 'email')
@@ -100,6 +117,16 @@ export default function PollRequestsPage() {
           className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 shadow-sm transition-colors">
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
         </button>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+        {statCards.map(({ label, value, color, bg, border }) => (
+          <div key={label} className={`rounded-2xl ${bg} border ${border} px-4 py-4 text-center`}>
+            <p className={`text-3xl font-bold ${color}`}>{value}</p>
+            <p className={`text-xs font-medium mt-1 ${color} opacity-80`}>{label}</p>
+          </div>
+        ))}
       </div>
 
       <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
