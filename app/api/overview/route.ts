@@ -4,11 +4,12 @@ import { getDb } from '@/lib/db/client'
 export async function GET() {
   const db = getDb()
 
-  const [pollsRes, regularPollsRes, feedbackRes, kpiRes] = await Promise.all([
+  const [pollsRes, regularPollsRes, feedbackRes, kpiRes, responsesRes] = await Promise.all([
     db.execute({ sql: 'SELECT id, status, rms_task_id, results_uploaded_at, closed_at FROM polls WHERE status != ? ORDER BY created_at DESC', args: ['ARCHIVED'] }),
     db.execute('SELECT id, frequency, is_active, next_run_date, last_run_date FROM regular_polls').catch(() => ({ rows: [] })),
     db.execute('SELECT id, type, status, category, rms_task_id, task_pending, followup_done, summary, submitted_by, department, poll_title FROM feedback_items ORDER BY created_at DESC').catch(() => ({ rows: [] })),
     db.execute("SELECT process_improvements, rms_improvements, policy_announced FROM kpi_data WHERE id = 'singleton'").catch(() => ({ rows: [] })),
+    db.execute('SELECT response_data FROM poll_responses').catch(() => ({ rows: [] })),
   ])
 
   const polls = pollsRes.rows as unknown as Array<{
@@ -58,6 +59,12 @@ export async function GET() {
   const totalPolls = polls.length
   const totalPending = polls.filter(p => PENDING_STATUSES.includes(p.status)).length
 
+  // Count individual poll responses across all polls
+  const totalSuggestionsReceived = (responsesRes.rows as unknown as Array<{ response_data: string | null }>)
+    .reduce((sum, row) => {
+      try { return sum + (JSON.parse(row.response_data ?? '[]') as unknown[]).length } catch { return sum }
+    }, 0)
+
   // Cadence breakdown
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const totalCadence = regularPolls.length
@@ -74,6 +81,7 @@ export async function GET() {
 
   // Feedback breakdown
   const totalSuggestions = feedbackItems.length
+  const totalResponses = totalSuggestionsReceived
   const pendingForAction = feedbackItems.filter(f => f.status === 'Open' || f.status === 'In Progress').length
   const processImproved = Number(kpiRow?.process_improvements ?? 0)
   const actionable = pendingForAction + processImproved
@@ -96,7 +104,7 @@ export async function GET() {
     kpi: {
       totalPolls,
       totalPending,
-      totalSuggestions,
+      totalSuggestions: totalResponses,
       suggestionsPendingReview: pendingForAction,
       processImprovements: processImproved,
       rmsImprovements: Number(kpiRow?.rms_improvements ?? 0),
