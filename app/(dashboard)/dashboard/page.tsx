@@ -77,14 +77,21 @@ const defaultData: OverviewData = {
   actionReport: { actionTaken: 0, policyImproved: 0, queryReplied: 0, noActionReq: 0, pendingReview: 0, totalItems: 0 },
 }
 
-function BreakdownRow({ label, value, color = 'bg-slate-400' }: { label: string; value: number; color?: string }) {
+function BreakdownRow({ label, value, color = 'bg-slate-400', href }: { label: string; value: number; color?: string; href?: string }) {
+  const router = useRouter()
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+    <div
+      onClick={href ? () => router.push(href) : undefined}
+      className={`flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0 ${href ? 'cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors' : ''}`}
+    >
       <div className="flex items-center gap-2">
         <span className={`h-2 w-2 rounded-full flex-shrink-0 ${color}`} />
         <span className="text-sm text-gray-600">{label}</span>
       </div>
-      <span className="text-sm font-bold text-gray-900">{value}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-sm font-bold text-gray-900">{value}</span>
+        {href && <span className="text-xs text-gray-300">→</span>}
+      </div>
     </div>
   )
 }
@@ -172,7 +179,7 @@ export default function DashboardPage() {
       icon: ClipboardList,
       color: 'text-purple-600',
       iconBg: 'bg-purple-50',
-      onClick: undefined,
+      onClick: () => router.push('/poll-requests?card=total'),
     },
     {
       label: 'Total Pending Polls',
@@ -252,12 +259,12 @@ export default function DashboardPage() {
             <ClipboardList className="h-4 w-4 text-purple-500" />
             <h2 className="font-semibold text-gray-900">Total Polls Breakdown</h2>
           </div>
-          <BreakdownRow label="Not Sent for Approval" value={data.pollBreakdown.notSentForApproval} color="bg-gray-400" />
-          <BreakdownRow label="Approval Pending" value={data.pollBreakdown.approvalPending} color="bg-amber-400" />
-          <BreakdownRow label="Active Polls" value={data.pollBreakdown.activePolls} color="bg-emerald-400" />
-          <BreakdownRow label="Polls Closed" value={data.pollBreakdown.pollsClosed} color="bg-slate-400" />
-          <BreakdownRow label="Result Not Sent to Sir" value={data.pollBreakdown.resultNotSentSir} color="bg-orange-400" />
-          <BreakdownRow label="Result Not Sent to Voter" value={data.pollBreakdown.resultNotSentVoter} color="bg-red-400" />
+          <BreakdownRow label="Not Sent for Approval" value={data.pollBreakdown.notSentForApproval} color="bg-gray-400"    href="/poll-requests?card=not-sent" />
+          <BreakdownRow label="Approval Pending"       value={data.pollBreakdown.approvalPending}    color="bg-amber-400"   href="/poll-requests?card=approval-pending" />
+          <BreakdownRow label="Active Polls"           value={data.pollBreakdown.activePolls}        color="bg-emerald-400" href="/poll-requests?card=active" />
+          <BreakdownRow label="Polls Closed"           value={data.pollBreakdown.pollsClosed}        color="bg-slate-400"   href="/poll-requests?card=closed" />
+          <BreakdownRow label="Result Not Sent to Sir" value={data.pollBreakdown.resultNotSentSir}   color="bg-orange-400"  href="/poll-requests?card=result-sir" />
+          <BreakdownRow label="Result Not Sent to Voter" value={data.pollBreakdown.resultNotSentVoter} color="bg-red-400"   href="/poll-requests?card=result-voter" />
         </div>
 
         {/* Cadence Breakdown */}

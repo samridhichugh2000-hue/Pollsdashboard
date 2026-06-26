@@ -2,7 +2,8 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { RefreshCw, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -34,10 +35,16 @@ function filterByTab(polls: Poll[], tab: string): Poll[] {
   }
 }
 
-export default function PollRequestsPage() {
+const VALID_CARD_KEYS: CardKey[] = ['not-sent', 'approval-pending', 'active', 'closed', 'result-sir', 'result-voter', 'total']
+
+function PollRequestsContent() {
+  const searchParams = useSearchParams()
+  const cardParam = searchParams.get('card') as CardKey | null
   const [polls, setPolls] = useState<Poll[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeCard, setActiveCard] = useState<CardKey | null>(null)
+  const [activeCard, setActiveCard] = useState<CardKey | null>(
+    cardParam && VALID_CARD_KEYS.includes(cardParam) ? cardParam : null
+  )
 
   const fetchPolls = useCallback(async () => {
     setLoading(true)
@@ -173,5 +180,17 @@ export default function PollRequestsPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function PollRequestsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-20">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+      </div>
+    }>
+      <PollRequestsContent />
+    </Suspense>
   )
 }
