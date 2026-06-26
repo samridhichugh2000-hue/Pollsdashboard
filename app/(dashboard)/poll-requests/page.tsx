@@ -19,7 +19,7 @@ function filterByCard(polls: Poll[], key: CardKey): Poll[] {
     case 'closed':            return polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status))
     case 'result-sir':        return polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED'].includes(p.status) && !p.rms_task_id)
     case 'result-voter':      return polls.filter(p => p.status === 'CLOSED')
-    case 'total':             return [...polls]
+    case 'total':             return polls.filter(p => p.status !== 'ARCHIVED')
   }
 }
 
@@ -87,7 +87,7 @@ export default function PollRequestsPage() {
     { key: 'closed',           label: 'Polls Closed',            value: filterByCard(polls, 'closed').length,           color: 'text-slate-700',   bg: 'bg-slate-50',   border: 'border-slate-200',   ring: 'ring-slate-400' },
     { key: 'result-sir',       label: 'Result Not Sent (Sir)',   value: filterByCard(polls, 'result-sir').length,       color: 'text-orange-700',  bg: 'bg-orange-50',  border: 'border-orange-200',  ring: 'ring-orange-400' },
     { key: 'result-voter',     label: 'Result Not Sent (Voter)', value: filterByCard(polls, 'result-voter').length,     color: 'text-red-700',     bg: 'bg-red-50',     border: 'border-red-200',     ring: 'ring-red-400' },
-    { key: 'total',            label: 'Total Polls',             value: polls.length,                                   color: 'text-purple-700',  bg: 'bg-purple-50',  border: 'border-purple-200',  ring: 'ring-purple-400' },
+    { key: 'total',            label: 'Total Polls',             value: polls.filter(p => p.status !== 'ARCHIVED').length,                                   color: 'text-purple-700',  bg: 'bg-purple-50',  border: 'border-purple-200',  ring: 'ring-purple-400' },
   ]
 
   const tablePolls = activeCard ? filterByCard(polls, activeCard) : null
