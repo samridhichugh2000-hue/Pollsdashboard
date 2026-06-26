@@ -9,7 +9,7 @@ export async function GET() {
     db.execute('SELECT id, frequency, is_active, next_run_date, last_run_date FROM regular_polls').catch(() => ({ rows: [] })),
     db.execute('SELECT id, type, status, category, rms_task_id, task_pending, followup_done, summary, submitted_by, department, poll_title FROM feedback_items ORDER BY created_at DESC').catch(() => ({ rows: [] })),
     db.execute("SELECT process_improvements, rms_improvements, policy_announced FROM kpi_data WHERE id = 'singleton'").catch(() => ({ rows: [] })),
-    db.execute('SELECT response_data FROM poll_responses').catch(() => ({ rows: [] })),
+    db.execute('SELECT poll_id, response_data FROM poll_responses').catch(() => ({ rows: [] })),
   ])
 
   const polls = pollsRes.rows as unknown as Array<{
@@ -59,8 +59,18 @@ export async function GET() {
   const totalPolls = polls.length
   const totalPending = polls.filter(p => PENDING_STATUSES.includes(p.status)).length
 
+  const responseRows = responsesRes.rows as unknown as Array<{ poll_id: string; response_data: string | null }>
+  const openPollIds = new Set(polls.filter(p => !CLOSED_STATUSES.includes(p.status)).map(p => p.id))
+
   // Count individual poll responses across all polls
-  const totalSuggestionsReceived = (responsesRes.rows as unknown as Array<{ response_data: string | null }>)
+  const totalSuggestionsReceived = responseRows
+    .reduce((sum, row) => {
+      try { return sum + (JSON.parse(row.response_data ?? '[]') as unknown[]).length } catch { return sum }
+    }, 0)
+
+  // Responses from polls not yet closed
+  const responsesPendingReview = responseRows
+    .filter(row => openPollIds.has(row.poll_id))
     .reduce((sum, row) => {
       try { return sum + (JSON.parse(row.response_data ?? '[]') as unknown[]).length } catch { return sum }
     }, 0)
@@ -105,7 +115,7 @@ export async function GET() {
       totalPolls,
       totalPending,
       totalSuggestions: totalResponses,
-      suggestionsPendingReview: pendingForAction,
+      suggestionsPendingReview: responsesPendingReview,
       processImprovements: processImproved,
       rmsImprovements: Number(kpiRow?.rms_improvements ?? 0),
     },
