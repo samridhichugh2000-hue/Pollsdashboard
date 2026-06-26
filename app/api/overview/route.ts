@@ -46,7 +46,7 @@ export async function GET() {
   // Poll breakdown
   const PENDING_STATUSES = ['DETECTED', 'DRAFT', 'FORM_CREATED', 'AWAITING_APPROVAL', 'APPROVED', 'RMS_TASK_CREATED', 'REJECTED', 'RMS_TASK_FAILED', 'RMS_PUBLISH_FAILED', 'SEND_FAILED']
   const ACTIVE_STATUSES = ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED']
-  const CLOSED_STATUSES = ['CLOSED', 'RESULTS_UPLOADED']
+  const CLOSED_STATUSES = ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED']
 
   const notSentForApproval = polls.filter(p => ['DETECTED', 'DRAFT', 'FORM_CREATED'].includes(p.status)).length
   const approvalPending = polls.filter(p => p.status === 'AWAITING_APPROVAL').length
