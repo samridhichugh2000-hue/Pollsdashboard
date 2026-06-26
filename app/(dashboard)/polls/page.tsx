@@ -148,7 +148,7 @@ function PollsContent() {
     let base: Poll[]
     switch (tab) {
       case 'inbox':    base = polls.filter(p => p.source === 'email'); break
-      case 'via-form': base = polls.filter(p => p.source === 'external'); break
+      case 'via-form': base = polls.filter(p => p.source === 'dashboard'); break
       case 'active':   base = polls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)); break
       case 'not-sent': base = polls.filter(p => p.status === 'DRAFT'); break
       case 'closed':   base = polls.filter(p => ['CLOSED', 'ARCHIVED', 'REJECTED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status)); break

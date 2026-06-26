@@ -26,7 +26,7 @@ function filterByCard(polls: Poll[], key: CardKey): Poll[] {
 function filterByTab(polls: Poll[], tab: string): Poll[] {
   switch (tab) {
     case 'inbox':    return polls.filter(p => p.source === 'email')
-    case 'via-form': return polls.filter(p => p.source === 'external')
+    case 'via-form': return polls.filter(p => p.source === 'dashboard')
     case 'active':   return polls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
     case 'not-sent': return polls.filter(p => p.status === 'DRAFT')
     case 'closed':   return polls.filter(p => ['CLOSED', 'ARCHIVED', 'REJECTED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status))
