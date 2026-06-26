@@ -147,13 +147,12 @@ function PollsContent() {
   const filterByTab = (tab: string): Poll[] => {
     let base: Poll[]
     switch (tab) {
-      case 'inbox':    base = polls.filter(p => active(p) && p.source === 'email'); break
-      case 'manual':   base = polls.filter(p => active(p) && p.source === 'dashboard'); break
-      case 'external': base = polls.filter(p => active(p) && p.source === 'external'); break
-      case 'pending':  base = polls.filter(p => active(p) && p.status === 'AWAITING_APPROVAL'); break
-      case 'active':   base = polls.filter(p => active(p) && ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)); break
-      case 'archived': base = polls.filter(p => p.status === 'ARCHIVED' || p.status === 'REJECTED'); break
-      default:         base = polls.filter(p => active(p))
+      case 'inbox':    base = polls.filter(p => p.source === 'email'); break
+      case 'via-form': base = polls.filter(p => p.source === 'external'); break
+      case 'active':   base = polls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)); break
+      case 'not-sent': base = polls.filter(p => p.status === 'DRAFT'); break
+      case 'closed':   base = polls.filter(p => ['CLOSED', 'ARCHIVED', 'REJECTED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status)); break
+      default:         base = [...polls]
     }
     return applySearch(base)
   }
@@ -259,38 +258,13 @@ function PollsContent() {
               <TabsList className="bg-gray-100 mb-0 flex-wrap h-auto gap-1">
                 <TabsTrigger value="all">All ({filterByTab('all').length})</TabsTrigger>
                 <TabsTrigger value="inbox">Inbox ({filterByTab('inbox').length})</TabsTrigger>
-                {(() => {
-                  const manualNew = filterByTab('manual').filter(p => p.status === 'DRAFT').length
-                  return (
-                    <TabsTrigger value="manual" className="relative">
-                      Manual ({filterByTab('manual').length})
-                      {manualNew > 0 && (
-                        <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-xs font-bold text-white">
-                          {manualNew}
-                        </span>
-                      )}
-                    </TabsTrigger>
-                  )
-                })()}
-                {(() => {
-                  const externalNew = filterByTab('external').filter(p => p.status === 'DRAFT').length
-                  return (
-                    <TabsTrigger value="external" className="relative">
-                      External ({filterByTab('external').length})
-                      {externalNew > 0 && (
-                        <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-xs font-bold text-white">
-                          {externalNew}
-                        </span>
-                      )}
-                    </TabsTrigger>
-                  )
-                })()}
-                <TabsTrigger value="pending">Pending ({filterByTab('pending').length})</TabsTrigger>
-                <TabsTrigger value="active">Active ({filterByTab('active').length})</TabsTrigger>
-                <TabsTrigger value="archived">Archived ({filterByTab('archived').length})</TabsTrigger>
+                <TabsTrigger value="via-form">Via Form ({filterByTab('via-form').length})</TabsTrigger>
+                <TabsTrigger value="active">Active Polls ({filterByTab('active').length})</TabsTrigger>
+                <TabsTrigger value="not-sent">Polls Not Sent for Approval ({filterByTab('not-sent').length})</TabsTrigger>
+                <TabsTrigger value="closed">Polls Closed ({filterByTab('closed').length})</TabsTrigger>
               </TabsList>
             </div>
-            {(['all', 'inbox', 'manual', 'external', 'pending', 'active'] as const).map((tab) => (
+            {(['all', 'inbox', 'via-form', 'active', 'not-sent'] as const).map((tab) => (
               <TabsContent key={tab} value={tab} className="mt-0">
                 <PollsTable
                   polls={filterByTab(tab)}
@@ -302,8 +276,8 @@ function PollsContent() {
                 />
               </TabsContent>
             ))}
-            <TabsContent value="archived" className="mt-0">
-              <PollsTable polls={filterByTab('archived')} />
+            <TabsContent value="closed" className="mt-0">
+              <PollsTable polls={filterByTab('closed')} />
             </TabsContent>
           </Tabs>
         )}
