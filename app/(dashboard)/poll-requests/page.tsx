@@ -43,7 +43,7 @@ export default function PollRequestsPage() {
     setLoading(true)
     try {
       const data = await fetch('/api/polls').then(r => r.ok ? r.json() : []) as Poll[]
-      setPolls(data)
+      setPolls(data.filter((p: Poll) => p.status !== 'ARCHIVED'))
     } catch { toast.error('Failed to load polls') }
     finally { setLoading(false) }
   }, [])
