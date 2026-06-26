@@ -77,6 +77,87 @@ export async function runMigrations() {
       )
     `)
   } catch { /* already exists */ }
+
+  // Feedback / suggestions collected per poll
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS feedback_items (
+        id TEXT PRIMARY KEY,
+        poll_id TEXT REFERENCES polls(id),
+        poll_title TEXT,
+        type TEXT,
+        summary TEXT,
+        detail TEXT,
+        submitted_by TEXT,
+        department TEXT,
+        owner TEXT,
+        status TEXT DEFAULT 'Open',
+        due_date TEXT,
+        submitted_date TEXT DEFAULT CURRENT_TIMESTAMP,
+        rms_task_id TEXT,
+        task_pending INTEGER DEFAULT 0,
+        followup_done INTEGER DEFAULT 0,
+        category TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+
+  // AI draft audit trail
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS ai_sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        poll_id TEXT,
+        type TEXT,
+        prompt TEXT,
+        generated_content TEXT,
+        model_version TEXT,
+        accepted_at TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+
+  // Closure / resolution tracking per feedback item
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS closure_items (
+        id TEXT PRIMARY KEY,
+        poll_id TEXT REFERENCES polls(id),
+        feedback_id TEXT REFERENCES feedback_items(id),
+        summary TEXT,
+        status TEXT,
+        email_sent INTEGER DEFAULT 0,
+        happy_with_solution INTEGER,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+
+  // Manually-maintained KPI counts (process improvements, RMS improvements, etc.)
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS kpi_data (
+        id TEXT PRIMARY KEY DEFAULT 'singleton',
+        process_improvements INTEGER DEFAULT 0,
+        rms_improvements INTEGER DEFAULT 0,
+        policy_announced INTEGER DEFAULT 0,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+
+  // Seed kpi_data singleton row if missing
+  try {
+    await db.execute(`INSERT OR IGNORE INTO kpi_data (id) VALUES ('singleton')`)
+  } catch { /* already exists */ }
+
+  // Add auto_approve column to regular_polls
+  try {
+    await db.execute(`ALTER TABLE regular_polls ADD COLUMN auto_approve INTEGER DEFAULT 0`)
+  } catch { /* already exists */ }
 }
 
 export async function initializeDatabase() {

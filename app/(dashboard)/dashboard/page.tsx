@@ -3,303 +3,352 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
-import { KPICards } from '@/components/dashboard/kpi-cards'
-import { AlertTriangle, Clock, ExternalLink, Bell, CalendarClock, CalendarRange, X } from 'lucide-react'
-import { formatRelative, isApprovalOverdue } from '@/lib/utils'
-import { StatusBadge } from '@/components/polls/status-badge'
-import type { Poll, KPIData, RegularPoll } from '@/types'
+import { useRouter } from 'next/navigation'
+import {
+  ClipboardList, Clock, MessageSquare, TrendingUp, BarChart3, Zap,
+  CalendarClock, CheckCircle, ChevronDown, ChevronUp, Loader2
+} from 'lucide-react'
 
-const defaultKPI: KPIData = {
-  totalThisMonth: 0,
-  awaitingApproval: 0,
-  active: 0,
-  closedThisMonth: 0,
-  rmsTasksCreated: 0,
-  resultsUploaded: 0,
+interface OverviewData {
+  kpi: {
+    totalPolls: number
+    totalPending: number
+    totalSuggestions: number
+    suggestionsPendingReview: number
+    processImprovements: number
+    rmsImprovements: number
+  }
+  pollBreakdown: {
+    notSentForApproval: number
+    approvalPending: number
+    activePolls: number
+    pollsClosed: number
+    resultNotSentSir: number
+    resultNotSentVoter: number
+  }
+  cadenceBreakdown: {
+    total: number
+    monthly: number
+    quarterly: number
+    biAnnual: number
+    annual: number
+    scheduledReleased: number
+    overdue: number
+  }
+  suggestionBreakdown: {
+    total: number
+    actionable: number
+    pendingForAction: number
+    processImproved: number
+    nonActionable: number
+  }
+  feedbackPending: {
+    rmsTaskRaised: FeedbackItem[]
+    actionYetToStart: FeedbackItem[]
+    annexurePending: FeedbackItem[]
+  }
+  actionReport: {
+    actionTaken: number
+    policyImproved: number
+    queryReplied: number
+    noActionReq: number
+    pendingReview: number
+    totalItems: number
+  }
 }
 
-function SkeletonCard({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded-2xl bg-slate-200 ${className}`} />
+interface FeedbackItem {
+  id: string
+  summary: string | null
+  submitted_by: string | null
+  department: string | null
+  poll_title: string | null
+  rms_task_id: string | null
+  task_pending: number | null
+  followup_done: number | null
+}
+
+const defaultData: OverviewData = {
+  kpi: { totalPolls: 0, totalPending: 0, totalSuggestions: 0, suggestionsPendingReview: 0, processImprovements: 0, rmsImprovements: 0 },
+  pollBreakdown: { notSentForApproval: 0, approvalPending: 0, activePolls: 0, pollsClosed: 0, resultNotSentSir: 0, resultNotSentVoter: 0 },
+  cadenceBreakdown: { total: 0, monthly: 0, quarterly: 0, biAnnual: 0, annual: 0, scheduledReleased: 0, overdue: 0 },
+  suggestionBreakdown: { total: 0, actionable: 0, pendingForAction: 0, processImproved: 0, nonActionable: 0 },
+  feedbackPending: { rmsTaskRaised: [], actionYetToStart: [], annexurePending: [] },
+  actionReport: { actionTaken: 0, policyImproved: 0, queryReplied: 0, noActionReq: 0, pendingReview: 0, totalItems: 0 },
+}
+
+function BreakdownRow({ label, value, color = 'bg-slate-400' }: { label: string; value: number; color?: string }) {
+  return (
+    <div className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+      <div className="flex items-center gap-2">
+        <span className={`h-2 w-2 rounded-full flex-shrink-0 ${color}`} />
+        <span className="text-sm text-gray-600">{label}</span>
+      </div>
+      <span className="text-sm font-bold text-gray-900">{value}</span>
+    </div>
+  )
+}
+
+function FeedbackCategory({
+  title, items, color, expandedBg,
+}: {
+  title: string
+  items: FeedbackItem[]
+  color: string
+  expandedBg: string
+}) {
+  const [open, setOpen] = useState(false)
+  if (items.length === 0) return null
+  return (
+    <div className="border border-gray-100 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${color}`}>{items.length}</span>
+          <span className="text-sm font-semibold text-gray-800">{title}</span>
+        </div>
+        {open ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+      </button>
+      {open && (
+        <div className={`divide-y divide-gray-100 ${expandedBg}`}>
+          {items.map(item => (
+            <div key={item.id} className="px-4 py-3 grid grid-cols-2 gap-x-4 gap-y-1">
+              <div className="col-span-2">
+                <p className="text-sm font-medium text-gray-800">{item.summary ?? '—'}</p>
+                <p className="text-xs text-gray-500">{item.poll_title ?? ''}{item.department ? ` · ${item.department}` : ''}</p>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                <span className="font-medium">RMS Task ID:</span>
+                <span>{item.rms_task_id ?? 'N/A'}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                <span className="font-medium">Task Pending:</span>
+                <span className={item.task_pending ? 'text-red-600 font-semibold' : 'text-emerald-600'}>
+                  {item.task_pending ? 'Yes' : 'No'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                <span className="font-medium">Follow-up:</span>
+                <span className={item.followup_done ? 'text-emerald-600 font-semibold' : 'text-amber-600'}>
+                  {item.followup_done ? 'Done' : 'Pending'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function DashboardPage() {
-  const [kpi, setKpi] = useState<KPIData>(defaultKPI)
-  const [polls, setPolls] = useState<Poll[]>([])
-  const [regularPolls, setRegularPolls] = useState<RegularPoll[]>([])
+  const router = useRouter()
+  const [data, setData] = useState<OverviewData>(defaultData)
   const [loading, setLoading] = useState(true)
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
 
   const fetchData = useCallback(() =>
-    Promise.all([
-      fetch('/api/kpi').then((r) => r.ok ? r.json() : defaultKPI),
-      fetch('/api/polls').then((r) => r.ok ? r.json() : []),
-      fetch('/api/regular-polls').then((r) => r.ok ? r.json() : []),
-    ]).then(([kpiData, pollsData, regularData]: [KPIData, Poll[], RegularPoll[]]) => {
-      setKpi(kpiData)
-      setPolls(pollsData)
-      setRegularPolls(regularData)
-    }).catch(console.error), [])
+    fetch('/api/overview')
+      .then(r => r.ok ? r.json() : defaultData)
+      .then((d: OverviewData) => setData(d))
+      .catch(console.error)
+  , [])
 
   useEffect(() => {
     fetchData().finally(() => setLoading(false))
-    // Auto-refresh every 60s
     const interval = setInterval(fetchData, 60_000)
     return () => clearInterval(interval)
   }, [fetchData])
 
-  // Apply date range filter to polls (by created_at)
-  const filteredPolls = polls.filter(p => {
-    if (dateFrom) {
-      const from = new Date(dateFrom); from.setHours(0, 0, 0, 0)
-      if (new Date(p.created_at) < from) return false
-    }
-    if (dateTo) {
-      const to = new Date(dateTo); to.setHours(23, 59, 59, 999)
-      if (new Date(p.created_at) > to) return false
-    }
-    return true
-  })
-  const hasDateFilter = dateFrom || dateTo
+  const scrollToFeedback = () => {
+    document.getElementById('feedback-pending')?.scrollIntoView({ behavior: 'smooth' })
+  }
 
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
-  const dueRegularPolls = regularPolls.filter(p => {
-    if (!p.is_active) return false
-    const d = new Date(p.next_run_date); d.setHours(0, 0, 0, 0)
-    return d <= tomorrow
-  })
-  const filteredKpi: KPIData = hasDateFilter ? {
-    totalThisMonth: filteredPolls.filter(p => p.status !== 'ARCHIVED').length,
-    awaitingApproval: filteredPolls.filter(p => p.status === 'AWAITING_APPROVAL').length,
-    active: filteredPolls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)).length,
-    closedThisMonth: filteredPolls.filter(p => ['CLOSED', 'RESULTS_UPLOADED'].includes(p.status)).length,
-    rmsTasksCreated: filteredPolls.filter(p => p.rms_task_id != null).length,
-    resultsUploaded: filteredPolls.filter(p => p.results_uploaded_at != null).length,
-  } : kpi
-
-  const recentPolls = filteredPolls.filter(p => p.status !== 'ARCHIVED').slice(0, 6)
-  const overdueApprovals = filteredPolls.filter(
-    (p) => p.status === 'AWAITING_APPROVAL' && isApprovalOverdue(p.updated_at)
-  )
-  const activePolls = filteredPolls.filter((p) => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
-
-  // Polls ready for result collection: reminder sent > 24h ago OR sent > 48h ago with no reminder
-  const now = Date.now()
-  const readyToCollect = filteredPolls.filter((p) => {
-    if (!['SENT', 'REMINDER_SENT'].includes(p.status)) return false
-    if (p.reminder_sent_at) {
-      return (now - new Date(p.reminder_sent_at).getTime()) / 3_600_000 > 24
-    }
-    if (p.sent_at) {
-      return (now - new Date(p.sent_at).getTime()) / 3_600_000 > 48
-    }
-    return false
-  })
+  const kpiCards = [
+    {
+      label: 'Total Polls',
+      value: data.kpi.totalPolls,
+      icon: ClipboardList,
+      color: 'text-purple-600',
+      iconBg: 'bg-purple-50',
+      onClick: undefined,
+    },
+    {
+      label: 'Total Pending Polls',
+      value: data.kpi.totalPending,
+      icon: Clock,
+      color: 'text-cyan-600',
+      iconBg: 'bg-cyan-50',
+      onClick: () => router.push('/poll-requests'),
+    },
+    {
+      label: 'Total Suggestions Received',
+      value: data.kpi.totalSuggestions,
+      icon: MessageSquare,
+      color: 'text-blue-600',
+      iconBg: 'bg-blue-50',
+      onClick: undefined,
+    },
+    {
+      label: 'Suggestions Pending Review',
+      value: data.kpi.suggestionsPendingReview,
+      icon: BarChart3,
+      color: 'text-amber-600',
+      iconBg: 'bg-amber-50',
+      onClick: scrollToFeedback,
+    },
+    {
+      label: 'Process Improvement',
+      value: data.kpi.processImprovements,
+      icon: TrendingUp,
+      color: 'text-emerald-600',
+      iconBg: 'bg-emerald-50',
+      onClick: undefined,
+    },
+    {
+      label: 'RMS Improvement',
+      value: data.kpi.rmsImprovements,
+      icon: Zap,
+      color: 'text-teal-600',
+      iconBg: 'bg-teal-50',
+      onClick: undefined,
+    },
+  ]
 
   if (loading) {
     return (
-      <div className="space-y-5">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} className="h-28" />)}
-        </div>
-        <div className="grid gap-4 lg:grid-cols-3">
-          <SkeletonCard className="h-72 lg:col-span-2" />
-          <SkeletonCard className="h-72" />
-        </div>
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-cyan-500" />
       </div>
     )
   }
 
   return (
     <div className="space-y-5">
-      {/* KPI row */}
-      <KPICards data={filteredKpi} filtered={!!hasDateFilter} />
-
-      {/* Date range filter */}
-      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white shadow-sm px-4 py-2.5">
-        <CalendarRange className="h-4 w-4 text-slate-400 flex-shrink-0" />
-        <span className="text-xs text-slate-400 flex-shrink-0">From</span>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={e => setDateFrom(e.target.value)}
-          className="bg-transparent text-sm text-slate-700 [color-scheme:light] outline-none cursor-pointer"
-        />
-        <span className="text-xs text-slate-400 flex-shrink-0">To</span>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={e => setDateTo(e.target.value)}
-          min={dateFrom || undefined}
-          className="bg-transparent text-sm text-slate-700 [color-scheme:light] outline-none cursor-pointer"
-        />
-        {hasDateFilter && (
-          <button
-            onClick={() => { setDateFrom(''); setDateTo('') }}
-            className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        {kpiCards.map(({ label, value, icon: Icon, color, iconBg, onClick }) => (
+          <div
+            key={label}
+            onClick={onClick}
+            className={`rounded-2xl bg-white px-4 py-5 shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-transform duration-200 hover:-translate-y-0.5 ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-cyan-300' : ''}`}
           >
-            <X className="h-3.5 w-3.5" /> Clear
-          </button>
-        )}
+            <div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl ${iconBg}`}>
+              <Icon className={`h-5 w-5 ${color}`} />
+            </div>
+            <div className={`text-3xl font-bold ${color}`}>{value}</div>
+            <p className="mt-1 text-sm font-medium text-gray-700">{label}</p>
+            {onClick && <p className="text-xs text-gray-400 mt-0.5">Click to view →</p>}
+          </div>
+        ))}
       </div>
 
-      {/* Due regular polls alert */}
-      {dueRegularPolls.length > 0 && (
-        <div className="rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
-          <div className="flex items-center gap-2 mb-2">
-            <CalendarClock className="h-4 w-4 text-amber-600" />
-            <span className="font-semibold text-amber-800">
-              {dueRegularPolls.length} regular poll{dueRegularPolls.length > 1 ? 's' : ''} auto-releasing soon — pause to skip
-            </span>
-            <Link href="/regular-polls" className="ml-auto text-xs text-amber-700 hover:text-amber-900 underline">
-              Go to Regular Polls →
-            </Link>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {dueRegularPolls.map(p => (
-              <Link key={p.id} href="/regular-polls"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 border border-amber-200 px-3 py-1.5 text-sm font-medium text-amber-800 transition-colors">
-                <CalendarClock className="h-3 w-3" /> {p.name}
-                <span className="text-amber-600 text-xs">({p.frequency})</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Main grid */}
+      {/* 3 Breakdown Tables */}
       <div className="grid gap-4 lg:grid-cols-3">
-
-        {/* Recent polls — wide card */}
-        <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] lg:col-span-2">
-          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-cyan-600" />
-              <h2 className="font-semibold text-gray-900">Recent Polls</h2>
-            </div>
-            <Link href="/polls" className="text-xs font-medium text-cyan-600 hover:text-cyan-700">
-              View all →
-            </Link>
+        {/* Poll Breakdown */}
+        <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+            <ClipboardList className="h-4 w-4 text-purple-500" />
+            <h2 className="font-semibold text-gray-900">Total Polls Breakdown</h2>
           </div>
-          <div className="divide-y divide-gray-50">
-            {recentPolls.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-gray-400">No polls yet. Create your first poll!</p>
-            ) : recentPolls.map((poll) => (
-              <Link key={poll.id} href={`/polls/${poll.id}`} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-900">{poll.topic}</p>
-                  <p className="text-xs text-gray-400">{poll.department} · {formatRelative(poll.created_at)}</p>
-                </div>
-                <StatusBadge status={poll.status} />
-                <ExternalLink className="h-3.5 w-3.5 text-gray-300 flex-shrink-0" />
-              </Link>
-            ))}
-          </div>
+          <BreakdownRow label="Not Sent for Approval" value={data.pollBreakdown.notSentForApproval} color="bg-gray-400" />
+          <BreakdownRow label="Approval Pending" value={data.pollBreakdown.approvalPending} color="bg-amber-400" />
+          <BreakdownRow label="Active Polls" value={data.pollBreakdown.activePolls} color="bg-emerald-400" />
+          <BreakdownRow label="Polls Closed" value={data.pollBreakdown.pollsClosed} color="bg-slate-400" />
+          <BreakdownRow label="Result Not Sent to Sir" value={data.pollBreakdown.resultNotSentSir} color="bg-orange-400" />
+          <BreakdownRow label="Result Not Sent to Voter" value={data.pollBreakdown.resultNotSentVoter} color="bg-red-400" />
         </div>
 
-        {/* Right column */}
-        <div className="space-y-4">
-
-          {/* Ready to collect — 48h since release */}
-          {readyToCollect.length > 0 && (
-            <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
-              <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-4">
-                <Bell className="h-4 w-4 text-violet-500" />
-                <h2 className="font-semibold text-gray-900">Ready to Collect Results</h2>
-                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">
-                  {readyToCollect.length}
-                </span>
-              </div>
-              <ul className="divide-y divide-gray-50">
-                {readyToCollect.map((p) => (
-                  <li key={p.id}>
-                    <Link href={`/polls/${p.id}`} className="flex flex-col px-5 py-3 hover:bg-gray-50 transition-colors">
-                      <span className="truncate text-sm font-medium text-gray-900">{p.topic}</span>
-                      <span className="text-xs text-violet-600">
-                        {p.reminder_sent_at
-                          ? `Reminder sent ${formatRelative(p.reminder_sent_at)}`
-                          : `Released ${formatRelative(p.sent_at)}`}
-                        {' · Close & share results'}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Overdue approvals */}
-          {overdueApprovals.length > 0 && (
-            <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
-              <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-4">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                <h2 className="font-semibold text-gray-900">Overdue Approvals</h2>
-                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-600">
-                  {overdueApprovals.length}
-                </span>
-              </div>
-              <ul className="divide-y divide-gray-50">
-                {overdueApprovals.map((p) => (
-                  <li key={p.id}>
-                    <Link href={`/polls/${p.id}`} className="flex flex-col px-5 py-3 hover:bg-gray-50 transition-colors">
-                      <span className="truncate text-sm font-medium text-gray-900">{p.topic}</span>
-                      <span className="text-xs text-amber-600">Sent {formatRelative(p.updated_at)}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Active polls tracker */}
-          <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-              <h2 className="font-semibold text-gray-900">Live Polls</h2>
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-600">
-                {activePolls.length}
-              </span>
-            </div>
-            {activePolls.length === 0 ? (
-              <p className="px-5 py-6 text-center text-sm text-gray-400">No active polls</p>
-            ) : (
-              <ul className="divide-y divide-gray-50">
-                {activePolls.slice(0, 5).map((p) => (
-                  <li key={p.id}>
-                    <Link href={`/polls/${p.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
-                      <span className="h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-900">{p.topic}</p>
-                        <p className="text-xs text-gray-400">Sent {formatRelative(p.sent_at)}</p>
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
+        {/* Cadence Breakdown */}
+        <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+            <CalendarClock className="h-4 w-4 text-cyan-500" />
+            <h2 className="font-semibold text-gray-900">Cadence Breakdown</h2>
           </div>
-
-          {/* Status breakdown */}
-          <div className="rounded-2xl bg-white px-5 py-4 shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
-            <h2 className="mb-3 font-semibold text-gray-900">Pipeline</h2>
-            <div className="space-y-2.5">
-              {[
-                { label: 'Draft', count: filteredPolls.filter(p => p.status === 'DRAFT').length, color: 'bg-gray-300' },
-                { label: 'Awaiting Approval', count: filteredPolls.filter(p => p.status === 'AWAITING_APPROVAL').length, color: 'bg-amber-400' },
-                { label: 'Approved', count: filteredPolls.filter(p => p.status === 'APPROVED').length, color: 'bg-green-400' },
-                { label: 'Sent / Active', count: filteredPolls.filter(p => ['SENT','REMINDER_SENT'].includes(p.status)).length, color: 'bg-violet-400' },
-                { label: 'Closed', count: filteredPolls.filter(p => ['CLOSED','RESULTS_UPLOADED'].includes(p.status)).length, color: 'bg-slate-400' },
-              ].map(({ label, count, color }) => (
-                <div key={label} className="flex items-center gap-3">
-                  <span className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${color}`} />
-                  <span className="flex-1 text-xs text-gray-600">{label}</span>
-                  <span className="text-xs font-semibold text-gray-900">{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <BreakdownRow label="Total Cadence" value={data.cadenceBreakdown.total} color="bg-cyan-400" />
+          <BreakdownRow label="Monthly" value={data.cadenceBreakdown.monthly} color="bg-blue-400" />
+          <BreakdownRow label="Quarterly" value={data.cadenceBreakdown.quarterly} color="bg-indigo-400" />
+          {data.cadenceBreakdown.biAnnual > 0 && <BreakdownRow label="Bi-Annual" value={data.cadenceBreakdown.biAnnual} color="bg-violet-400" />}
+          {data.cadenceBreakdown.annual > 0 && <BreakdownRow label="Annual" value={data.cadenceBreakdown.annual} color="bg-purple-400" />}
+          <BreakdownRow label="Scheduled & Released" value={data.cadenceBreakdown.scheduledReleased} color="bg-emerald-400" />
+          <BreakdownRow label="Overdue" value={data.cadenceBreakdown.overdue} color="bg-red-400" />
         </div>
+
+        {/* Suggestion Breakdown */}
+        <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+            <MessageSquare className="h-4 w-4 text-blue-500" />
+            <h2 className="font-semibold text-gray-900">Suggestion Breakdown</h2>
+          </div>
+          <BreakdownRow label="Total" value={data.suggestionBreakdown.total} color="bg-blue-400" />
+          <BreakdownRow label="Actionable" value={data.suggestionBreakdown.actionable} color="bg-orange-400" />
+          <BreakdownRow label="Pending for Action" value={data.suggestionBreakdown.pendingForAction} color="bg-amber-400" />
+          <BreakdownRow label="Process Improved" value={data.suggestionBreakdown.processImproved} color="bg-emerald-400" />
+          <BreakdownRow label="Non-Actionable" value={data.suggestionBreakdown.nonActionable} color="bg-slate-400" />
+        </div>
+      </div>
+
+      {/* Action Report Widget */}
+      <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
+        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+          <CheckCircle className="h-4 w-4 text-emerald-500" />
+          <h2 className="font-semibold text-gray-900">Action Report</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {[
+            { label: 'Action Taken', value: data.actionReport.actionTaken, color: 'text-emerald-600', bg: 'bg-emerald-50', onClick: undefined },
+            { label: 'Policy Improved', value: data.actionReport.policyImproved, color: 'text-blue-600', bg: 'bg-blue-50', onClick: undefined },
+            { label: 'Query Replied', value: data.actionReport.queryReplied, color: 'text-cyan-600', bg: 'bg-cyan-50', onClick: undefined },
+            { label: 'No Action Req.', value: data.actionReport.noActionReq, color: 'text-slate-600', bg: 'bg-slate-50', onClick: undefined },
+            { label: 'Pending Review', value: data.actionReport.pendingReview, color: 'text-amber-600', bg: 'bg-amber-50', onClick: scrollToFeedback },
+            { label: 'Total Items', value: data.actionReport.totalItems, color: 'text-purple-600', bg: 'bg-purple-50', onClick: undefined },
+          ].map(({ label, value, color, bg, onClick }) => (
+            <div key={label} onClick={onClick}
+              className={`rounded-xl px-4 py-3 text-center ${bg} ${onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}>
+              <p className={`text-2xl font-bold ${color}`}>{value}</p>
+              <p className={`text-xs font-medium mt-1 ${color}`}>{label}</p>
+              {onClick && <p className="text-xs text-gray-400 mt-0.5">↓ below</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Feedback Pending for Review */}
+      <div id="feedback-pending" className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
+        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+          <MessageSquare className="h-4 w-4 text-amber-500" />
+          <h2 className="font-semibold text-gray-900">Feedback Pending for Review</h2>
+          <span className="ml-auto text-xs text-gray-400">
+            {data.feedbackPending.rmsTaskRaised.length + data.feedbackPending.actionYetToStart.length + data.feedbackPending.annexurePending.length} items
+          </span>
+        </div>
+        {data.feedbackPending.rmsTaskRaised.length === 0 &&
+         data.feedbackPending.actionYetToStart.length === 0 &&
+         data.feedbackPending.annexurePending.length === 0 ? (
+          <p className="text-center py-8 text-sm text-gray-400">No feedback pending for review</p>
+        ) : (
+          <div className="space-y-2">
+            <FeedbackCategory
+              title="RMS Task Raised"
+              items={data.feedbackPending.rmsTaskRaised}
+              color="bg-orange-100 text-orange-700"
+              expandedBg="bg-orange-50"
+            />
+            <FeedbackCategory
+              title="Action Yet to Start"
+              items={data.feedbackPending.actionYetToStart}
+              color="bg-amber-100 text-amber-700"
+              expandedBg="bg-amber-50"
+            />
+            <FeedbackCategory
+              title="Annexure Pending from Sir"
+              items={data.feedbackPending.annexurePending}
+              color="bg-red-100 text-red-700"
+              expandedBg="bg-red-50"
+            />
+          </div>
+        )}
       </div>
     </div>
   )

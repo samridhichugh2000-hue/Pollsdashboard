@@ -338,13 +338,13 @@ export async function createRegularPoll(fields: Omit<RegularPoll, 'id' | 'create
   const id = uuidv4()
   const now = new Date().toISOString()
   await getDb().execute({
-    sql: `INSERT INTO regular_polls (id, name, description, frequency, scheduled_day, department, subject, draft_email_body, questions, recipients, ms_form_link, next_run_date, last_run_date, is_active, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO regular_polls (id, name, description, frequency, scheduled_day, department, subject, draft_email_body, questions, recipients, ms_form_link, next_run_date, last_run_date, is_active, auto_approve, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       id, fields.name, fields.description ?? null, fields.frequency, fields.scheduled_day,
       fields.department, fields.subject, fields.draft_email_body, fields.questions,
       fields.recipients, fields.ms_form_link ?? null, fields.next_run_date,
-      fields.last_run_date ?? null, fields.is_active ? 1 : 0, now, now,
+      fields.last_run_date ?? null, fields.is_active ? 1 : 0, fields.auto_approve ? 1 : 0, now, now,
     ],
   })
   return (await getRegularPollById(id))!
@@ -353,7 +353,7 @@ export async function createRegularPoll(fields: Omit<RegularPoll, 'id' | 'create
 export async function updateRegularPoll(id: string, fields: Partial<Omit<RegularPoll, 'id' | 'created_at'>>): Promise<void> {
   const now = new Date().toISOString()
   const allowed = ['name', 'description', 'frequency', 'scheduled_day', 'department', 'subject',
-    'draft_email_body', 'questions', 'recipients', 'ms_form_link', 'next_run_date', 'last_run_date', 'is_active']
+    'draft_email_body', 'questions', 'recipients', 'ms_form_link', 'next_run_date', 'last_run_date', 'is_active', 'auto_approve']
   const setClauses: string[] = ['updated_at = ?']
   const args: (string | number | null)[] = [now]
   for (const [key, value] of Object.entries(fields)) {

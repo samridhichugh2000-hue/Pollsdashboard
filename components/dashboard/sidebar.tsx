@@ -10,14 +10,19 @@ import {
   Settings,
   CheckSquare,
   CalendarClock,
+  MessageSquare,
+  Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-  { href: '/polls', label: 'Polls', icon: ClipboardList },
-  { href: '/regular-polls', label: 'Regular Polls', icon: CalendarClock },
-  { href: '/results', label: 'Results & Follow-up', icon: BarChart3 },
+  { href: '/poll-requests', label: 'Poll Requests', icon: ClipboardList },
+  { href: '/polls', label: 'Polls', icon: CheckSquare },
+  { href: '/feedback', label: 'Feedback', icon: MessageSquare },
+  { href: '/cadence', label: 'Poll Cadence', icon: CalendarClock },
+  { href: '/participation', label: 'Participation', icon: Users },
+  { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/archived', label: 'Archived', icon: Archive },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
@@ -44,7 +49,9 @@ export function Sidebar() {
           const Icon = item.icon
           const isActive = item.href === '/dashboard'
             ? pathname === '/dashboard'
-            : pathname.startsWith(item.href)
+            : item.href === '/polls'
+              ? pathname === '/polls' || pathname.startsWith('/polls/')
+              : pathname.startsWith(item.href)
 
           return (
             <Link

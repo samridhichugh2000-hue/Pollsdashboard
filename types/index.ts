@@ -128,11 +128,13 @@ export interface AuthorizedSender {
   name: string
 }
 
+export type RegularPollFrequency = 'monthly' | 'quarterly' | 'bi-annual' | 'annual'
+
 export interface RegularPoll {
   id: string
   name: string
   description?: string | null
-  frequency: 'monthly' | 'quarterly'
+  frequency: RegularPollFrequency
   scheduled_day: number
   department: string
   subject: string
@@ -143,6 +145,7 @@ export interface RegularPoll {
   next_run_date: string // YYYY-MM-DD
   last_run_date?: string | null
   is_active: number // 1 or 0 (SQLite boolean)
+  auto_approve: number // 1 or 0 (SQLite boolean)
   created_at: string
   updated_at: string
 }

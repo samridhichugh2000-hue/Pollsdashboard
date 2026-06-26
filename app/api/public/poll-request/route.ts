@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
           next_run_date: nextRunDate,
           last_run_date: null,
           is_active: 1,
+          auto_approve: 0,
         })
       } catch (err) {
         // Non-fatal — poll record is already created; log for debugging

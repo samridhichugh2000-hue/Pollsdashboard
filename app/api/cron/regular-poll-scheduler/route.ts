@@ -3,9 +3,10 @@ import { getDueRegularPolls, updateRegularPoll, createPoll, updatePoll, updatePo
 import { sendEmailGetId } from '@/lib/graph'
 import { buildPollEmailHtml, formatDate } from '@/lib/utils'
 
-function advanceNextRunDate(current: string, frequency: 'monthly' | 'quarterly'): string {
+function advanceNextRunDate(current: string, frequency: string): string {
   const date = new Date(current)
-  date.setMonth(date.getMonth() + (frequency === 'quarterly' ? 3 : 1))
+  const months = frequency === 'quarterly' ? 3 : frequency === 'bi-annual' ? 6 : frequency === 'annual' ? 12 : 1
+  date.setMonth(date.getMonth() + months)
   return date.toISOString().split('T')[0]
 }
 

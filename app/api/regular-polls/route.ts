@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAllRegularPolls, createRegularPoll } from '@/lib/db/queries'
+import type { RegularPollFrequency } from '@/types'
 
-function computeNextRunDate(frequency: 'monthly' | 'quarterly', scheduledDay: number): string {
+function computeNextRunDate(frequency: RegularPollFrequency, scheduledDay: number): string {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const thisMonth = new Date(today.getFullYear(), today.getMonth(), scheduledDay)
   if (thisMonth >= today) return thisMonth.toISOString().split('T')[0]
-  // Already passed this period — advance
   const next = new Date(thisMonth)
-  next.setMonth(next.getMonth() + (frequency === 'quarterly' ? 3 : 1))
+  const months = frequency === 'quarterly' ? 3 : frequency === 'bi-annual' ? 6 : frequency === 'annual' ? 12 : 1
+  next.setMonth(next.getMonth() + months)
   return next.toISOString().split('T')[0]
 }
 
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const freq = frequency as 'monthly' | 'quarterly'
+  const freq = frequency as RegularPollFrequency
   const day = Number(scheduled_day)
   const appUrl = process.env.NEXTAUTH_URL?.replace('http://localhost:3000', 'https://pollsdashboard.vercel.app') ?? 'https://pollsdashboard.vercel.app'
 
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
     next_run_date: computeNextRunDate(freq, day),
     last_run_date: null,
     is_active: 1,
+    auto_approve: 0,
   })
 
   return NextResponse.json(poll, { status: 201 })

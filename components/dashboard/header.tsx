@@ -10,9 +10,25 @@ interface HeaderProps {
   userRole?: string
 }
 
+function getQuarterLabel(): string {
+  const now = new Date()
+  const month = now.getMonth() // 0-based
+  const year = now.getFullYear()
+  const quarters = [
+    { months: [0, 1, 2], label: 'Jan – Mar' },
+    { months: [3, 4, 5], label: 'Apr – Jun' },
+    { months: [6, 7, 8], label: 'Jul – Sep' },
+    { months: [9, 10, 11], label: 'Oct – Dec' },
+  ]
+  const q = quarters.find(q => q.months.includes(month))!
+  const qNum = quarters.indexOf(q) + 1
+  return `Q${qNum} · ${q.label} ${year}`
+}
+
 export function Header({ title, userName, userRole }: HeaderProps) {
   const now = new Date()
   const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening'
+  const quarterLabel = getQuarterLabel()
   const [query, setQuery] = useState('')
   const router = useRouter()
 
@@ -31,6 +47,11 @@ export function Header({ title, userName, userRole }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Quarter label */}
+        <span className="hidden md:inline-flex items-center rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600">
+          {quarterLabel}
+        </span>
+
         {/* Search */}
         <form onSubmit={handleSearch} className="flex h-9 items-center gap-2 rounded-xl bg-slate-100 px-3 focus-within:bg-slate-200 transition-colors">
           <Search className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
