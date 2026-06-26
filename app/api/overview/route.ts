@@ -6,9 +6,9 @@ export async function GET() {
 
   const [pollsRes, regularPollsRes, feedbackRes, kpiRes] = await Promise.all([
     db.execute({ sql: 'SELECT id, status, rms_task_id, results_uploaded_at, closed_at FROM polls WHERE status != ? ORDER BY created_at DESC', args: ['ARCHIVED'] }),
-    db.execute('SELECT id, frequency, is_active, next_run_date, last_run_date FROM regular_polls'),
-    db.execute('SELECT id, type, status, category, rms_task_id, task_pending, followup_done, summary, submitted_by, department, poll_title FROM feedback_items ORDER BY created_at DESC'),
-    db.execute("SELECT process_improvements, rms_improvements, policy_announced FROM kpi_data WHERE id = 'singleton'"),
+    db.execute('SELECT id, frequency, is_active, next_run_date, last_run_date FROM regular_polls').catch(() => ({ rows: [] })),
+    db.execute('SELECT id, type, status, category, rms_task_id, task_pending, followup_done, summary, submitted_by, department, poll_title FROM feedback_items ORDER BY created_at DESC').catch(() => ({ rows: [] })),
+    db.execute("SELECT process_improvements, rms_improvements, policy_announced FROM kpi_data WHERE id = 'singleton'").catch(() => ({ rows: [] })),
   ])
 
   const polls = pollsRes.rows as unknown as Array<{
