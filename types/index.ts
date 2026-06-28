@@ -169,7 +169,7 @@ export const STATUS_LABELS: Record<PollStatus, string> = {
   REMINDER_SENT: 'Reminder Sent',
   RMS_PUBLISHED: 'RMS Published',
   CLOSED: 'Closed',
-  RESULTS_UPLOADED: 'Results Shared',
+  RESULTS_UPLOADED: 'Koenig News',
   ARCHIVED: 'Archived',
   REJECTED: 'Rejected',
   RMS_TASK_FAILED: 'RMS Task Failed',
