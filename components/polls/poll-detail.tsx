@@ -1131,7 +1131,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 </div>
               ) : (() => {
                 // Derive question headers from first entry with answers
-                const qHeaders = entries[0]?.answers.map((a, qi) => `Q${qi + 1}`) ?? []
+                const qHeaders = entries[0]?.answers.map((a, qi) => ({ label: `Q${qi + 1}`, question: a.question })) ?? []
 
                 return (
                   <div className="overflow-x-auto rounded-xl border border-gray-200">
@@ -1140,7 +1140,10 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                         <tr className="bg-gray-50 border-b border-gray-200">
                           <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Emp Name</th>
                           {qHeaders.map(q => (
-                            <th key={q} className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide">{q}</th>
+                            <th key={q.label} className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide min-w-[160px]">
+                              <span className="text-gray-700">{q.label}</span>
+                              <p className="text-[10px] font-normal normal-case tracking-normal text-gray-400 mt-0.5 whitespace-normal">{q.question}</p>
+                            </th>
                           ))}
                           <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Classify</th>
                           <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">RMS Actions</th>
@@ -1166,12 +1169,9 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
 
                               {/* Q1…Qn answers */}
                               {entry.answers.map((a, ai) => (
-                                <td key={ai} className="px-3 py-3 max-w-[180px]">
-                                  <p className="text-gray-400 font-medium mb-0.5 text-[10px] uppercase tracking-wide truncate" title={a.question}>{a.question}</p>
-                                  <p className="text-gray-700 leading-snug" title={a.answer}>
-                                    {a.answer
-                                      ? (a.answer.length > 80 ? a.answer.slice(0, 80) + '…' : a.answer)
-                                      : <span className="italic text-gray-300">—</span>}
+                                <td key={ai} className="px-3 py-3 min-w-[160px]">
+                                  <p className="text-gray-700 leading-snug whitespace-pre-wrap">
+                                    {a.answer || <span className="italic text-gray-300">—</span>}
                                   </p>
                                 </td>
                               ))}
