@@ -6,8 +6,20 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ClipboardList, Clock, MessageSquare, TrendingUp, BarChart3, Zap,
-  CalendarClock, ChevronDown, ChevronUp, Loader2
+  CalendarClock, ChevronDown, ChevronUp, Loader2, ArrowRight
 } from 'lucide-react'
+import Link from 'next/link'
+
+interface PendingPoll {
+  id: string
+  pollNo: string
+  topic: string
+  requestedBy: string
+  department: string
+  source: string
+  createdAt: string
+  status: string
+}
 
 interface OverviewData {
   kpi: {
@@ -47,14 +59,7 @@ interface OverviewData {
     actionYetToStart: FeedbackItem[]
     annexurePending: FeedbackItem[]
   }
-  actionReport: {
-    actionTaken: number
-    policyImproved: number
-    queryReplied: number
-    noActionReq: number
-    pendingReview: number
-    totalItems: number
-  }
+  pendingPolls: PendingPoll[]
 }
 
 interface FeedbackItem {
@@ -74,7 +79,7 @@ const defaultData: OverviewData = {
   cadenceBreakdown: { total: 0, monthly: 0, quarterly: 0, biAnnual: 0, annual: 0, scheduledReleased: 0, overdue: 0 },
   suggestionBreakdown: { total: 0, actionable: 0, pendingForAction: 0, processImproved: 0, nonActionable: 0 },
   feedbackPending: { rmsTaskRaised: [], actionYetToStart: [], annexurePending: [] },
-  actionReport: { actionTaken: 0, policyImproved: 0, queryReplied: 0, noActionReq: 0, pendingReview: 0, totalItems: 0 },
+  pendingPolls: [],
 }
 
 function BreakdownRow({ label, value, color = 'bg-slate-400', href }: { label: string; value: number; color?: string; href?: string }) {
@@ -291,6 +296,68 @@ export default function DashboardPage() {
           <BreakdownRow label="Non-Actionable" value={data.suggestionBreakdown.nonActionable} color="bg-slate-400" />
         </div>
       </div>
+
+      {/* Total Pending Polls Table */}
+      {data.pendingPolls.length > 0 && (
+        <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-cyan-500" />
+              <h2 className="font-semibold text-gray-900">Total Pending Polls</h2>
+              <span className="text-xs font-semibold bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full">{data.pendingPolls.length}</span>
+            </div>
+            <Link href="/poll-requests" className="flex items-center gap-1 text-xs text-cyan-600 hover:text-cyan-800 font-medium transition-colors">
+              View all <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                  <th className="text-left pb-2 pr-4 font-semibold">Poll No.</th>
+                  <th className="text-left pb-2 pr-4 font-semibold">Request Title</th>
+                  <th className="text-left pb-2 pr-4 font-semibold">Requester</th>
+                  <th className="text-left pb-2 pr-4 font-semibold">Dept.</th>
+                  <th className="text-left pb-2 pr-4 font-semibold">Source</th>
+                  <th className="text-left pb-2 pr-4 font-semibold">Date</th>
+                  <th className="text-left pb-2 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {data.pendingPolls.map(p => (
+                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-2.5 pr-4">
+                      <span className="text-xs font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full whitespace-nowrap">{p.pollNo}</span>
+                    </td>
+                    <td className="py-2.5 pr-4 max-w-[200px]">
+                      <span className="text-gray-800 font-medium truncate block" title={p.topic}>{p.topic}</span>
+                    </td>
+                    <td className="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{p.requestedBy}</td>
+                    <td className="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{p.department}</td>
+                    <td className="py-2.5 pr-4">
+                      {p.source === 'email'
+                        ? <span className="text-xs font-medium bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">Mailbox</span>
+                        : <span className="text-xs font-medium bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full">Form</span>}
+                    </td>
+                    <td className="py-2.5 pr-4 text-gray-500 whitespace-nowrap text-xs">
+                      {new Date(p.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="py-2.5">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        p.status === 'DRAFT' ? 'bg-gray-100 text-gray-600' :
+                        p.status === 'AWAITING_APPROVAL' ? 'bg-amber-100 text-amber-700' :
+                        p.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' :
+                        p.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
+                        'bg-slate-100 text-slate-600'
+                      }`}>{p.status.replace(/_/g, ' ')}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Feedback Pending for Review */}
       <div id="feedback-pending" className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">

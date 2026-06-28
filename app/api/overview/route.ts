@@ -5,7 +5,7 @@ export async function GET() {
   const db = getDb()
 
   const [pollsRes, regularPollsRes, feedbackRes, kpiRes, responsesRes] = await Promise.all([
-    db.execute({ sql: 'SELECT id, status, rms_task_id, results_uploaded_at, closed_at FROM polls WHERE status != ? ORDER BY created_at DESC', args: ['ARCHIVED'] }),
+    db.execute({ sql: 'SELECT id, topic, status, source, requested_by, department, created_at, rms_task_id, results_uploaded_at, closed_at FROM polls WHERE status != ? ORDER BY created_at DESC', args: ['ARCHIVED'] }),
     db.execute('SELECT id, frequency, is_active, next_run_date, last_run_date FROM regular_polls').catch(() => ({ rows: [] })),
     db.execute('SELECT id, type, status, category, rms_task_id, task_pending, followup_done, summary, submitted_by, department, poll_title FROM feedback_items ORDER BY created_at DESC').catch(() => ({ rows: [] })),
     db.execute("SELECT process_improvements, rms_improvements, policy_announced FROM kpi_data WHERE id = 'singleton'").catch(() => ({ rows: [] })),
@@ -14,7 +14,12 @@ export async function GET() {
 
   const polls = pollsRes.rows as unknown as Array<{
     id: string
+    topic: string
     status: string
+    source: string | null
+    requested_by: string | null
+    department: string | null
+    created_at: string
     rms_task_id: string | null
     results_uploaded_at: string | null
     closed_at: string | null
@@ -110,6 +115,21 @@ export async function GET() {
   const pendingReview = pendingForAction
   const totalItems = totalSuggestions
 
+  // Pending polls list for table
+  const allSorted = [...polls].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  const pendingPolls = polls
+    .filter(p => PENDING_STATUSES.includes(p.status))
+    .map(p => ({
+      id: p.id,
+      pollNo: `POLL-${new Date(p.created_at).getFullYear()}-${String(allSorted.findIndex(s => s.id === p.id) + 1).padStart(3, '0')}`,
+      topic: p.topic,
+      requestedBy: p.requested_by ?? '—',
+      department: p.department ?? '—',
+      source: p.source ?? 'dashboard',
+      createdAt: p.created_at,
+      status: p.status,
+    }))
+
   return NextResponse.json({
     kpi: {
       totalPolls,
@@ -148,13 +168,6 @@ export async function GET() {
       actionYetToStart,
       annexurePending,
     },
-    actionReport: {
-      actionTaken,
-      policyImproved,
-      queryReplied,
-      noActionReq,
-      pendingReview,
-      totalItems,
-    },
+    pendingPolls,
   })
 }
