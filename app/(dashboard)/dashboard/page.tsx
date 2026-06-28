@@ -296,31 +296,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Action Report Widget */}
-      <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
-        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-          <CheckCircle className="h-4 w-4 text-emerald-500" />
-          <h2 className="font-semibold text-gray-900">Action Report</h2>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {[
-            { label: 'Action Taken', value: data.actionReport.actionTaken, color: 'text-emerald-600', bg: 'bg-emerald-50', onClick: undefined },
-            { label: 'Policy Improved', value: data.actionReport.policyImproved, color: 'text-blue-600', bg: 'bg-blue-50', onClick: undefined },
-            { label: 'Query Replied', value: data.actionReport.queryReplied, color: 'text-cyan-600', bg: 'bg-cyan-50', onClick: undefined },
-            { label: 'No Action Req.', value: data.actionReport.noActionReq, color: 'text-slate-600', bg: 'bg-slate-50', onClick: undefined },
-            { label: 'Pending Review', value: data.actionReport.pendingReview, color: 'text-amber-600', bg: 'bg-amber-50', onClick: scrollToFeedback },
-            { label: 'Total Items', value: data.actionReport.totalItems, color: 'text-purple-600', bg: 'bg-purple-50', onClick: undefined },
-          ].map(({ label, value, color, bg, onClick }) => (
-            <div key={label} onClick={onClick}
-              className={`rounded-xl px-4 py-3 text-center ${bg} ${onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}>
-              <p className={`text-2xl font-bold ${color}`}>{value}</p>
-              <p className={`text-xs font-medium mt-1 ${color}`}>{label}</p>
-              {onClick && <p className="text-xs text-gray-400 mt-0.5">↓ below</p>}
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Feedback Pending for Review */}
       <div id="feedback-pending" className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
         <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
