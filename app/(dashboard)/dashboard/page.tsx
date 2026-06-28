@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ClipboardList, Clock, MessageSquare, TrendingUp, BarChart3, Zap,
-  CalendarClock, CheckCircle, ChevronDown, ChevronUp, Loader2
+  CalendarClock, ChevronDown, ChevronUp, Loader2
 } from 'lucide-react'
 
 interface OverviewData {
@@ -168,10 +168,6 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [fetchData])
 
-  const scrollToFeedback = () => {
-    document.getElementById('feedback-pending')?.scrollIntoView({ behavior: 'smooth' })
-  }
-
   const kpiCards = [
     {
       label: 'Total Polls',
@@ -203,7 +199,7 @@ export default function DashboardPage() {
       icon: BarChart3,
       color: 'text-amber-600',
       iconBg: 'bg-amber-50',
-      onClick: scrollToFeedback,
+      onClick: undefined,
     },
     {
       label: 'Process Improvement',
