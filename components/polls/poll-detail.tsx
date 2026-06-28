@@ -1239,8 +1239,10 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                                   placeholder={`Reply to ${entry.respondent ?? 'respondent'}…`}
                                   value={entryReplies[i] ?? ''}
                                   onChange={e => setEntryReplies(p => ({ ...p, [i]: e.target.value }))}
-                                  rows={2}
-                                  className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition resize-none"
+                                  rows={entryReplies[i] ? 4 : 2}
+                                  onFocus={e => { e.currentTarget.rows = 4 }}
+                                  onBlur={e => { if (!e.currentTarget.value) e.currentTarget.rows = 2 }}
+                                  className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition resize-y min-h-[40px]"
                                 />
                                 <button type="button" disabled={sendingReply === i || !entryReplies[i]?.trim()}
                                   onClick={() => void sendReply(i)}
