@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 :root {
   --teal-bg: #0e7490;
   --teal-dark: #0c6478;
@@ -11,8 +13,16 @@ body {
   color: #111827;
 }
 
+.dark body {
+  background: #0f1117;
+  color: #e2e8f0;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.25); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,0.4); }
+
+.dark ::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.4); }
+.dark ::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,0.6); }

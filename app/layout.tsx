@@ -15,8 +15,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
-      <body className={`${inter.className} h-full bg-gray-50`}>{children}</body>
+    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        {/* Default to dark mode; respect saved preference */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){var t=localStorage.getItem('theme')||'dark';if(t==='dark')document.documentElement.classList.add('dark');})()` }} />
+      </head>
+      <body className={`${inter.className} h-full bg-gray-50 dark:bg-[#0f1117]`}>{children}</body>
     </html>
   );
 }

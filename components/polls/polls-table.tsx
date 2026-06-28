@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ExternalLink, Trash2 } from 'lucide-react'
+import { ExternalLink, Trash2, ArchiveRestore } from 'lucide-react'
 import { StatusBadge } from './status-badge'
 import { Button } from '@/components/ui/button'
 import { formatDateTime, formatRelative, isApprovalOverdue } from '@/lib/utils'
@@ -17,9 +17,10 @@ interface PollsTableProps {
   onReject?: (pollId: string) => void
   onRejectExternal?: (pollId: string, reason: string) => void
   onDeleted?: () => void
+  onUnarchived?: () => void
 }
 
-export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, onReject, onRejectExternal, onDeleted }: PollsTableProps) {
+export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, onReject, onRejectExternal, onDeleted, onUnarchived }: PollsTableProps) {
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const [confirmArchive, setConfirmArchive] = useState<string | null>(null)
   const [confirmReject, setConfirmReject] = useState<string | null>(null)
@@ -27,6 +28,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [unarchiving, setUnarchiving] = useState(false)
 
   const allSelected = polls.length > 0 && selected.size === polls.length
   const someSelected = selected.size > 0
@@ -58,6 +60,28 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
       toast.error('Failed to delete polls')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const handleBulkUnarchive = async () => {
+    setUnarchiving(true)
+    try {
+      const res = await fetch('/api/polls', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'BULK_UNARCHIVE', ids: [...selected] }),
+      })
+      if (res.ok) {
+        toast.success(`${selected.size} poll${selected.size > 1 ? 's' : ''} unarchived`)
+        setSelected(new Set())
+        onUnarchived?.()
+      } else {
+        toast.error('Failed to unarchive polls')
+      }
+    } catch {
+      toast.error('Failed to unarchive polls')
+    } finally {
+      setUnarchiving(false)
     }
   }
 
@@ -94,6 +118,14 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                   className="text-xs text-red-400 hover:text-red-600 transition-colors">
                   Clear selection
                 </button>
+                {onUnarchived && (
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                    disabled={unarchiving}
+                    onClick={() => void handleBulkUnarchive()}>
+                    <ArchiveRestore className="h-3.5 w-3.5" />
+                    {unarchiving ? 'Unarchiving…' : 'Unarchive selected'}
+                  </Button>
+                )}
                 <Button variant="destructive" size="sm" className="h-7 text-xs gap-1.5"
                   onClick={() => setConfirmBulkDelete(true)}>
                   <Trash2 className="h-3.5 w-3.5" /> Delete selected
@@ -106,37 +138,37 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
     <div className="overflow-x-auto">
       <table className="min-w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-100">
+          <tr className="border-b border-gray-100 dark:border-slate-700">
             <th className="px-5 py-3 text-left">
               <input type="checkbox" checked={allSelected} onChange={toggleAll}
                 className="h-4 w-4 rounded border-gray-300 text-cyan-600 cursor-pointer" />
             </th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Topic</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Department</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Requested By</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Source</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Status</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Created</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Poll Deadline</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Form</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400"></th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Topic</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Department</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Requested By</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Source</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Status</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Created</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Poll Deadline</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Form</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500"></th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-50">
+        <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
           {polls.map((poll) => {
             const overdue = poll.status === 'AWAITING_APPROVAL' && isApprovalOverdue(poll.updated_at)
 
             return (
-              <tr key={poll.id} className={`hover:bg-gray-50 transition-colors ${selected.has(poll.id) ? 'bg-red-50/50' : ''}`}>
+              <tr key={poll.id} className={`transition-colors ${selected.has(poll.id) ? 'bg-red-50/50 dark:bg-red-900/20' : 'hover:bg-gray-50 dark:hover:bg-slate-700/30'}`}>
                 <td className="px-5 py-3.5">
                   <input type="checkbox" checked={selected.has(poll.id)} onChange={() => toggleOne(poll.id)}
                     className="h-4 w-4 rounded border-gray-300 text-cyan-600 cursor-pointer" />
                 </td>
                 <td className="max-w-[200px] px-5 py-3.5">
-                  <p className="truncate font-medium text-gray-900">{poll.topic}</p>
+                  <p className="truncate font-medium text-gray-900 dark:text-slate-100">{poll.topic}</p>
                   {overdue && <span className="text-xs font-medium text-rose-500">Overdue</span>}
                 </td>
-                <td className="px-5 py-3.5 text-gray-500">{poll.department}</td>
+                <td className="px-5 py-3.5 text-gray-500 dark:text-slate-400">{poll.department}</td>
                 <td className="px-5 py-3.5 text-gray-500 max-w-[140px] truncate">{poll.requested_by}</td>
                 <td className="px-5 py-3.5">
                   <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${

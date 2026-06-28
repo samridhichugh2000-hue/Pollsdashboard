@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,15 +87,15 @@ function BreakdownRow({ label, value, color = 'bg-slate-400', href }: { label: s
   return (
     <div
       onClick={href ? () => router.push(href) : undefined}
-      className={`flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0 ${href ? 'cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors' : ''}`}
+      className={`flex items-center justify-between py-2.5 border-b border-gray-50 dark:border-slate-700/50 last:border-0 ${href ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/40 rounded-lg px-1 -mx-1 transition-colors" : ""}`}
     >
       <div className="flex items-center gap-2">
         <span className={`h-2 w-2 rounded-full flex-shrink-0 ${color}`} />
-        <span className="text-sm text-gray-600">{label}</span>
+        <span className="text-sm text-gray-600 dark:text-slate-300">{label}</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="text-sm font-bold text-gray-900">{value}</span>
-        {href && <span className="text-xs text-gray-300">→</span>}
+        <span className="text-sm font-bold text-gray-900 dark:text-white">{value}</span>
+        {href && <span className="text-xs text-gray-300 dark:text-slate-600">→</span>}
       </div>
     </div>
   )
@@ -112,14 +112,14 @@ function FeedbackCategory({
   const [open, setOpen] = useState(false)
   if (items.length === 0) return null
   return (
-    <div className="border border-gray-100 rounded-xl overflow-hidden">
+    <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-700/40 transition-colors"
       >
         <div className="flex items-center gap-2.5">
           <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${color}`}>{items.length}</span>
-          <span className="text-sm font-semibold text-gray-800">{title}</span>
+          <span className="text-sm font-semibold text-gray-800 dark:text-slate-100">{title}</span>
         </div>
         {open ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
       </button>
@@ -180,7 +180,7 @@ export default function DashboardPage() {
       icon: ClipboardList,
       color: 'text-purple-600',
       iconBg: 'bg-purple-50',
-      onClick: () => router.push('/poll-requests?card=total'),
+      onClick: () => router.push('/polls?card=total'),
     },
     {
       label: 'Total Pending Polls',
@@ -188,7 +188,7 @@ export default function DashboardPage() {
       icon: Clock,
       color: 'text-cyan-600',
       iconBg: 'bg-cyan-50',
-      onClick: () => router.push('/poll-requests'),
+      onClick: () => router.push('/polls'),
     },
     {
       label: 'Total Suggestions Received',
@@ -240,14 +240,14 @@ export default function DashboardPage() {
           <div
             key={label}
             onClick={onClick}
-            className={`rounded-2xl bg-white px-4 py-5 shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-transform duration-200 hover:-translate-y-0.5 ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-cyan-300' : ''}`}
+            className={`rounded-2xl bg-white dark:bg-[#1e2535] px-4 py-5 shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] transition-transform duration-200 hover:-translate-y-0.5 ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-purple-400' : ''}`}
           >
             <div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl ${iconBg}`}>
               <Icon className={`h-5 w-5 ${color}`} />
             </div>
             <div className={`text-3xl font-bold ${color}`}>{value}</div>
-            <p className="mt-1 text-sm font-medium text-gray-700">{label}</p>
-            {onClick && <p className="text-xs text-gray-400 mt-0.5">Click to view →</p>}
+            <p className="mt-1 text-sm font-medium text-gray-700 dark:text-slate-300">{label}</p>
+            {onClick && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Click to view →</p>}
           </div>
         ))}
       </div>
@@ -255,24 +255,24 @@ export default function DashboardPage() {
       {/* 3 Breakdown Tables */}
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Poll Breakdown */}
-        <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
-          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+        <div className="rounded-2xl bg-white dark:bg-[#1e2535] shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] px-5 py-4">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100 dark:border-slate-700">
             <ClipboardList className="h-4 w-4 text-purple-500" />
-            <h2 className="font-semibold text-gray-900">Total Polls Breakdown</h2>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Total Polls Breakdown</h2>
           </div>
-          <BreakdownRow label="Not Sent for Approval" value={data.pollBreakdown.notSentForApproval} color="bg-gray-400"    href="/poll-requests?card=not-sent" />
-          <BreakdownRow label="Approval Pending"       value={data.pollBreakdown.approvalPending}    color="bg-amber-400"   href="/poll-requests?card=approval-pending" />
-          <BreakdownRow label="Active Polls"           value={data.pollBreakdown.activePolls}        color="bg-emerald-400" href="/poll-requests?card=active" />
-          <BreakdownRow label="Polls Closed"           value={data.pollBreakdown.pollsClosed}        color="bg-slate-400"   href="/poll-requests?card=closed" />
-          <BreakdownRow label="Result Not Sent to Sir" value={data.pollBreakdown.resultNotSentSir}   color="bg-orange-400"  href="/poll-requests?card=result-sir" />
-          <BreakdownRow label="Result Not Sent to Voter" value={data.pollBreakdown.resultNotSentVoter} color="bg-red-400"   href="/poll-requests?card=result-voter" />
+          <BreakdownRow label="Not Sent for Approval" value={data.pollBreakdown.notSentForApproval} color="bg-gray-400"    href="/polls?card=not-sent" />
+          <BreakdownRow label="Approval Pending"       value={data.pollBreakdown.approvalPending}    color="bg-amber-400"   href="/polls?card=approval-pending" />
+          <BreakdownRow label="Active Polls"           value={data.pollBreakdown.activePolls}        color="bg-emerald-400" href="/polls?card=active" />
+          <BreakdownRow label="Polls Closed"           value={data.pollBreakdown.pollsClosed}        color="bg-slate-400"   href="/polls?card=closed" />
+          <BreakdownRow label="Result Not Sent to Sir" value={data.pollBreakdown.resultNotSentSir}   color="bg-orange-400"  href="/polls?card=result-sir" />
+          <BreakdownRow label="Result Not Sent to Voter" value={data.pollBreakdown.resultNotSentVoter} color="bg-red-400"   href="/polls?card=result-voter" />
         </div>
 
         {/* Cadence Breakdown */}
-        <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
-          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+        <div className="rounded-2xl bg-white dark:bg-[#1e2535] shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] px-5 py-4">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100 dark:border-slate-700">
             <CalendarClock className="h-4 w-4 text-cyan-500" />
-            <h2 className="font-semibold text-gray-900">Cadence Breakdown</h2>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Cadence Breakdown</h2>
           </div>
           <BreakdownRow label="Total Cadence" value={data.cadenceBreakdown.total} color="bg-cyan-400" />
           <BreakdownRow label="Monthly" value={data.cadenceBreakdown.monthly} color="bg-blue-400" />
@@ -284,10 +284,10 @@ export default function DashboardPage() {
         </div>
 
         {/* Suggestion Breakdown */}
-        <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
-          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+        <div className="rounded-2xl bg-white dark:bg-[#1e2535] shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] px-5 py-4">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100 dark:border-slate-700">
             <MessageSquare className="h-4 w-4 text-blue-500" />
-            <h2 className="font-semibold text-gray-900">Suggestion Breakdown</h2>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Suggestion Breakdown</h2>
           </div>
           <BreakdownRow label="Total" value={data.suggestionBreakdown.total} color="bg-blue-400" />
           <BreakdownRow label="Actionable" value={data.suggestionBreakdown.actionable} color="bg-orange-400" />
@@ -299,21 +299,21 @@ export default function DashboardPage() {
 
       {/* Total Pending Polls Table */}
       {data.pendingPolls.length > 0 && (
-        <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
+        <div className="rounded-2xl bg-white dark:bg-[#1e2535] shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] px-5 py-4">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-cyan-500" />
-              <h2 className="font-semibold text-gray-900">Total Pending Polls</h2>
+              <h2 className="font-semibold text-gray-900 dark:text-white">Total Pending Polls</h2>
               <span className="text-xs font-semibold bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full">{data.pendingPolls.length}</span>
             </div>
-            <Link href="/poll-requests" className="flex items-center gap-1 text-xs text-cyan-600 hover:text-cyan-800 font-medium transition-colors">
+            <Link href="/polls" className="flex items-center gap-1 text-xs text-cyan-600 hover:text-cyan-800 font-medium transition-colors">
               View all <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                <tr className="text-xs text-gray-400 dark:text-slate-500 uppercase tracking-wide border-b border-gray-100 dark:border-slate-700">
                   <th className="text-left pb-2 pr-4 font-semibold">Poll No.</th>
                   <th className="text-left pb-2 pr-4 font-semibold">Request Title</th>
                   <th className="text-left pb-2 pr-4 font-semibold">Requester</th>
@@ -323,23 +323,23 @@ export default function DashboardPage() {
                   <th className="text-left pb-2 font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
                 {data.pendingPolls.map(p => (
-                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
                     <td className="py-2.5 pr-4">
                       <span className="text-xs font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full whitespace-nowrap">{p.pollNo}</span>
                     </td>
                     <td className="py-2.5 pr-4 max-w-[200px]">
-                      <span className="text-gray-800 font-medium truncate block" title={p.topic}>{p.topic}</span>
+                      <span className="text-gray-800 dark:text-slate-200 font-medium truncate block" title={p.topic}>{p.topic}</span>
                     </td>
-                    <td className="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{p.requestedBy}</td>
-                    <td className="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{p.department}</td>
+                    <td className="py-2.5 pr-4 text-gray-600 dark:text-slate-400 whitespace-nowrap">{p.requestedBy}</td>
+                    <td className="py-2.5 pr-4 text-gray-600 dark:text-slate-400 whitespace-nowrap">{p.department}</td>
                     <td className="py-2.5 pr-4">
                       {p.source === 'email'
                         ? <span className="text-xs font-medium bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">Mailbox</span>
                         : <span className="text-xs font-medium bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full">Form</span>}
                     </td>
-                    <td className="py-2.5 pr-4 text-gray-500 whitespace-nowrap text-xs">
+                    <td className="py-2.5 pr-4 text-gray-500 dark:text-slate-500 whitespace-nowrap text-xs">
                       {new Date(p.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="py-2.5">
@@ -360,10 +360,10 @@ export default function DashboardPage() {
       )}
 
       {/* Feedback Pending for Review */}
-      <div id="feedback-pending" className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] px-5 py-4">
-        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+      <div id="feedback-pending" className="rounded-2xl bg-white dark:bg-[#1e2535] shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] px-5 py-4">
+        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100 dark:border-slate-700">
           <MessageSquare className="h-4 w-4 text-amber-500" />
-          <h2 className="font-semibold text-gray-900">Feedback Pending for Review</h2>
+          <h2 className="font-semibold text-gray-900 dark:text-white">Feedback Pending for Review</h2>
           <span className="ml-auto text-xs text-gray-400">
             {data.feedbackPending.rmsTaskRaised.length + data.feedbackPending.actionYetToStart.length + data.feedbackPending.annexurePending.length} items
           </span>
@@ -398,3 +398,4 @@ export default function DashboardPage() {
     </div>
   )
 }
+

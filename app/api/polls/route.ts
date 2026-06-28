@@ -27,6 +27,23 @@ export async function GET() {
   return NextResponse.json(polls)
 }
 
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json() as { action: string; ids: string[] }
+    if (body.action === 'BULK_UNARCHIVE') {
+      const { ids } = body
+      if (!Array.isArray(ids) || ids.length === 0) return NextResponse.json({ error: 'ids required' }, { status: 400 })
+      const ph = ids.map(() => '?').join(', ')
+      await getDb().execute({ sql: `UPDATE polls SET status = 'CLOSED' WHERE id IN (${ph}) AND status = 'ARCHIVED'`, args: ids })
+      return NextResponse.json({ unarchived: ids.length })
+    }
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+  } catch (err) {
+    console.error('Bulk action error:', err)
+    return NextResponse.json({ error: 'Action failed' }, { status: 500 })
+  }
+}
+
 export async function DELETE(req: NextRequest) {
   try {
     const { ids } = await req.json() as { ids: string[] }
