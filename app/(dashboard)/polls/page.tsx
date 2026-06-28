@@ -273,11 +273,12 @@ function PollsContent() {
                   onArchive={handleArchive}
                   onReject={handleReject}
                   onRejectExternal={handleRejectExternal}
+                  onDeleted={() => void fetchPolls()}
                 />
               </TabsContent>
             ))}
             <TabsContent value="closed" className="mt-0">
-              <PollsTable polls={filterByTab('closed')} />
+              <PollsTable polls={filterByTab('closed')} onDeleted={() => void fetchPolls()} />
             </TabsContent>
           </Tabs>
         )}

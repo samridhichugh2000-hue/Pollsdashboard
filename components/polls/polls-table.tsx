@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Trash2 } from 'lucide-react'
 import { StatusBadge } from './status-badge'
 import { Button } from '@/components/ui/button'
 import { formatDateTime, formatRelative, isApprovalOverdue } from '@/lib/utils'
+import { toast } from 'sonner'
 import type { Poll } from '@/types'
 
 interface PollsTableProps {
@@ -15,13 +16,50 @@ interface PollsTableProps {
   onArchive?: (pollId: string) => void
   onReject?: (pollId: string) => void
   onRejectExternal?: (pollId: string, reason: string) => void
+  onDeleted?: () => void
 }
 
-export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, onReject, onRejectExternal }: PollsTableProps) {
+export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, onReject, onRejectExternal, onDeleted }: PollsTableProps) {
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const [confirmArchive, setConfirmArchive] = useState<string | null>(null)
   const [confirmReject, setConfirmReject] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const allSelected = polls.length > 0 && selected.size === polls.length
+  const someSelected = selected.size > 0
+
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(polls.map(p => p.id)))
+  const toggleOne = (id: string) => setSelected(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const handleBulkDelete = async () => {
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/polls', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [...selected] }),
+      })
+      if (res.ok) {
+        toast.success(`${selected.size} poll${selected.size > 1 ? 's' : ''} deleted`)
+        setSelected(new Set())
+        setConfirmBulkDelete(false)
+        onDeleted?.()
+      } else {
+        toast.error('Failed to delete polls')
+      }
+    } catch {
+      toast.error('Failed to delete polls')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   if (polls.length === 0) {
     return (
@@ -32,10 +70,47 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
   }
 
   return (
+    <div>
+      {/* Bulk action toolbar */}
+      {someSelected && (
+        <div className="flex items-center justify-between px-5 py-2.5 bg-red-50 border-b border-red-100">
+          <span className="text-sm font-medium text-red-700">{selected.size} poll{selected.size > 1 ? 's' : ''} selected</span>
+          <div className="flex items-center gap-2">
+            {confirmBulkDelete ? (
+              <>
+                <span className="text-xs text-red-600">Delete {selected.size} poll{selected.size > 1 ? 's' : ''}? This cannot be undone.</span>
+                <Button variant="destructive" size="sm" className="h-7 text-xs" disabled={deleting}
+                  onClick={handleBulkDelete}>
+                  {deleting ? 'Deleting…' : 'Yes, Delete'}
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 text-xs"
+                  onClick={() => setConfirmBulkDelete(false)}>
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => setSelected(new Set())}
+                  className="text-xs text-red-400 hover:text-red-600 transition-colors">
+                  Clear selection
+                </button>
+                <Button variant="destructive" size="sm" className="h-7 text-xs gap-1.5"
+                  onClick={() => setConfirmBulkDelete(true)}>
+                  <Trash2 className="h-3.5 w-3.5" /> Delete selected
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     <div className="overflow-x-auto">
       <table className="min-w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100">
+            <th className="px-5 py-3 text-left">
+              <input type="checkbox" checked={allSelected} onChange={toggleAll}
+                className="h-4 w-4 rounded border-gray-300 text-cyan-600 cursor-pointer" />
+            </th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Topic</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Department</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Requested By</th>
@@ -52,7 +127,11 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
             const overdue = poll.status === 'AWAITING_APPROVAL' && isApprovalOverdue(poll.updated_at)
 
             return (
-              <tr key={poll.id} className="hover:bg-gray-50 transition-colors">
+              <tr key={poll.id} className={`hover:bg-gray-50 transition-colors ${selected.has(poll.id) ? 'bg-red-50/50' : ''}`}>
+                <td className="px-5 py-3.5">
+                  <input type="checkbox" checked={selected.has(poll.id)} onChange={() => toggleOne(poll.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-cyan-600 cursor-pointer" />
+                </td>
                 <td className="max-w-[200px] px-5 py-3.5">
                   <p className="truncate font-medium text-gray-900">{poll.topic}</p>
                   {overdue && <span className="text-xs font-medium text-rose-500">Overdue</span>}
@@ -191,6 +270,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
           })}
         </tbody>
       </table>
+    </div>
     </div>
   )
 }

@@ -153,7 +153,7 @@ function PollRequestsContent() {
                 <X className="h-3.5 w-3.5" /> Clear filter
               </button>
             </div>
-            <PollsTable polls={tablePolls!} {...tableActions} />
+            <PollsTable polls={tablePolls!} {...tableActions} onDeleted={() => void fetchPolls()} />
           </>
         ) : (
           /* No card selected — show normal tabs */
@@ -170,11 +170,11 @@ function PollRequestsContent() {
             </div>
             {(['all', 'inbox', 'via-form', 'active', 'not-sent'] as const).map((tab) => (
               <TabsContent key={tab} value={tab} className="mt-0">
-                <PollsTable polls={filterByTab(polls, tab)} {...tableActions} />
+                <PollsTable polls={filterByTab(polls, tab)} {...tableActions} onDeleted={() => void fetchPolls()} />
               </TabsContent>
             ))}
             <TabsContent value="closed" className="mt-0">
-              <PollsTable polls={filterByTab(polls, 'closed')} />
+              <PollsTable polls={filterByTab(polls, 'closed')} onDeleted={() => void fetchPolls()} />
             </TabsContent>
           </Tabs>
         )}

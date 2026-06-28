@@ -27,6 +27,22 @@ export async function GET() {
   return NextResponse.json(polls)
 }
 
+export async function DELETE(req: NextRequest) {
+  try {
+    const { ids } = await req.json() as { ids: string[] }
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: 'ids array required' }, { status: 400 })
+    }
+    const db = getDb()
+    const placeholders = ids.map(() => '?').join(', ')
+    await db.execute({ sql: `DELETE FROM polls WHERE id IN (${placeholders})`, args: ids })
+    return NextResponse.json({ deleted: ids.length })
+  } catch (err) {
+    console.error('Bulk delete error:', err)
+    return NextResponse.json({ error: 'Failed to delete polls' }, { status: 500 })
+  }
+}
+
 export async function POST(req: NextRequest) {
 
   try {
