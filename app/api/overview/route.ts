@@ -59,7 +59,7 @@ export async function GET() {
   const activePolls = polls.filter(p => ACTIVE_STATUSES.includes(p.status)).length
   const pollsClosed = polls.filter(p => CLOSED_STATUSES.includes(p.status)).length
   const resultNotSentSir = polls.filter(p => CLOSED_STATUSES.includes(p.status) && !p.rms_task_id).length
-  const resultNotSentVoter = polls.filter(p => p.status === 'CLOSED').length // CLOSED = not yet RESULTS_UPLOADED
+  const resultNotSentVoter = polls.filter(p => !CLOSED_STATUSES.includes(p.status)).length // CLOSED = not yet RESULTS_UPLOADED
 
   const totalPolls = polls.length
   const totalPending = polls.filter(p => PENDING_STATUSES.includes(p.status)).length
