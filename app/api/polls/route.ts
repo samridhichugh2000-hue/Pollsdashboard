@@ -34,8 +34,12 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'ids array required' }, { status: 400 })
     }
     const db = getDb()
-    const placeholders = ids.map(() => '?').join(', ')
-    await db.execute({ sql: `DELETE FROM polls WHERE id IN (${placeholders})`, args: ids })
+    const ph = ids.map(() => '?').join(', ')
+    // Delete child rows first to satisfy FK constraints
+    for (const table of ['poll_attachments', 'poll_approvals', 'poll_responses', 'audit_logs', 'poll_approval_tokens']) {
+      await db.execute({ sql: `DELETE FROM ${table} WHERE poll_id IN (${ph})`, args: ids }).catch(() => {})
+    }
+    await db.execute({ sql: `DELETE FROM polls WHERE id IN (${ph})`, args: ids })
     return NextResponse.json({ deleted: ids.length })
   } catch (err) {
     console.error('Bulk delete error:', err)
