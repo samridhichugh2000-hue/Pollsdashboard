@@ -445,8 +445,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{poll.topic}</h2>
-            <p className="text-sm text-gray-500">Poll ID: {poll.id.slice(0, 8)}...</p>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">{poll.topic}</h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400">Poll ID: {poll.id.slice(0, 8)}...</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -467,32 +467,32 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             <CardContent>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                 <div>
-                  <dt className="text-gray-500">Department</dt>
-                  <dd className="font-medium text-gray-900">{poll.department}</dd>
+                  <dt className="text-gray-500 dark:text-slate-400">Department</dt>
+                  <dd className="font-medium text-gray-900 dark:text-slate-100">{poll.department}</dd>
                 </div>
                 <div>
-                  <dt className="text-gray-500">Requested By</dt>
-                  <dd className="font-medium text-gray-900">{poll.requested_by}</dd>
+                  <dt className="text-gray-500 dark:text-slate-400">Requested By</dt>
+                  <dd className="font-medium text-gray-900 dark:text-slate-100">{poll.requested_by}</dd>
                 </div>
                 <div>
-                  <dt className="text-gray-500">Source</dt>
-                  <dd className="font-medium capitalize text-gray-900">{poll.source}</dd>
+                  <dt className="text-gray-500 dark:text-slate-400">Source</dt>
+                  <dd className="font-medium capitalize text-gray-900 dark:text-slate-100">{poll.source}</dd>
                 </div>
                 <div>
-                  <dt className="text-gray-500">Deadline</dt>
-                  <dd className="font-medium text-gray-900">{formatDateTime(poll.deadline)}</dd>
+                  <dt className="text-gray-500 dark:text-slate-400">Deadline</dt>
+                  <dd className="font-medium text-gray-900 dark:text-slate-100">{formatDateTime(poll.deadline)}</dd>
                 </div>
                 <div>
-                  <dt className="text-gray-500">Created</dt>
-                  <dd className="font-medium text-gray-900">{formatDateTime(poll.created_at)}</dd>
+                  <dt className="text-gray-500 dark:text-slate-400">Created</dt>
+                  <dd className="font-medium text-gray-900 dark:text-slate-100">{formatDateTime(poll.created_at)}</dd>
                 </div>
                 <div>
-                  <dt className="text-gray-500">Sent At</dt>
-                  <dd className="font-medium text-gray-900">{formatDateTime(poll.sent_at)}</dd>
+                  <dt className="text-gray-500 dark:text-slate-400">Sent At</dt>
+                  <dd className="font-medium text-gray-900 dark:text-slate-100">{formatDateTime(poll.sent_at)}</dd>
                 </div>
                 {poll.ms_form_link && (
                   <div className="col-span-2">
-                    <dt className="text-gray-500">Poll Form</dt>
+                    <dt className="text-gray-500 dark:text-slate-400">Poll Form</dt>
                     <dd>
                       <a href={poll.ms_form_link} target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">
@@ -503,14 +503,14 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 )}
                 {poll.rms_task_id && (
                   <div>
-                    <dt className="text-gray-500">RMS Task ID</dt>
-                    <dd className="font-medium text-gray-900">{poll.rms_task_id}</dd>
+                    <dt className="text-gray-500 dark:text-slate-400">RMS Task ID</dt>
+                    <dd className="font-medium text-gray-900 dark:text-slate-100">{poll.rms_task_id}</dd>
                   </div>
                 )}
                 {poll.remarks && (
                   <div className="col-span-2">
-                    <dt className="text-gray-500">Remarks</dt>
-                    <dd className="text-gray-700">{poll.remarks}</dd>
+                    <dt className="text-gray-500 dark:text-slate-400">Remarks</dt>
+                    <dd className="text-gray-700 dark:text-slate-300">{poll.remarks}</dd>
                   </div>
                 )}
               </dl>
@@ -525,13 +525,13 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 const rejection = [...approvals].reverse().find(a => a.action === 'rejected' && a.notes)
                 if (!rejection) return null
                 return (
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4">
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 dark:bg-red-900/20 dark:border-red-900/50">
                     <div className="flex items-start gap-3">
-                      <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-600" />
+                      <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-600 dark:text-red-400" />
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-red-800">Rejected — sent back for revision</p>
-                        <p className="mt-1 text-sm text-red-700 whitespace-pre-wrap">{rejection.notes}</p>
-                        <p className="mt-1.5 text-xs text-red-400">{formatRelative(rejection.actioned_at)}</p>
+                        <p className="text-sm font-semibold text-red-800 dark:text-red-200">Rejected — sent back for revision</p>
+                        <p className="mt-1 text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap">{rejection.notes}</p>
+                        <p className="mt-1.5 text-xs text-red-400 dark:text-red-500">{formatRelative(rejection.actioned_at)}</p>
                       </div>
                     </div>
                   </div>
@@ -543,13 +543,13 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 const feedback = [...approvals].reverse().find(a => a.action === 'clarification' && a.notes)
                 if (!feedback) return null
                 return (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 dark:bg-amber-900/20 dark:border-amber-900/50">
                     <div className="flex items-start gap-3">
-                      <MessageSquare className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+                      <MessageSquare className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-amber-800">Feedback from approver</p>
-                        <p className="mt-1 text-sm text-amber-700 whitespace-pre-wrap">{feedback.notes}</p>
-                        <p className="mt-1.5 text-xs text-amber-500">{formatRelative(feedback.actioned_at)}</p>
+                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Feedback from approver</p>
+                        <p className="mt-1 text-sm text-amber-700 dark:text-amber-300 whitespace-pre-wrap">{feedback.notes}</p>
+                        <p className="mt-1.5 text-xs text-amber-500 dark:text-amber-500">{formatRelative(feedback.actioned_at)}</p>
                       </div>
                     </div>
                   </div>
@@ -566,7 +566,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                     className="w-full"
                     placeholder={`Poll: ${poll.topic}`}
                   />
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-400 dark:text-slate-500">
                     This subject will appear on the poll response form and in all emails.
                   </p>
                 </CardContent>
@@ -578,7 +578,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   <CardTitle className="flex items-center gap-2">
                     Response Deadline
                     {editDeadline === defaultDeadline && (
-                      <span className="text-xs font-normal text-gray-400">(48 hrs default)</span>
+                      <span className="text-xs font-normal text-gray-400 dark:text-slate-500">(48 hrs default)</span>
                     )}
                   </CardTitle>
                 </CardHeader>
@@ -588,7 +588,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                     min={new Date().toISOString().split('T')[0]}
                     value={editDeadline}
                     onChange={e => setEditDeadline(e.target.value || defaultDeadline)}
-                    className={editDeadline === defaultDeadline ? 'text-gray-400' : ''}
+                    className={editDeadline === defaultDeadline ? 'text-gray-400 dark:text-slate-500' : ''}
                   />
                   <p className="mt-1.5 text-xs text-amber-600">
                     Please choose a suitable deadline — the 48-hour default may not apply.
@@ -615,7 +615,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                       <button
                         type="button"
                         onClick={() => setUseKeywords(u => !u)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${useKeywords ? 'bg-cyan-600' : 'bg-gray-200'}`}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${useKeywords ? 'bg-cyan-600' : 'bg-gray-200 dark:bg-slate-700'}`}
                       >
                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${useKeywords ? 'translate-x-4' : 'translate-x-1'}`} />
                       </button>
@@ -674,25 +674,25 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Paperclip className="h-4 w-4 text-gray-400" />
+                    <Paperclip className="h-4 w-4 text-gray-400 dark:text-slate-500" />
                     Attachments
-                    <span className="text-xs font-normal text-gray-400">(optional · max 5 files · 20 MB each)</span>
+                    <span className="text-xs font-normal text-gray-400 dark:text-slate-500">(optional · max 5 files · 20 MB each)</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {releaseAttachments.length > 0 && (
                     <div className="space-y-1.5">
                       {releaseAttachments.map((file, i) => (
-                        <div key={i} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 overflow-hidden">
+                        <div key={i} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 overflow-hidden dark:border-slate-700 dark:bg-slate-800">
                           <div className="flex items-center gap-2 min-w-0">
-                            <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
-                            <span className="text-sm text-gray-700 truncate">{file.name}</span>
-                            <span className="text-xs text-gray-400 flex-shrink-0">
+                            <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" />
+                            <span className="text-sm text-gray-700 truncate dark:text-slate-300">{file.name}</span>
+                            <span className="text-xs text-gray-400 flex-shrink-0 dark:text-slate-500">
                               {file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
                             </span>
                           </div>
                           <button type="button" onClick={() => setReleaseAttachments(prev => prev.filter((_, j) => j !== i))}
-                            className="ml-2 flex-shrink-0 text-gray-400 hover:text-rose-500 transition-colors">
+                            className="ml-2 flex-shrink-0 text-gray-400 hover:text-rose-500 transition-colors dark:text-slate-500">
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -711,14 +711,14 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                       <button
                         type="button"
                         onClick={() => draftFileInputRef.current?.click()}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-2.5 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-2.5 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors dark:border-slate-600 dark:text-slate-400 dark:hover:border-blue-500 dark:hover:text-blue-400 dark:hover:bg-blue-900/20"
                       >
                         <Paperclip className="h-4 w-4" />
                         {releaseAttachments.length === 0 ? 'Attach files' : 'Attach more files'}
                       </button>
                     </>
                   )}
-                  <p className="text-xs text-gray-400">These files will be included when the poll email is sent.</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500">These files will be included when the poll email is sent.</p>
                 </CardContent>
               </Card>
 
@@ -748,7 +748,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   <CardHeader><CardTitle>Draft Email Body</CardTitle></CardHeader>
                   <CardContent>
                     <div
-                      className="rounded-md bg-gray-50 p-3 text-sm text-gray-700 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5"
+                      className="rounded-md bg-gray-50 p-3 text-sm text-gray-700 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 dark:bg-slate-900 dark:text-slate-200"
                       dangerouslySetInnerHTML={{ __html: sanitizeWordHtml(poll.draft_email_body) }}
                     />
                   </CardContent>
@@ -776,7 +776,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                         Save Questions
                       </Button>
                     </div>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-400 dark:text-slate-500">
                       {poll.status === 'AWAITING_APPROVAL'
                         ? 'Edits apply immediately to the poll form — no need to send back to draft.'
                         : 'Edits apply immediately to the poll form — no re-approval required.'}
@@ -790,8 +790,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                     <ol className="space-y-2 text-sm">
                       {questions.map((q, i) => (
                         <li key={i} className="flex gap-2">
-                          <span className="font-medium text-gray-500">{i + 1}.</span>
-                          <span className="text-gray-900">{q.text}</span>
+                          <span className="font-medium text-gray-500 dark:text-slate-400">{i + 1}.</span>
+                          <span className="text-gray-900 dark:text-slate-100">{q.text}</span>
                         </li>
                       ))}
                     </ol>
@@ -950,8 +950,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               )}
 
               {['SENT', 'REMINDER_SENT'].includes(poll.status) && (
-                <div className="space-y-2 pt-2 border-t border-gray-100">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Extend Deadline</Label>
+                <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-slate-700">
+                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide dark:text-slate-400">Extend Deadline</Label>
                   <Input
                     type="date"
                     min={new Date().toISOString().split('T')[0]}
@@ -998,15 +998,15 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             <CardHeader><CardTitle>Activity Timeline</CardTitle></CardHeader>
             <CardContent>
               {auditLogs.length === 0 ? (
-                <p className="text-sm text-gray-400">No activity yet.</p>
+                <p className="text-sm text-gray-400 dark:text-slate-500">No activity yet.</p>
               ) : (
                 <ol className="space-y-3">
                   {auditLogs.map((log) => (
                     <li key={log.id} className="flex gap-2 text-sm">
                       <span className="mt-0.5 h-2 w-2 flex-shrink-0 rounded-full bg-blue-400 mt-1.5" />
                       <div>
-                        <p className="font-medium text-gray-900">{log.action.replace(/_/g, ' ')}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="font-medium text-gray-900 dark:text-slate-100">{log.action.replace(/_/g, ' ')}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">
                           {log.performed_by ?? 'System'} · {formatRelative(log.created_at)}
                         </p>
                       </div>
@@ -1030,10 +1030,10 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                           a.action === 'approved' ? 'text-green-700' :
                           a.action === 'edited' ? 'text-yellow-700' : 'text-blue-700'
                         }`}>{a.action}</span>
-                        <span className="text-xs text-gray-400">{formatRelative(a.actioned_at)}</span>
+                        <span className="text-xs text-gray-400 dark:text-slate-500">{formatRelative(a.actioned_at)}</span>
                       </div>
-                      {a.notes && <p className="mt-0.5 text-gray-600">{a.notes}</p>}
-                      {a.actioned_by && <p className="text-xs text-gray-400">by {a.actioned_by}</p>}
+                      {a.notes && <p className="mt-0.5 text-gray-600 dark:text-slate-400">{a.notes}</p>}
+                      {a.actioned_by && <p className="text-xs text-gray-400 dark:text-slate-500">by {a.actioned_by}</p>}
                     </li>
                   ))}
                 </ol>
@@ -1075,7 +1075,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle>
                   Poll Responses
-                  <span className="ml-2 text-sm font-normal text-gray-400">
+                  <span className="ml-2 text-sm font-normal text-gray-400 dark:text-slate-500">
                     ({entries.length} {entries.length === 1 ? 'response' : 'responses'})
                   </span>
                 </CardTitle>
@@ -1098,7 +1098,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 <div className="space-y-2">
                   <div className="grid grid-cols-4 gap-2">
                     {[
-                      { label: 'Total', value: stats.total, cls: 'bg-gray-100 text-gray-700' },
+                      { label: 'Total', value: stats.total, cls: 'bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-300' },
                       { label: 'Actionable', value: stats.actionable, cls: 'bg-emerald-100 text-emerald-700' },
                       { label: 'Not Actionable', value: stats.notActionable, cls: 'bg-slate-100 text-slate-600' },
                       { label: 'Pending Review', value: stats.pending, cls: 'bg-amber-100 text-amber-700' },
@@ -1125,53 +1125,53 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               )}
 
               {entries.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-200 px-6 py-10 text-center">
-                  <p className="text-sm font-medium text-gray-400">No responses yet</p>
-                  <p className="mt-1 text-xs text-gray-300">Responses will appear here as employees fill out the poll. Auto-refreshes every 30 s.</p>
+                <div className="rounded-xl border border-dashed border-gray-200 px-6 py-10 text-center dark:border-slate-700">
+                  <p className="text-sm font-medium text-gray-400 dark:text-slate-500">No responses yet</p>
+                  <p className="mt-1 text-xs text-gray-300 dark:text-slate-600">Responses will appear here as employees fill out the poll. Auto-refreshes every 30 s.</p>
                 </div>
               ) : (() => {
                 // Derive question headers from first entry with answers
                 const qHeaders = entries[0]?.answers.map((a, qi) => ({ label: `Q${qi + 1}`, question: a.question })) ?? []
 
                 return (
-                  <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700">
                     <table className="min-w-full text-xs">
                       <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
-                          <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Emp Name</th>
+                        <tr className="bg-gray-50 border-b border-gray-200 dark:bg-slate-800 dark:border-slate-700">
+                          <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap dark:text-slate-400">Emp Name</th>
                           {qHeaders.map(q => (
-                            <th key={q.label} className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide min-w-[160px]">
-                              <span className="text-gray-700">{q.label}</span>
-                              <p className="text-[10px] font-normal normal-case tracking-normal text-gray-400 mt-0.5 whitespace-normal">{q.question}</p>
+                            <th key={q.label} className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide min-w-[160px] dark:text-slate-400">
+                              <span className="text-gray-700 dark:text-slate-300">{q.label}</span>
+                              <p className="text-[10px] font-normal normal-case tracking-normal text-gray-400 mt-0.5 whitespace-normal dark:text-slate-500">{q.question}</p>
                             </th>
                           ))}
-                          <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Classify</th>
-                          <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">RMS Actions</th>
-                          <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Progress</th>
-                          <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Reply</th>
-                          <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Mark As</th>
+                          <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap dark:text-slate-400">Classify</th>
+                          <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap dark:text-slate-400">RMS Actions</th>
+                          <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap dark:text-slate-400">Progress</th>
+                          <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap dark:text-slate-400">Reply</th>
+                          <th className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap dark:text-slate-400">Mark As</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
                         {entries.map((entry, i) => {
                           const currentCls = entryClassifications[i] !== undefined ? entryClassifications[i] : (entry.classification ?? null)
                           const currentStatus = entryStatuses[i] !== undefined ? entryStatuses[i] : (entry.status ?? null)
 
                           return (
-                            <tr key={i} className="hover:bg-gray-50 transition-colors align-top">
+                            <tr key={i} className="hover:bg-gray-50 transition-colors align-top dark:hover:bg-slate-700/30">
                               {/* Emp Name */}
                               <td className="px-3 py-3 whitespace-nowrap">
-                                <p className="font-semibold text-gray-800">{entry.respondent ?? 'Anonymous'}</p>
-                                <p className="text-gray-400 truncate max-w-[140px]" title={entry.email}>{entry.email ?? ''}</p>
-                                <p className="text-gray-300 mt-0.5">{formatRelative(entry.submitted_at)}</p>
+                                <p className="font-semibold text-gray-800 dark:text-slate-200">{entry.respondent ?? 'Anonymous'}</p>
+                                <p className="text-gray-400 truncate max-w-[140px] dark:text-slate-500" title={entry.email}>{entry.email ?? ''}</p>
+                                <p className="text-gray-300 mt-0.5 dark:text-slate-600">{formatRelative(entry.submitted_at)}</p>
                                 {entry.reply_sent_at && <span className="inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600">Replied</span>}
                               </td>
 
                               {/* Q1…Qn answers */}
                               {entry.answers.map((a, ai) => (
                                 <td key={ai} className="px-3 py-3 min-w-[160px]">
-                                  <p className="text-gray-700 leading-snug whitespace-pre-wrap">
-                                    {a.answer || <span className="italic text-gray-300">—</span>}
+                                  <p className="text-gray-700 leading-snug whitespace-pre-wrap dark:text-slate-300">
+                                    {a.answer || <span className="italic text-gray-300 dark:text-slate-600">—</span>}
                                   </p>
                                 </td>
                               ))}
@@ -1191,7 +1191,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                                           setEntryClassifications(p => ({ ...p, [i]: next }))
                                           void saveEntry(i, entry.actionable ?? null, next)
                                         }}
-                                        className={`px-2.5 py-1 rounded-md text-[10px] font-semibold border transition-colors ${isActive ? activeStyles[key] + ' border-transparent' : 'bg-white ' + inactiveStyles[key]}`}
+                                        className={`px-2.5 py-1 rounded-md text-[10px] font-semibold border transition-colors ${isActive ? activeStyles[key] + ' border-transparent' : 'bg-white dark:bg-slate-800 ' + inactiveStyles[key]}`}
                                       >
                                         {labels[key]}
                                       </button>
@@ -1204,11 +1204,11 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                               <td className="px-3 py-3 whitespace-nowrap">
                                 <div className="flex flex-col gap-1">
                                   <a href="https://rms.koenig-solutions.com/RMS_Feedback/RMSF.aspx" target="_blank" rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition-colors">
+                                    className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition-colors dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/40">
                                     <ExternalLink className="h-3 w-3" /> RMS Task
                                   </a>
                                   <a href="https://rms.koenig-solutions.com/RMS_Feedback/RMSF.aspx" target="_blank" rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2.5 py-1 text-[10px] font-semibold text-purple-700 hover:bg-purple-100 transition-colors">
+                                    className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2.5 py-1 text-[10px] font-semibold text-purple-700 hover:bg-purple-100 transition-colors dark:border-purple-900/50 dark:bg-purple-900/20 dark:text-purple-300 dark:hover:bg-purple-900/40">
                                     <ExternalLink className="h-3 w-3" /> Non-RMS
                                   </a>
                                 </div>
@@ -1242,7 +1242,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                                   rows={entryReplies[i] ? 4 : 2}
                                   onFocus={e => { e.currentTarget.rows = 4 }}
                                   onBlur={e => { if (!e.currentTarget.value) e.currentTarget.rows = 2 }}
-                                  className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition resize-y min-h-[40px]"
+                                  className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition resize-y min-h-[40px] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:focus:border-indigo-500 dark:focus:ring-indigo-900/30"
                                 />
                                 <button type="button" disabled={sendingReply === i || !entryReplies[i]?.trim()}
                                   onClick={() => void sendReply(i)}
@@ -1292,15 +1292,15 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
 
           {/* Hunt group dropdown */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Hunt Groups</Label>
+            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide dark:text-slate-400">Hunt Groups</Label>
             <div className="relative" ref={huntGroupDropdownRef}>
               <button
                 type="button"
                 onClick={() => !huntGroupsLoading && setHuntGroupDropdownOpen(o => !o)}
-                className="flex w-full items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
+                className="flex w-full items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 disabled={huntGroupsLoading}
               >
-                <span className={selectedHuntGroupIds.length === 0 ? 'text-gray-400' : ''}>
+                <span className={selectedHuntGroupIds.length === 0 ? 'text-gray-400 dark:text-slate-500' : ''}>
                   {huntGroupsLoading
                     ? 'Loading...'
                     : selectedHuntGroupIds.length === 0
@@ -1308,20 +1308,20 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                       : `${selectedHuntGroupIds.length} group${selectedHuntGroupIds.length > 1 ? 's' : ''} selected`}
                 </span>
                 {huntGroupsLoading
-                  ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                  : <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${huntGroupDropdownOpen ? 'rotate-180' : ''}`} />}
+                  ? <Loader2 className="h-4 w-4 animate-spin text-gray-400 dark:text-slate-500" />
+                  : <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform dark:text-slate-500 ${huntGroupDropdownOpen ? 'rotate-180' : ''}`} />}
               </button>
 
               {huntGroupDropdownOpen && huntGroups.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
                   {huntGroups.length === 0 ? (
-                    <p className="px-3 py-3 text-sm text-gray-400 text-center">No hunt groups configured.</p>
+                    <p className="px-3 py-3 text-sm text-gray-400 text-center dark:text-slate-500">No hunt groups configured.</p>
                   ) : (
                     huntGroups.map((group) => (
-                      <label key={group.id} className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors">
+                      <label key={group.id} className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors dark:hover:bg-slate-700">
                         <input
                           type="checkbox"
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
                           checked={selectedHuntGroupIds.includes(group.id)}
                           onChange={(e) => {
                             setSelectedHuntGroupIds(prev =>
@@ -1330,8 +1330,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                           }}
                         />
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900">{group.name}</p>
-                          <p className="text-xs text-gray-400 truncate">{group.email}</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{group.name}</p>
+                          <p className="text-xs text-gray-400 truncate dark:text-slate-500">{group.email}</p>
                         </div>
                       </label>
                     ))
@@ -1340,8 +1340,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               )}
 
               {huntGroupDropdownOpen && huntGroups.length === 0 && !huntGroupsLoading && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-md border border-gray-200 bg-white shadow-lg px-3 py-3">
-                  <p className="text-sm text-gray-400 text-center">No hunt groups configured. Add them in Settings.</p>
+                <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-md border border-gray-200 bg-white shadow-lg px-3 py-3 dark:border-slate-700 dark:bg-slate-800">
+                  <p className="text-sm text-gray-400 text-center dark:text-slate-500">No hunt groups configured. Add them in Settings.</p>
                 </div>
               )}
             </div>
@@ -1350,9 +1350,9 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             {selectedHuntGroupIds.length > 0 && (
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {huntGroups.filter(g => selectedHuntGroupIds.includes(g.id)).map(g => (
-                  <span key={g.id} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-700">
+                  <span key={g.id} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/20 dark:border-blue-900/50 dark:text-blue-300">
                     {g.name}
-                    <button type="button" onClick={() => setSelectedHuntGroupIds(prev => prev.filter(id => id !== g.id))} className="hover:text-red-600 ml-0.5">
+                    <button type="button" onClick={() => setSelectedHuntGroupIds(prev => prev.filter(id => id !== g.id))} className="hover:text-red-600 ml-0.5 dark:hover:text-red-400">
                       <X className="h-3 w-3" />
                     </button>
                   </span>
@@ -1362,8 +1362,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
           </div>
 
           {/* Manual individual email addresses */}
-          <div className="space-y-1.5 pt-1 border-t border-gray-100">
-            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          <div className="space-y-1.5 pt-1 border-t border-gray-100 dark:border-slate-700">
+            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide dark:text-slate-400">
               Add individual emails
             </Label>
             <Textarea
@@ -1374,16 +1374,16 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               className="resize-none text-sm"
             />
             {customReleaseText.trim() && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 dark:text-slate-500">
                 {parseEmails(customReleaseText).length} email(s) detected
               </p>
             )}
           </div>
 
           {/* Attachments */}
-          <div className="space-y-2 pt-1 border-t border-gray-100">
-            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Attachments <span className="normal-case font-normal text-gray-400">(optional · max 5 files · 20 MB each)</span>
+          <div className="space-y-2 pt-1 border-t border-gray-100 dark:border-slate-700">
+            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide dark:text-slate-400">
+              Attachments <span className="normal-case font-normal text-gray-400 dark:text-slate-500">(optional · max 5 files · 20 MB each)</span>
             </Label>
 
             {/* Files carried over from the approval step (saved server-side) */}
@@ -1392,17 +1392,17 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 {existingAttachments
                   .filter(a => !removedAttachmentNames.includes(a.name))
                   .map((file) => (
-                    <div key={file.name} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 overflow-hidden">
+                    <div key={file.name} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 overflow-hidden dark:border-slate-700 dark:bg-slate-800">
                       <div className="flex items-center gap-2 min-w-0">
-                        <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
-                        <span className="text-sm text-gray-700 truncate">{file.name}</span>
-                        <span className="text-xs text-gray-400 flex-shrink-0">
+                        <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" />
+                        <span className="text-sm text-gray-700 truncate dark:text-slate-300">{file.name}</span>
+                        <span className="text-xs text-gray-400 flex-shrink-0 dark:text-slate-500">
                           {file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
                         </span>
-                        <span className="text-[10px] uppercase tracking-wide text-gray-400 flex-shrink-0">from approval</span>
+                        <span className="text-[10px] uppercase tracking-wide text-gray-400 flex-shrink-0 dark:text-slate-500">from approval</span>
                       </div>
                       <button type="button" onClick={() => setRemovedAttachmentNames(prev => [...prev, file.name])}
-                        className="ml-2 flex-shrink-0 text-gray-400 hover:text-rose-500 transition-colors">
+                        className="ml-2 flex-shrink-0 text-gray-400 hover:text-rose-500 transition-colors dark:text-slate-500">
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -1413,16 +1413,16 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             {releaseAttachments.length > 0 && (
               <div className="space-y-1.5">
                 {releaseAttachments.map((file, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 overflow-hidden">
+                  <div key={i} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 overflow-hidden dark:border-slate-700 dark:bg-slate-800">
                     <div className="flex items-center gap-2 min-w-0">
-                      <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
-                      <span className="text-sm text-gray-700 truncate">{file.name}</span>
-                      <span className="text-xs text-gray-400 flex-shrink-0">
+                      <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" />
+                      <span className="text-sm text-gray-700 truncate dark:text-slate-300">{file.name}</span>
+                      <span className="text-xs text-gray-400 flex-shrink-0 dark:text-slate-500">
                         {file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
                       </span>
                     </div>
                     <button type="button" onClick={() => setReleaseAttachments(prev => prev.filter((_, j) => j !== i))}
-                      className="ml-2 flex-shrink-0 text-gray-400 hover:text-rose-500 transition-colors">
+                      className="ml-2 flex-shrink-0 text-gray-400 hover:text-rose-500 transition-colors dark:text-slate-500">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -1442,7 +1442,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 <button
                   type="button"
                   onClick={() => releaseFileInputRef.current?.click()}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-2.5 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-2.5 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors dark:border-slate-600 dark:text-slate-400 dark:hover:border-blue-500 dark:hover:text-blue-400 dark:hover:bg-blue-900/20"
                 >
                   <Paperclip className="h-4 w-4" />
                   {releaseAttachments.length === 0 ? 'Attach files' : 'Attach more files'}
@@ -1486,7 +1486,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 onChange={(e) => setShareRecipientInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addShareRecipient() } }}
                 placeholder="recipient@koenig-solutions.com"
-                className="flex-1 rounded-md border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                className="flex-1 rounded-md border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:focus:border-blue-500 dark:focus:ring-blue-900/30"
               />
               <Button type="button" size="sm" variant="outline" onClick={addShareRecipient}>Add</Button>
             </div>
@@ -1494,16 +1494,16 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             {shareRecipients.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {shareRecipients.map((email) => (
-                  <span key={email} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs text-blue-700">
+                  <span key={email} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs text-blue-700 dark:bg-blue-900/20 dark:border-blue-900/50 dark:text-blue-300">
                     {email}
-                    <button type="button" onClick={() => setShareRecipients(prev => prev.filter(e => e !== email))} className="hover:text-red-600 ml-0.5">
+                    <button type="button" onClick={() => setShareRecipients(prev => prev.filter(e => e !== email))} className="hover:text-red-600 ml-0.5 dark:hover:text-red-400">
                       <X className="h-3 w-3" />
                     </button>
                   </span>
                 ))}
               </div>
             )}
-            <p className="text-xs text-gray-400">Press Enter or comma to add multiple recipients.</p>
+            <p className="text-xs text-gray-400 dark:text-slate-500">Press Enter or comma to add multiple recipients.</p>
           </div>
 
           <DialogFooter>
@@ -1534,18 +1534,18 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
 
           <div className="space-y-4">
             {/* Email Preview */}
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
-              <h3 className="font-semibold text-gray-900">Poll Approval Request: {poll.topic}</h3>
-              <div className="text-sm space-y-1 text-gray-700">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 dark:border-slate-700 dark:bg-slate-800/50">
+              <h3 className="font-semibold text-gray-900 dark:text-slate-100">Poll Approval Request: {poll.topic}</h3>
+              <div className="text-sm space-y-1 text-gray-700 dark:text-slate-300">
                 <p><span className="font-medium">Department:</span> {poll.department}</p>
                 <p><span className="font-medium">Deadline:</span> {formatDate(poll.deadline)}</p>
               </div>
 
               {poll.draft_email_body && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Draft Email Body</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Draft Email Body</p>
                   <div
-                    className="rounded bg-white border border-gray-200 p-3 text-sm text-gray-700 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5"
+                    className="rounded bg-white border border-gray-200 p-3 text-sm text-gray-700 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200"
                     dangerouslySetInnerHTML={{ __html: sanitizeWordHtml(poll.draft_email_body) }}
                   />
                 </div>
@@ -1553,12 +1553,12 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
 
               {questions.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Poll Questions</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Poll Questions</p>
                   <ol className="text-sm space-y-1">
                     {questions.map((q, i) => (
                       <li key={i} className="flex gap-2">
-                        <span className="font-medium text-gray-400">{i + 1}.</span>
-                        <span className="text-gray-800">{q.text}</span>
+                        <span className="font-medium text-gray-400 dark:text-slate-500">{i + 1}.</span>
+                        <span className="text-gray-800 dark:text-slate-200">{q.text}</span>
                       </li>
                     ))}
                   </ol>
@@ -1567,7 +1567,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
 
               {poll.ms_form_link && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Poll Form Link</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Poll Form Link</p>
                   <a href={poll.ms_form_link} target="_blank" rel="noopener noreferrer"
                     className="text-sm text-blue-600 hover:underline break-all">
                     {poll.ms_form_link}
@@ -1614,12 +1614,12 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               {approvalRecipients.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-1">
                   {approvalRecipients.map((email) => (
-                    <span key={email} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs text-blue-700">
+                    <span key={email} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs text-blue-700 dark:bg-blue-900/20 dark:border-blue-900/50 dark:text-blue-300">
                       {email}
                       <button
                         type="button"
                         onClick={() => setApprovalRecipients(prev => prev.filter(e => e !== email))}
-                        className="hover:text-red-600 transition-colors ml-0.5"
+                        className="hover:text-red-600 transition-colors ml-0.5 dark:hover:text-red-400"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -1628,7 +1628,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 </div>
               )}
 
-              <p className="text-xs text-gray-400">Press Enter or comma to add multiple recipients.</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500">Press Enter or comma to add multiple recipients.</p>
             </div>
           </div>
 

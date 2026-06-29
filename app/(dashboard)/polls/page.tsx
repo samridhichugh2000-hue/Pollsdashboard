@@ -11,8 +11,8 @@ import { PollsTable } from '@/components/polls/polls-table'
 import { PollForm } from '@/components/polls/poll-form'
 import type { Poll } from '@/types'
 
-type CardKey = 'not-sent' | 'approval-pending' | 'active' | 'closed' | 'result-sir' | 'result-voter' | 'total'
-const VALID_CARD_KEYS: CardKey[] = ['not-sent', 'approval-pending', 'active', 'closed', 'result-sir', 'result-voter', 'total']
+type CardKey = 'not-sent' | 'approval-pending' | 'active' | 'closed' | 'result-sir' | 'total'
+const VALID_CARD_KEYS: CardKey[] = ['not-sent', 'approval-pending', 'active', 'closed', 'result-sir', 'total']
 
 function filterByCard(polls: Poll[], key: CardKey): Poll[] {
   switch (key) {
@@ -21,7 +21,6 @@ function filterByCard(polls: Poll[], key: CardKey): Poll[] {
     case 'active':           return polls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
     case 'closed':           return polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status))
     case 'result-sir':       return polls.filter(p => p.status === 'CLOSED')
-    case 'result-voter':     return polls.filter(p => ['CLOSED', 'RESULTS_SHARED'].includes(p.status))
     case 'total':            return polls.filter(p => p.status !== 'ARCHIVED')
   }
 }
@@ -214,10 +213,10 @@ function PollsContent() {
         <CalendarRange className="h-4 w-4 text-slate-400 flex-shrink-0" />
         <span className="text-xs text-slate-400 flex-shrink-0">From</span>
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-          className="bg-transparent text-sm text-slate-700 [color-scheme:light] outline-none cursor-pointer" />
+          className="bg-transparent text-sm text-slate-700 dark:text-slate-300 [color-scheme:light] dark:[color-scheme:dark] outline-none cursor-pointer" />
         <span className="text-xs text-slate-400 flex-shrink-0">To</span>
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} min={dateFrom || undefined}
-          className="bg-transparent text-sm text-slate-700 [color-scheme:light] outline-none cursor-pointer" />
+          className="bg-transparent text-sm text-slate-700 dark:text-slate-300 [color-scheme:light] dark:[color-scheme:dark] outline-none cursor-pointer" />
         {hasDateFilter && (
           <button onClick={clearDateFilter} className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
             <X className="h-3.5 w-3.5" /> Clear
@@ -227,7 +226,7 @@ function PollsContent() {
 
       {/* Search active banner */}
       {searchQuery && (
-        <div className="flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm text-slate-600">
+        <div className="flex items-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300">
           Showing results across all tabs for &quot;{searchQuery}&quot;
           <button onClick={clearSearch} className="ml-auto text-slate-400 hover:text-slate-600 transition-colors">
             <X className="h-3.5 w-3.5" />
@@ -243,13 +242,13 @@ function PollsContent() {
           </div>
         ) : activeCard ? (
           <>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-              <p className="text-sm font-semibold text-gray-700">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-slate-700">
+              <p className="text-sm font-semibold text-gray-700 dark:text-slate-300">
                 Showing: <span className="text-cyan-600">{activeCardLabel}</span>
-                <span className="ml-2 text-gray-400 font-normal">({cardPolls!.length} polls)</span>
+                <span className="ml-2 text-gray-400 dark:text-slate-500 font-normal">({cardPolls!.length} polls)</span>
               </p>
               <button onClick={() => setActiveCard(null)}
-                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">
                 <X className="h-3.5 w-3.5" /> Clear filter
               </button>
             </div>
@@ -257,8 +256,8 @@ function PollsContent() {
           </>
         ) : (
           <Tabs defaultValue="all">
-            <div className="border-b border-gray-100 px-5 pt-4">
-              <TabsList className="bg-gray-100 mb-0 flex-wrap h-auto gap-1">
+            <div className="border-b border-gray-100 dark:border-slate-700 px-5 pt-4">
+              <TabsList className="bg-gray-100 dark:bg-slate-800 mb-0 flex-wrap h-auto gap-1">
                 <TabsTrigger value="all">All ({filterByTab('all').length})</TabsTrigger>
                 <TabsTrigger value="inbox">Inbox ({filterByTab('inbox').length})</TabsTrigger>
                 <TabsTrigger value="via-form">Via Form ({filterByTab('via-form').length})</TabsTrigger>

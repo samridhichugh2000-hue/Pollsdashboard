@@ -97,8 +97,8 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
     <div>
       {/* Bulk action toolbar */}
       {someSelected && (
-        <div className="flex items-center justify-between px-5 py-2.5 bg-red-50 border-b border-red-100">
-          <span className="text-sm font-medium text-red-700">{selected.size} poll{selected.size > 1 ? 's' : ''} selected</span>
+        <div className="flex items-center justify-between px-5 py-2.5 bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-900/50">
+          <span className="text-sm font-medium text-red-700 dark:text-red-400">{selected.size} poll{selected.size > 1 ? 's' : ''} selected</span>
           <div className="flex items-center gap-2">
             {confirmBulkDelete ? (
               <>
@@ -169,7 +169,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                   {overdue && <span className="text-xs font-medium text-rose-500">Overdue</span>}
                 </td>
                 <td className="px-5 py-3.5 text-gray-500 dark:text-slate-400">{poll.department}</td>
-                <td className="px-5 py-3.5 text-gray-500 max-w-[140px] truncate">{poll.requested_by}</td>
+                <td className="px-5 py-3.5 text-gray-500 dark:text-slate-400 max-w-[140px] truncate">{poll.requested_by}</td>
                 <td className="px-5 py-3.5">
                   <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     poll.source === 'email' ? 'bg-cyan-50 text-cyan-700' :
@@ -180,14 +180,14 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                   </span>
                 </td>
                 <td className="px-5 py-3.5"><StatusBadge status={poll.status} /></td>
-                <td className="px-5 py-3.5 text-gray-400 text-xs">
+                <td className="px-5 py-3.5 text-gray-400 dark:text-slate-500 text-xs">
                   <span title={formatDateTime(poll.created_at)}>{formatRelative(poll.created_at)}</span>
                 </td>
                 <td className="px-5 py-3.5 text-xs">
                   {poll.status === 'DRAFT' ? (
-                    <span className="text-gray-300">—</span>
+                    <span className="text-gray-300 dark:text-slate-600">—</span>
                   ) : ['CLOSED', 'ARCHIVED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(poll.status) && poll.closed_at ? (
-                    <span className="text-gray-500" title={formatDateTime(poll.closed_at)}>
+                    <span className="text-gray-500 dark:text-slate-400" title={formatDateTime(poll.closed_at)}>
                       Closed on {new Date(poll.closed_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                     </span>
                   ) : poll.deadline ? (
@@ -195,7 +195,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                       Closes on {new Date(poll.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                     </span>
                   ) : (
-                    <span className="text-gray-300">—</span>
+                    <span className="text-gray-300 dark:text-slate-600">—</span>
                   )}
                 </td>
                 <td className="px-5 py-3.5">
@@ -204,7 +204,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                       className="inline-flex items-center gap-1 text-xs text-cyan-600 hover:underline">
                       Open <ExternalLink className="h-3 w-3" />
                     </a>
-                  ) : <span className="text-gray-300">—</span>}
+                  ) : <span className="text-gray-300 dark:text-slate-600">—</span>}
                 </td>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-2">
@@ -221,7 +221,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                             placeholder="Reason for rejection (required)"
                             value={rejectReason}
                             onChange={e => setRejectReason(e.target.value)}
-                            className="w-full rounded border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none"
+                            className="w-full rounded border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-gray-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none"
                           />
                           <div className="flex gap-1">
                             <Button variant="destructive" size="sm" className="h-6 text-xs"
