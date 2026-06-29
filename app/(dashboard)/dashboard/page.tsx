@@ -271,7 +271,7 @@ export default function DashboardPage() {
           <BreakdownRow label="Approval Pending"       value={data.pollBreakdown.approvalPending}    color="bg-amber-400"   href="/polls?card=approval-pending" />
           <BreakdownRow label="Active Polls"           value={data.pollBreakdown.activePolls}        color="bg-emerald-400" href="/polls?card=active" />
           <BreakdownRow label="Polls Closed"           value={data.pollBreakdown.pollsClosed}        color="bg-slate-400"   href="/polls?card=closed" />
-          <BreakdownRow label="Result Not Sent to Sir" value={data.pollBreakdown.resultNotSentSir}   color="bg-orange-400"  href="/polls?card=result-sir" />
+          <BreakdownRow label="Result Not Sent to Poll Requester" value={data.pollBreakdown.resultNotSentSir}   color="bg-orange-400"  href="/polls?card=result-sir" />
           <BreakdownRow label="Result Not Sent to Voter" value={data.pollBreakdown.resultNotSentVoter} color="bg-red-400"   href="/polls?card=result-voter" />
         </div>
 
