@@ -193,12 +193,11 @@ export default function ParticipationPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {[
           { label: 'Total employees', value: loading ? '—' : totalEmployees.toLocaleString(), color: '' },
           { label: 'Participated in ≥2 polls', value: loading ? '—' : participated.toLocaleString(), color: 'text-emerald-600 dark:text-emerald-400' },
           { label: 'Never participated', value: loading ? '—' : notParticipated.toLocaleString(), color: 'text-red-500 dark:text-red-400' },
-          { label: 'Avg polls / employee', value: loading ? '—' : avgPolls, color: '' },
         ].map(c => (
           <div key={c.label} className="bg-white dark:bg-[#1a2035] border border-gray-100 dark:border-slate-700 rounded-xl p-4">
             <div className="text-[13px] text-gray-500 dark:text-slate-400 mb-1">{c.label}</div>
