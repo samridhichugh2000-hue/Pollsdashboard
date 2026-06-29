@@ -9,6 +9,7 @@ export type PollStatus =
   | 'REMINDER_SENT'
   | 'RMS_PUBLISHED'
   | 'CLOSED'
+  | 'RESULTS_SHARED'
   | 'RESULTS_UPLOADED'
   | 'ARCHIVED'
   | 'REJECTED'
@@ -169,6 +170,7 @@ export const STATUS_LABELS: Record<PollStatus, string> = {
   REMINDER_SENT: 'Reminder Sent',
   RMS_PUBLISHED: 'RMS Published',
   CLOSED: 'Closed',
+  RESULTS_SHARED: 'Results Sent to Sir',
   RESULTS_UPLOADED: 'Koenig News',
   ARCHIVED: 'Archived',
   REJECTED: 'Rejected',
@@ -188,6 +190,7 @@ export const STATUS_COLORS: Record<PollStatus, string> = {
   REMINDER_SENT: 'bg-violet-100 text-violet-800',
   RMS_PUBLISHED: 'bg-cyan-100 text-cyan-800',
   CLOSED: 'bg-slate-100 text-slate-800',
+  RESULTS_SHARED: 'bg-orange-100 text-orange-800',
   RESULTS_UPLOADED: 'bg-emerald-100 text-emerald-800',
   ARCHIVED: 'bg-gray-200 text-gray-600',
   REJECTED: 'bg-red-100 text-red-700',
