@@ -89,8 +89,8 @@ export function PollForm({ onSuccess }: PollFormProps) {
   return (
     <div className="space-y-6">
       {/* Poll Lifecycle Timeline */}
-      <div className="rounded-xl bg-cyan-50 px-4 py-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-cyan-700">Poll Lifecycle</p>
+      <div className="rounded-xl bg-cyan-50 px-4 py-4 dark:bg-cyan-900/20">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">Poll Lifecycle</p>
         <ol className="space-y-2">
           {TIMELINE_STEPS.map((step, i) => (
             <li key={i} className="flex items-start gap-3">
@@ -99,12 +99,12 @@ export function PollForm({ onSuccess }: PollFormProps) {
                   {i + 1}
                 </div>
                 {i < TIMELINE_STEPS.length - 1 && (
-                  <div className="mt-1 h-4 w-px bg-cyan-300" />
+                  <div className="mt-1 h-4 w-px bg-cyan-300 dark:bg-cyan-700" />
                 )}
               </div>
               <div className="pb-1">
-                <p className="text-xs font-semibold text-cyan-900">{step.label}</p>
-                <p className="text-xs text-cyan-600">{step.desc}</p>
+                <p className="text-xs font-semibold text-cyan-900 dark:text-cyan-300">{step.label}</p>
+                <p className="text-xs text-cyan-600 dark:text-cyan-500">{step.desc}</p>
               </div>
             </li>
           ))}
@@ -113,7 +113,7 @@ export function PollForm({ onSuccess }: PollFormProps) {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
-          <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">{error}</div>
         )}
 
         {/* Topic */}
