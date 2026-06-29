@@ -1535,7 +1535,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
           <div className="space-y-4">
             {/* Email Preview */}
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 dark:border-slate-700 dark:bg-slate-800/50">
-              <h3 className="font-semibold text-gray-900 dark:text-slate-100">Poll Approval Request: {poll.topic}</h3>
+              <h3 className="font-semibold text-gray-900 dark:text-slate-100">Poll Approval Request: {poll.subject || poll.topic}</h3>
               <div className="text-sm space-y-1 text-gray-700 dark:text-slate-300">
                 <p><span className="font-medium">Department:</span> {poll.department}</p>
                 <p><span className="font-medium">Deadline:</span> {formatDate(poll.deadline)}</p>
