@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Plus, RefreshCw, CalendarClock, Edit2, Trash2, Play, Power, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
@@ -108,7 +108,7 @@ function StatCard({ label, value, colour, active, onClick }: {
 
 type FilterKey = 'all' | 'upcoming' | 'overdue' | 'released'
 
-export default function CadencePage() {
+function CadencePageInner() {
   const [polls, setPolls] = useState<RegularPoll[]>([])
   const [loading, setLoading] = useState(true)
   const searchParams = useSearchParams()
@@ -579,3 +579,8 @@ export default function CadencePage() {
     </div>
   )
 }
+
+export default function CadencePage() {
+  return <Suspense><CadencePageInner /></Suspense>
+}
+

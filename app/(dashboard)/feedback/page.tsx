@@ -1,8 +1,8 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { MessageSquare, RefreshCw, CheckCircle2, XCircle, Clock, X, Send, ChevronDown, Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { formatRelative } from '@/lib/utils'
@@ -135,7 +135,7 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
             {entry.answers.map((a, i) => (
               <div key={i} className={`px-3 py-2.5 ${i > 0 ? 'border-t border-slate-100 dark:border-slate-700/60' : ''}`}>
                 <p className="text-[10px] font-semibold text-slate-400 mb-1">Q{i + 1}. {a.question}</p>
-                <p className="text-xs text-gray-700 dark:text-slate-200 whitespace-pre-wrap">{a.answer || '—'}</p>
+                <p className="text-xs text-gray-700 dark:text-slate-200 whitespace-pre-wrap">{a.answer || 'â€”'}</p>
               </div>
             ))}
           </div>
@@ -163,7 +163,7 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
             <select disabled={saving} value={entry.status ?? ''}
               onChange={e => void update({ status: e.target.value || null })}
               className="text-[11px] font-medium px-2 py-1 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer disabled:opacity-50">
-              <option value="">Status…</option>
+              <option value="">Statusâ€¦</option>
               <option value="wip">WIP</option>
               <option value="completed">Completed</option>
               <option value="process-improved">Process Improved</option>
@@ -179,11 +179,11 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
           {showReply && (
             <div className="flex gap-2 items-start">
               <textarea value={replyText} onChange={e => setReplyText(e.target.value)}
-                placeholder="Type your reply…" rows={2}
+                placeholder="Type your replyâ€¦" rows={2}
                 className="flex-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-gray-800 dark:text-slate-200 resize-none focus:outline-none focus:ring-2 focus:ring-purple-400" />
               <button disabled={saving || !replyText.trim()} onClick={() => void sendReply()}
                 className="text-xs font-semibold px-3 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50">
-                {saving ? '…' : 'Send'}
+                {saving ? 'â€¦' : 'Send'}
               </button>
             </div>
           )}
@@ -193,7 +193,7 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
   )
 }
 
-export default function FeedbackPage() {
+function FeedbackPageInner() {
   const [polls, setPolls] = useState<PollWithEntries[]>([])
   const [loadingPolls, setLoadingPolls] = useState(true)
   const searchParams = useSearchParams()
@@ -388,7 +388,7 @@ export default function FeedbackPage() {
                         </span>
                         {pendingCount !== null && pendingCount > 0 && (
                           <>
-                            <span className={`text-[10px] ${isActive ? 'text-white/40' : 'text-slate-300 dark:text-slate-600'}`}>·</span>
+                            <span className={`text-[10px] ${isActive ? 'text-white/40' : 'text-slate-300 dark:text-slate-600'}`}>Â·</span>
                             <span className={`text-[10px] font-medium ${isActive ? 'text-amber-200' : 'text-amber-600 dark:text-amber-400'}`}>
                               {pendingCount} pending
                             </span>
@@ -418,7 +418,7 @@ export default function FeedbackPage() {
             {/* Poll title */}
             <div className="flex-shrink-0">
               <h2 className="text-sm font-bold text-slate-800 dark:text-white truncate">{activePoll.topic}</h2>
-              <p className="text-xs text-slate-400">{activePoll.department} · {activePoll.requested_by}</p>
+              <p className="text-xs text-slate-400">{activePoll.department} Â· {activePoll.requested_by}</p>
             </div>
 
             {/* Stat cards */}
@@ -438,7 +438,7 @@ export default function FeedbackPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <input value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder="Search responses…"
+                  placeholder="Search responsesâ€¦"
                   className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e2535] pl-9 pr-3 py-2 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-400" />
               </div>
               {activeCard && (
@@ -481,3 +481,8 @@ export default function FeedbackPage() {
     </div>
   )
 }
+
+export default function FeedbackPage() {
+  return <Suspense><FeedbackPageInner /></Suspense>
+}
+
