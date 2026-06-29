@@ -79,8 +79,6 @@ export async function GET() {
       try { return sum + (JSON.parse(row.response_data ?? '[]') as unknown[]).length } catch { return sum }
     }, 0)
 
-  const resultNotSentVoter = allEntries.filter(e => !e.reply_sent_at).length
-
   // Cadence breakdown
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const totalCadence = regularPolls.length
@@ -107,6 +105,7 @@ export async function GET() {
   const pendingForAction = allEntries.filter(e => e.actionable == null).length
   const processImproved = allEntries.filter(e => e.status === 'process-improved').length
   const nonActionable = allEntries.filter(e => e.actionable === false).length
+  const resultNotSentVoter = allEntries.filter(e => !e.reply_sent_at).length
 
   // Polls with pending feedback — responses where actionable is null (not yet reviewed), grouped by poll
   const pollMap2 = new Map(polls.map(p => [p.id, p.topic]))
