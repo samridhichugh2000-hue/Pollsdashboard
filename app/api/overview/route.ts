@@ -157,7 +157,7 @@ export async function GET() {
       totalPolls,
       totalPending,
       totalSuggestions: totalResponses,
-      suggestionsPendingReview: responsesPendingReview,
+      suggestionsPendingReview: pendingForAction,
       processImprovements: processImproved,
       rmsImprovements: Number(kpiRow?.rms_improvements ?? 0),
     },
