@@ -79,7 +79,7 @@ export async function GET() {
       try { return sum + (JSON.parse(row.response_data ?? '[]') as unknown[]).length } catch { return sum }
     }, 0)
 
-  const resultNotSentVoter = responsesPendingReview
+  const resultNotSentVoter = polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED'].includes(p.status)).length
 
   // Cadence breakdown
   const today = new Date(); today.setHours(0, 0, 0, 0)
