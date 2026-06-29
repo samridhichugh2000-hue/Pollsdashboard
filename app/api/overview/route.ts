@@ -58,7 +58,7 @@ export async function GET() {
   const approvalPending = polls.filter(p => p.status === 'AWAITING_APPROVAL').length
   const activePolls = polls.filter(p => ACTIVE_STATUSES.includes(p.status)).length
   const pollsClosed = polls.filter(p => CLOSED_STATUSES.includes(p.status)).length
-  const resultNotSentSir = polls.filter(p => CLOSED_STATUSES.includes(p.status) && !p.rms_task_id).length
+  const resultNotSentSir = polls.filter(p => p.status === 'CLOSED').length
 
   const totalPolls = polls.length
   const totalPending = polls.filter(p => PENDING_STATUSES.includes(p.status)).length
@@ -79,7 +79,7 @@ export async function GET() {
       try { return sum + (JSON.parse(row.response_data ?? '[]') as unknown[]).length } catch { return sum }
     }, 0)
 
-  const resultNotSentVoter = polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED'].includes(p.status)).length
+  const resultNotSentVoter = polls.filter(p => ['CLOSED', 'RESULTS_SHARED'].includes(p.status)).length
 
   // Cadence breakdown
   const today = new Date(); today.setHours(0, 0, 0, 0)

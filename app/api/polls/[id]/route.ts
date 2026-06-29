@@ -501,7 +501,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           attachments: [attachment],
         })
 
-        await updatePollStatus(id, 'RESULTS_UPLOADED', { results_uploaded_at: new Date().toISOString() })
+        await updatePollStatus(id, 'RESULTS_SHARED', { results_uploaded_at: new Date().toISOString() })
         await createAuditLog(id, 'RESULTS_SHARED', userEmail, { recipients: shareRecipients })
         break
       }

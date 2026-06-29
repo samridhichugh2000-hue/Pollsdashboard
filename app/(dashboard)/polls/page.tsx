@@ -20,8 +20,8 @@ function filterByCard(polls: Poll[], key: CardKey): Poll[] {
     case 'approval-pending': return polls.filter(p => p.status === 'AWAITING_APPROVAL')
     case 'active':           return polls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
     case 'closed':           return polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status))
-    case 'result-sir':       return polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED'].includes(p.status) && !p.rms_task_id)
-    case 'result-voter':     return polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED'].includes(p.status))
+    case 'result-sir':       return polls.filter(p => p.status === 'CLOSED')
+    case 'result-voter':     return polls.filter(p => ['CLOSED', 'RESULTS_SHARED'].includes(p.status))
     case 'total':            return polls.filter(p => p.status !== 'ARCHIVED')
   }
 }
