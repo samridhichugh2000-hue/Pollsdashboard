@@ -95,13 +95,35 @@ export async function GET() {
     return d <= today
   }).length
 
-  // Feedback breakdown
-  const totalSuggestions = feedbackItems.length
+  // Suggestion breakdown — parse all response_data entries (same source as feedback page)
+  interface ResponseEntry { actionable?: boolean | null; status?: string | null; reply_sent_at?: string | null }
+  const allEntries: ResponseEntry[] = []
+  for (const row of responseRows) {
+    try { (JSON.parse(row.response_data ?? '[]') as ResponseEntry[]).forEach(e => allEntries.push(e)) } catch { /* skip */ }
+  }
+  const totalSuggestions = allEntries.length
   const totalResponses = totalSuggestionsReceived
-  const pendingForAction = feedbackItems.filter(f => f.status === 'Open' || f.status === 'In Progress').length
-  const processImproved = Number(kpiRow?.process_improvements ?? 0)
-  const actionable = pendingForAction + processImproved
-  const nonActionable = feedbackItems.filter(f => f.type !== 'Actionable' && f.type !== 'Query').length
+  const actionable = allEntries.filter(e => e.actionable === true).length
+  const pendingForAction = allEntries.filter(e => e.actionable == null).length
+  const processImproved = allEntries.filter(e => e.status === 'process-improved').length
+  const nonActionable = allEntries.filter(e => e.actionable === false).length
+
+  // Polls with pending feedback — responses where actionable is null (not yet reviewed), grouped by poll
+  const pollMap2 = new Map(polls.map(p => [p.id, p.topic]))
+  const pendingByPoll = new Map<string, { poll_title: string | null; count: number; poll_id: string | null }>()
+  for (const row of responseRows) {
+    let entries: ResponseEntry[] = []
+    try { entries = JSON.parse(row.response_data ?? '[]') as ResponseEntry[] } catch { continue }
+    const pendingCount = entries.filter(e => e.actionable == null).length
+    if (pendingCount === 0) continue
+    const poll_id = row.poll_id
+    const poll_title = pollMap2.get(poll_id) ?? null
+    const existing = pendingByPoll.get(poll_id)
+    if (existing) existing.count += pendingCount
+    else pendingByPoll.set(poll_id, { poll_title, poll_id, count: pendingCount })
+  }
+  const pollsWithFeedbackPending = [...pendingByPoll.values()]
+    .sort((a, b) => b.count - a.count)
 
   // Feedback pending categories
   const rmsTaskRaised = feedbackItems.filter(f => f.category === 'RMS Task Raised')
@@ -164,6 +186,7 @@ export async function GET() {
       processImproved,
       nonActionable,
     },
+    pollsWithFeedbackPending,
     feedbackPending: {
       rmsTaskRaised,
       actionYetToStart,

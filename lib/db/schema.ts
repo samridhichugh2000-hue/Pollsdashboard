@@ -158,6 +158,42 @@ export async function runMigrations() {
   try {
     await db.execute(`ALTER TABLE regular_polls ADD COLUMN auto_approve INTEGER DEFAULT 0`)
   } catch { /* already exists */ }
+
+  // Employee master cache — email is primary key (bulk API doesn't return emp_codes)
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS employees (
+        email_address TEXT PRIMARY KEY,
+        emp_code TEXT,
+        first_name TEXT,
+        last_name TEXT,
+        manager_name TEXT,
+        department_name TEXT,
+        designation_name TEXT,
+        synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+  // Migrate old emp_code-keyed table to email-keyed
+  try {
+    const cols = await db.execute(`PRAGMA table_info(employees)`)
+    const firstName = (cols.rows[0] as unknown as { name?: string; 1?: string })[1] as string
+    if (firstName === 'emp_code') {
+      await db.execute(`DROP TABLE employees`)
+      await db.execute(`
+        CREATE TABLE employees (
+          email_address TEXT PRIMARY KEY,
+          emp_code TEXT,
+          first_name TEXT,
+          last_name TEXT,
+          manager_name TEXT,
+          department_name TEXT,
+          designation_name TEXT,
+          synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+    }
+  } catch { /* already migrated */ }
 }
 
 export async function initializeDatabase() {

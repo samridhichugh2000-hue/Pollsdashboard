@@ -8,6 +8,7 @@ import {
   ClipboardList, Clock, MessageSquare, TrendingUp, BarChart3, Zap,
   CalendarClock, ChevronDown, ChevronUp, Loader2, ArrowRight
 } from 'lucide-react'
+
 import Link from 'next/link'
 
 interface PendingPoll {
@@ -54,6 +55,7 @@ interface OverviewData {
     processImproved: number
     nonActionable: number
   }
+  pollsWithFeedbackPending: { poll_title: string | null; poll_id: string | null; count: number }[]
   feedbackPending: {
     rmsTaskRaised: FeedbackItem[]
     actionYetToStart: FeedbackItem[]
@@ -78,6 +80,7 @@ const defaultData: OverviewData = {
   pollBreakdown: { notSentForApproval: 0, approvalPending: 0, activePolls: 0, pollsClosed: 0, resultNotSentSir: 0, resultNotSentVoter: 0 },
   cadenceBreakdown: { total: 0, monthly: 0, quarterly: 0, biAnnual: 0, annual: 0, scheduledReleased: 0, overdue: 0 },
   suggestionBreakdown: { total: 0, actionable: 0, pendingForAction: 0, processImproved: 0, nonActionable: 0 },
+  pollsWithFeedbackPending: [],
   feedbackPending: { rmsTaskRaised: [], actionYetToStart: [], annexurePending: [] },
   pendingPolls: [],
 }
@@ -159,6 +162,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const [data, setData] = useState<OverviewData>(defaultData)
   const [loading, setLoading] = useState(true)
+  const [showAllPending, setShowAllPending] = useState(false)
 
   const fetchData = useCallback(() =>
     fetch('/api/overview')
@@ -196,7 +200,7 @@ export default function DashboardPage() {
       icon: MessageSquare,
       color: 'text-blue-600',
       iconBg: 'bg-blue-50',
-      onClick: undefined,
+      onClick: () => router.push('/feedback'),
     },
     {
       label: 'Suggestions Pending Review',
@@ -204,7 +208,10 @@ export default function DashboardPage() {
       icon: BarChart3,
       color: 'text-amber-600',
       iconBg: 'bg-amber-50',
-      onClick: undefined,
+      onClick: () => {
+        const el = document.getElementById('feedback-pending-section')
+        if (el) el.scrollIntoView({ behavior: 'smooth' })
+      },
     },
     {
       label: 'Process Improvement',
@@ -274,13 +281,13 @@ export default function DashboardPage() {
             <CalendarClock className="h-4 w-4 text-cyan-500" />
             <h2 className="font-semibold text-gray-900 dark:text-white">Cadence Breakdown</h2>
           </div>
-          <BreakdownRow label="Total Cadence" value={data.cadenceBreakdown.total} color="bg-cyan-400" />
-          <BreakdownRow label="Monthly" value={data.cadenceBreakdown.monthly} color="bg-blue-400" />
-          <BreakdownRow label="Quarterly" value={data.cadenceBreakdown.quarterly} color="bg-indigo-400" />
-          {data.cadenceBreakdown.biAnnual > 0 && <BreakdownRow label="Bi-Annual" value={data.cadenceBreakdown.biAnnual} color="bg-violet-400" />}
-          {data.cadenceBreakdown.annual > 0 && <BreakdownRow label="Annual" value={data.cadenceBreakdown.annual} color="bg-purple-400" />}
-          <BreakdownRow label="Scheduled & Released" value={data.cadenceBreakdown.scheduledReleased} color="bg-emerald-400" />
-          <BreakdownRow label="Overdue" value={data.cadenceBreakdown.overdue} color="bg-red-400" />
+          <BreakdownRow label="Total Cadence"          value={data.cadenceBreakdown.total}            color="bg-cyan-400"    href="/cadence?card=all" />
+          <BreakdownRow label="Monthly"                value={data.cadenceBreakdown.monthly}          color="bg-blue-400"    href="/cadence?card=all" />
+          <BreakdownRow label="Quarterly"              value={data.cadenceBreakdown.quarterly}        color="bg-indigo-400"  href="/cadence?card=all" />
+          {data.cadenceBreakdown.biAnnual > 0 && <BreakdownRow label="Bi-Annual" value={data.cadenceBreakdown.biAnnual} color="bg-violet-400" href="/cadence?card=all" />}
+          {data.cadenceBreakdown.annual > 0 && <BreakdownRow label="Annual" value={data.cadenceBreakdown.annual} color="bg-purple-400" href="/cadence?card=all" />}
+          <BreakdownRow label="Scheduled & Released"  value={data.cadenceBreakdown.scheduledReleased} color="bg-emerald-400" href="/cadence?card=released" />
+          <BreakdownRow label="Overdue"               value={data.cadenceBreakdown.overdue}           color="bg-red-400"    href="/cadence?card=overdue" />
         </div>
 
         {/* Suggestion Breakdown */}
@@ -289,11 +296,11 @@ export default function DashboardPage() {
             <MessageSquare className="h-4 w-4 text-blue-500" />
             <h2 className="font-semibold text-gray-900 dark:text-white">Suggestion Breakdown</h2>
           </div>
-          <BreakdownRow label="Total" value={data.suggestionBreakdown.total} color="bg-blue-400" />
-          <BreakdownRow label="Actionable" value={data.suggestionBreakdown.actionable} color="bg-orange-400" />
-          <BreakdownRow label="Pending for Action" value={data.suggestionBreakdown.pendingForAction} color="bg-amber-400" />
-          <BreakdownRow label="Process Improved" value={data.suggestionBreakdown.processImproved} color="bg-emerald-400" />
-          <BreakdownRow label="Non-Actionable" value={data.suggestionBreakdown.nonActionable} color="bg-slate-400" />
+          <BreakdownRow label="Total"            value={data.suggestionBreakdown.total}           color="bg-blue-400"    href="/feedback?card=total" />
+          <BreakdownRow label="Actionable"       value={data.suggestionBreakdown.actionable}      color="bg-orange-400"  href="/feedback?card=actionable" />
+          <BreakdownRow label="Pending for Action" value={data.suggestionBreakdown.pendingForAction} color="bg-amber-400" href="/feedback?card=pending" />
+          <BreakdownRow label="Process Improved" value={data.suggestionBreakdown.processImproved} color="bg-emerald-400" href="/feedback?card=process-improved" />
+          <BreakdownRow label="Non-Actionable"   value={data.suggestionBreakdown.nonActionable}   color="bg-slate-400"   href="/feedback?card=non-actionable" />
         </div>
       </div>
 
@@ -359,40 +366,57 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Feedback Pending for Review */}
-      <div id="feedback-pending" className="rounded-2xl bg-white dark:bg-[#1e2535] shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] px-5 py-4">
+      {/* Polls with feedback pending for review */}
+      <div id="feedback-pending-section" className="rounded-2xl bg-white dark:bg-[#1e2535] shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] px-5 py-4">
         <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100 dark:border-slate-700">
           <MessageSquare className="h-4 w-4 text-amber-500" />
-          <h2 className="font-semibold text-gray-900 dark:text-white">Feedback Pending for Review</h2>
-          <span className="ml-auto text-xs text-gray-400">
-            {data.feedbackPending.rmsTaskRaised.length + data.feedbackPending.actionYetToStart.length + data.feedbackPending.annexurePending.length} items
+          <h2 className="font-semibold text-gray-900 dark:text-white">Polls with feedback pending for review</h2>
+          <span className="ml-1.5 text-xs font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
+            {data.pollsWithFeedbackPending.length}
           </span>
+          <Link href="/feedback" className="ml-auto flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-800 font-medium transition-colors">
+            View all <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
-        {data.feedbackPending.rmsTaskRaised.length === 0 &&
-         data.feedbackPending.actionYetToStart.length === 0 &&
-         data.feedbackPending.annexurePending.length === 0 ? (
-          <p className="text-center py-8 text-sm text-gray-400">No feedback pending for review</p>
+        {data.pollsWithFeedbackPending.length === 0 ? (
+          <p className="text-center py-8 text-sm text-gray-400 dark:text-slate-500">No feedback pending for review</p>
         ) : (
-          <div className="space-y-2">
-            <FeedbackCategory
-              title="RMS Task Raised"
-              items={data.feedbackPending.rmsTaskRaised}
-              color="bg-orange-100 text-orange-700"
-              expandedBg="bg-orange-50"
-            />
-            <FeedbackCategory
-              title="Action Yet to Start"
-              items={data.feedbackPending.actionYetToStart}
-              color="bg-amber-100 text-amber-700"
-              expandedBg="bg-amber-50"
-            />
-            <FeedbackCategory
-              title="Annexure Pending from Sir"
-              items={data.feedbackPending.annexurePending}
-              color="bg-red-100 text-red-700"
-              expandedBg="bg-red-50"
-            />
-          </div>
+          <>
+            <div className="divide-y divide-gray-50 dark:divide-slate-700/50">
+              {(showAllPending ? data.pollsWithFeedbackPending : data.pollsWithFeedbackPending.slice(0, 6)).map((p, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-lg hover:bg-amber-50/60 dark:hover:bg-amber-900/10 transition-colors cursor-default"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="h-2 w-2 rounded-full bg-amber-400 flex-shrink-0" />
+                    <span className="text-sm text-gray-700 dark:text-slate-300 truncate">{p.poll_title ?? 'Untitled Poll'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">{p.count} pending</span>
+                    <Link
+                      href={p.poll_id ? `/feedback?poll=${p.poll_id}` : '/feedback'}
+                      className="text-xs text-amber-500 dark:text-amber-400 hover:text-amber-700 font-medium transition-colors whitespace-nowrap"
+                    >
+                      View responses →
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {data.pollsWithFeedbackPending.length > 6 && (
+              <div className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700">
+                <button
+                  onClick={() => setShowAllPending(v => !v)}
+                  className="flex items-center justify-center gap-1.5 w-full text-sm text-amber-600 dark:text-amber-400 hover:text-amber-800 font-medium transition-colors"
+                >
+                  {showAllPending
+                    ? <>Show less <ChevronUp className="h-3.5 w-3.5" /></>
+                    : <>View {data.pollsWithFeedbackPending.length - 6} more polls <ChevronDown className="h-3.5 w-3.5" /></>}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

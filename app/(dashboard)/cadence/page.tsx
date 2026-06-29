@@ -1,8 +1,9 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Plus, RefreshCw, CalendarClock, Edit2, Trash2, Play, Power, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -91,25 +92,27 @@ function FrequencyBadge({ frequency }: { frequency: string }) {
   )
 }
 
-// ── Stat Cards ────────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, colour, onClick }: {
-  label: string; value: number; colour: string; onClick?: () => void
+function StatCard({ label, value, colour, active, onClick }: {
+  label: string; value: number; colour: string; active?: boolean; onClick?: () => void
 }) {
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col gap-1 rounded-2xl bg-white px-5 py-4 shadow-sm border border-gray-100 text-left transition-all hover:shadow-md hover:-translate-y-0.5 ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
+      className={`flex flex-col gap-1 rounded-2xl px-5 py-4 shadow-sm border text-left transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${active ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-100'}`}
     >
-      <span className={`text-2xl font-bold ${colour}`}>{value}</span>
-      <span className="text-xs text-gray-500 font-medium">{label}</span>
+      <span className={`text-2xl font-bold ${active ? 'text-white' : colour}`}>{value}</span>
+      <span className={`text-xs font-medium ${active ? 'text-slate-300' : 'text-gray-500'}`}>{label}</span>
     </button>
   )
 }
 
+type FilterKey = 'all' | 'upcoming' | 'overdue' | 'released'
+
 export default function CadencePage() {
   const [polls, setPolls] = useState<RegularPoll[]>([])
   const [loading, setLoading] = useState(true)
+  const searchParams = useSearchParams()
+  const [activeFilter, setActiveFilter] = useState<FilterKey>((searchParams.get('card') as FilterKey) ?? 'all')
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -218,21 +221,38 @@ export default function CadencePage() {
     finally { setReleasing(false) }
   }
 
-  const scrollToCadenceTable = () => {
+  const releasingTemplate = polls.find(p => p.id === releaseId)
+
+  const todayMs = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime() })()
+  const weekMs = todayMs + 7 * 86400000
+  const upcomingPolls = polls.filter(p => p.is_active && (isDueTomorrow(p.next_run_date) || isDueToday(p.next_run_date)))
+
+  const total = polls.length
+  const upcomingCount = polls.filter(p => {
+    if (!p.is_active) return false
+    const d = new Date(p.next_run_date); d.setHours(0, 0, 0, 0)
+    return d.getTime() > todayMs && d.getTime() <= weekMs
+  }).length
+  const overdueCount = polls.filter(p => p.is_active && isDueToday(p.next_run_date)).length
+  const releasedCount = polls.filter(p => p.last_run_date != null).length
+
+  const handleCardClick = (key: FilterKey) => {
+    setActiveFilter(f => f === key ? 'all' : key)
     document.getElementById('cadence-table')?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const upcomingPolls = polls.filter(p => p.is_active && (isDueTomorrow(p.next_run_date) || isDueToday(p.next_run_date)))
-  const releasingTemplate = polls.find(p => p.id === releaseId)
+  const filteredPolls = polls.filter(p => {
+    if (activeFilter === 'all') return true
+    if (activeFilter === 'upcoming') {
+      if (!p.is_active) return false
+      const d = new Date(p.next_run_date); d.setHours(0, 0, 0, 0)
+      return d.getTime() > todayMs && d.getTime() <= weekMs
+    }
+    if (activeFilter === 'overdue') return p.is_active && isDueToday(p.next_run_date)
+    if (activeFilter === 'released') return p.last_run_date != null
+    return true
+  })
 
-  // Stat card counts
-  const total = polls.length
-  const scheduled = polls.filter(p => p.is_active && !isDueToday(p.next_run_date)).length
-  const released = polls.filter(p => p.last_run_date != null).length
-  const overdue = polls.filter(p => p.is_active && isDueToday(p.next_run_date)).length
-  const autoApprove = polls.filter(p => p.auto_approve === 1).length
-
-  // Frequency breakdown counts
   const byFreq: Record<string, number> = {}
   for (const p of polls) {
     byFreq[p.frequency] = (byFreq[p.frequency] ?? 0) + 1
@@ -247,11 +267,10 @@ export default function CadencePage() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Poll Cadence</h1>
-          <p className="text-sm text-slate-500">{polls.length} template{polls.length !== 1 ? 's' : ''} · auto-releases daily at 9 AM</p>
+          <p className="text-sm text-slate-500">{polls.length} template{polls.length !== 1 ? 's' : ''} &middot; auto-releases daily at 9 AM</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm" onClick={fetchPolls}>
@@ -263,16 +282,13 @@ export default function CadencePage() {
         </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <StatCard label="Total Cadence Polls" value={total} colour="text-purple-600" onClick={scrollToCadenceTable} />
-        <StatCard label="Scheduled" value={scheduled} colour="text-amber-600" onClick={scrollToCadenceTable} />
-        <StatCard label="Released" value={released} colour="text-emerald-600" onClick={scrollToCadenceTable} />
-        <StatCard label="Overdue" value={overdue} colour="text-red-600" onClick={scrollToCadenceTable} />
-        <StatCard label="Auto-Approve" value={autoApprove} colour="text-cyan-600" onClick={scrollToCadenceTable} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label="Total Cadence Polls" value={total} colour="text-purple-600" active={activeFilter === 'all'} onClick={() => handleCardClick('all')} />
+        <StatCard label="Upcoming (this week)" value={upcomingCount} colour="text-teal-600" active={activeFilter === 'upcoming'} onClick={() => handleCardClick('upcoming')} />
+        <StatCard label="Overdue" value={overdueCount} colour="text-red-600" active={activeFilter === 'overdue'} onClick={() => handleCardClick('overdue')} />
+        <StatCard label="Released" value={releasedCount} colour="text-emerald-600" active={activeFilter === 'released'} onClick={() => handleCardClick('released')} />
       </div>
 
-      {/* Frequency progress bars */}
       {polls.length > 0 && (
         <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-5 py-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Cadence Breakdown by Frequency</h2>
@@ -293,7 +309,6 @@ export default function CadencePage() {
         </div>
       )}
 
-      {/* Upcoming auto-release alert */}
       {upcomingPolls.length > 0 && (
         <div className="rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
           <div className="flex items-center gap-2 mb-1">
@@ -319,22 +334,29 @@ export default function CadencePage() {
         </div>
       )}
 
-      {/* Cadence table */}
       <div id="cadence-table" className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+        {activeFilter !== 'all' && (
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-slate-50">
+            <span className="text-xs font-semibold text-slate-600">
+              Showing: <span className="capitalize text-slate-800">{activeFilter === 'upcoming' ? 'Upcoming this week' : activeFilter}</span> &middot; {filteredPolls.length} poll{filteredPolls.length !== 1 ? 's' : ''}
+            </span>
+            <button onClick={() => setActiveFilter('all')} className="text-xs text-slate-400 hover:text-slate-700 underline">Clear filter</button>
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
           </div>
-        ) : polls.length === 0 ? (
+        ) : filteredPolls.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <CalendarClock className="h-10 w-10 text-gray-200 mb-3" />
-            <p className="text-sm font-medium text-gray-500">No cadence polls yet</p>
-            <p className="text-xs text-gray-400 mt-1">Add a monthly or quarterly poll template to get started</p>
-            <Button size="sm" className="mt-4" onClick={openCreate}><Plus className="mr-1.5 h-3.5 w-3.5" /> Add Cadence Poll</Button>
+            <p className="text-sm font-medium text-gray-500">{polls.length === 0 ? 'No cadence polls yet' : 'No polls match this filter'}</p>
+            {polls.length === 0 && <><p className="text-xs text-gray-400 mt-1">Add a monthly or quarterly poll template to get started</p>
+            <Button size="sm" className="mt-4" onClick={openCreate}><Plus className="mr-1.5 h-3.5 w-3.5" /> Add Cadence Poll</Button></>}
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {polls
+            {filteredPolls
               .slice()
               .sort((a, b) => new Date(a.next_run_date).getTime() - new Date(b.next_run_date).getTime())
               .map((t) => {
@@ -357,21 +379,21 @@ export default function CadencePage() {
                           <span className="font-semibold text-gray-900 text-sm">{t.name}</span>
                           <FrequencyBadge frequency={t.frequency} />
                           {!t.is_active && <span className="text-xs text-gray-400">(Paused)</span>}
-                          {dueToday && <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Overdue — releasing today</span>}
+                          {dueToday && <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Overdue &mdash; releasing today</span>}
                           {dueTomorrow && <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Releases tomorrow</span>}
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
                           <span>{t.department}</span>
-                          <span>·</span>
+                          <span>&middot;</span>
                           <span>Day {t.scheduled_day} of month</span>
-                          <span>·</span>
+                          <span>&middot;</span>
                           <span className={dueToday ? 'text-red-600 font-medium' : dueTomorrow ? 'text-amber-600 font-medium' : ''}>
                             Next: {formatDate(t.next_run_date)}
                           </span>
-                          <span>·</span>
+                          <span>&middot;</span>
                           <span>{recipientList.length} recipient{recipientList.length !== 1 ? 's' : ''}</span>
-                          {t.last_run_date && <><span>·</span><span>Last sent: {formatDate(t.last_run_date)}</span></>}
-                          {t.auto_approve === 1 && <><span>·</span><span className="text-cyan-600 font-medium">Auto-approve ON</span></>}
+                          {t.last_run_date && <><span>&middot;</span><span>Last sent: {formatDate(t.last_run_date)}</span></>}
+                          {t.auto_approve === 1 && <><span>&middot;</span><span className="text-cyan-600 font-medium">Auto-approve ON</span></>}
                         </div>
                       </div>
 
@@ -445,7 +467,6 @@ export default function CadencePage() {
         )}
       </div>
 
-      {/* Create / Edit Dialog */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingId ? 'Edit Cadence Poll' : 'New Cadence Poll'}</DialogTitle></DialogHeader>
@@ -470,7 +491,7 @@ export default function CadencePage() {
               <div>
                 <label className="text-xs font-medium text-gray-700">Day of Month *</label>
                 <input type="number" min={1} max={28} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  placeholder="1–28" value={form.scheduled_day}
+                  placeholder="1-28" value={form.scheduled_day}
                   onChange={e => setForm(f => ({ ...f, scheduled_day: e.target.value }))} />
               </div>
               <div>
@@ -483,13 +504,13 @@ export default function CadencePage() {
             <div>
               <label className="text-xs font-medium text-gray-700">Email Subject *</label>
               <input className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                placeholder="Monthly Feedback Poll – April 2026" value={form.subject}
+                placeholder="Monthly Feedback Poll" value={form.subject}
                 onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-700">Email Body *</label>
               <textarea rows={5} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-y"
-                placeholder="Dear Team,&#10;&#10;Please take a moment to fill in our monthly feedback poll..." value={form.draft_email_body}
+                value={form.draft_email_body}
                 onChange={e => setForm(f => ({ ...f, draft_email_body: e.target.value }))} />
             </div>
             <div>
@@ -502,13 +523,12 @@ export default function CadencePage() {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button>
-              <Button onClick={saveForm} disabled={saving}>{saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Cadence Poll'}</Button>
+              <Button onClick={saveForm} disabled={saving}>{saving ? 'Saving...' : editingId ? 'Save Changes' : 'Create Cadence Poll'}</Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Release Dialog */}
       <Dialog open={!!releaseId} onOpenChange={(open) => { if (!open) setReleaseId(null) }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Release: {releasingTemplate?.name}</DialogTitle></DialogHeader>
@@ -549,7 +569,7 @@ export default function CadencePage() {
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setReleaseId(null)}>Cancel</Button>
                 <Button className="bg-amber-500 hover:bg-amber-600" onClick={doRelease} disabled={releasing}>
-                  {releasing ? 'Releasing…' : 'Release Now'}
+                  {releasing ? 'Releasing...' : 'Release Now'}
                 </Button>
               </div>
             </div>

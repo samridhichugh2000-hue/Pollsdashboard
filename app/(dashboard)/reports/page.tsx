@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BarChart3, X, Loader2, RefreshCw, Clock, User, Mail, ChevronDown, ChevronUp, Save, ExternalLink, Send, Upload, Zap } from 'lucide-react'
+import { BarChart3, X, Loader2, RefreshCw, Clock, User, Mail, ChevronDown, ChevronUp, Save, ExternalLink, Send, Upload, Zap, TrendingUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { StatusBadge } from '@/components/polls/status-badge'
 import { formatDateTime, formatRelative } from '@/lib/utils'
@@ -30,6 +30,80 @@ const CLS_CONFIG: Record<Classification, { label: string; active: string; inacti
   rms:     { label: 'RMS',     active: 'bg-blue-500 text-white border-blue-500',     inactive: 'border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600' },
   non_rms: { label: 'Non-RMS', active: 'bg-purple-500 text-white border-purple-500', inactive: 'border-gray-200 text-gray-600 hover:border-purple-400 hover:text-purple-600' },
   partial: { label: 'Partial', active: 'bg-orange-500 text-white border-orange-500', inactive: 'border-gray-200 text-gray-600 hover:border-orange-400 hover:text-orange-600' },
+}
+
+interface MonthBucket { month: string; label: string; count: number }
+interface ChartData { monthlyPolls: MonthBucket[]; monthlyResponses: MonthBucket[]; from: string; to: string }
+
+function monthLabel(ym: string) {
+  const [y, m] = ym.split('-')
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+}
+
+// Generate all YYYY-MM values from 2024-01 to current month
+function allMonthOptions() {
+  const opts: { value: string; label: string }[] = []
+  const now = new Date()
+  let y = 2024, m = 1
+  while (y < now.getFullYear() || (y === now.getFullYear() && m <= now.getMonth() + 1)) {
+    const val = `${y}-${String(m).padStart(2, '0')}`
+    opts.push({ value: val, label: monthLabel(val) })
+    m++; if (m > 12) { m = 1; y++ }
+  }
+  return opts
+}
+
+function BarChart({ data, color, emptyText }: { data: MonthBucket[]; color: string; emptyText: string }) {
+  const max = Math.max(...data.map(d => d.count), 1)
+  const W = 700
+  const H = 220
+  const padL = 36
+  const padR = 12
+  const padT = 20
+  const padB = 40
+  const chartW = W - padL - padR
+  const chartH = H - padT - padB
+  const barW = Math.max(Math.floor(chartW / data.length) - 4, 8)
+  const barGap = (chartW - barW * data.length) / (data.length - 1 || 1)
+
+  // Y-axis ticks (4 levels)
+  const ticks = [0, Math.round(max / 3), Math.round((2 * max) / 3), max]
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: H }}>
+      {/* grid lines */}
+      {ticks.map(t => {
+        const y = padT + chartH - (t / max) * chartH
+        return (
+          <g key={t}>
+            <line x1={padL} x2={W - padR} y1={y} y2={y} stroke="currentColor" strokeWidth={0.5} opacity={0.12} />
+            <text x={padL - 4} y={y + 4} textAnchor="end" fontSize={9} fill="currentColor" opacity={0.4}>{t}</text>
+          </g>
+        )
+      })}
+      {/* bars */}
+      {data.map((d, i) => {
+        const x = padL + i * (barW + barGap)
+        const barH = Math.max((d.count / max) * chartH, d.count > 0 ? 2 : 0)
+        const y = padT + chartH - barH
+        return (
+          <g key={d.month}>
+            <rect x={x} y={y} width={barW} height={barH} rx={3} fill={color} opacity={0.85} />
+            {d.count > 0 && (
+              <text x={x + barW / 2} y={y - 3} textAnchor="middle" fontSize={9} fill={color} fontWeight="600">{d.count}</text>
+            )}
+            <text x={x + barW / 2} y={H - 2} textAnchor="middle" fontSize={8} fill="currentColor" opacity={0.45}
+              transform={data.length > 8 ? `rotate(-35 ${x + barW / 2} ${H - 2})` : undefined}>
+              {d.label.split(' ')[0]}
+            </text>
+          </g>
+        )
+      })}
+      {data.every(d => d.count === 0) && (
+        <text x={W / 2} y={H / 2} textAnchor="middle" fontSize={11} fill="currentColor" opacity={0.3}>{emptyText}</text>
+      )}
+    </svg>
+  )
 }
 
 function ManageDialog({ poll, onClose }: { poll: Poll; onClose: () => void }) {
@@ -373,19 +447,45 @@ export default function ReportsPage() {
   const [managePoll, setManagePoll] = useState<Poll | null>(null)
   const [uploadingId, setUploadingId] = useState<string | null>(null)
   const [pushingRmsId, setPushingRmsId] = useState<string | null>(null)
+  const [chartData, setChartData] = useState<ChartData | null>(null)
+  const [chartFrom, setChartFrom] = useState('2026-05')
+  const [chartTo, setChartTo] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
   const uploadInputRef = useRef<HTMLInputElement>(null)
   const uploadTargetPoll = useRef<Poll | null>(null)
+  const monthOpts = allMonthOptions()
+
+  const fetchCharts = useCallback(async (from?: string, to?: string) => {
+    const now = new Date()
+    const defaultTo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const resolvedFrom = from ?? '2026-05'
+    const resolvedTo = to ?? defaultTo
+    const params = new URLSearchParams({ from: resolvedFrom, to: resolvedTo })
+    const charts = await fetch(`/api/reports/charts?${params}`).then(r => r.ok ? r.json() : null) as ChartData | null
+    if (charts) setChartData(charts)
+  }, [])
 
   const fetchPolls = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await fetch('/api/polls').then(r => r.ok ? r.json() : []) as Poll[]
-      setPolls(data.filter(p => RELEASED_STATUSES.includes(p.status)))
+      const [pollsData] = await Promise.all([
+        fetch('/api/polls').then(r => r.ok ? r.json() : []) as Promise<Poll[]>,
+        fetchCharts(),
+      ])
+      setPolls(pollsData.filter(p => RELEASED_STATUSES.includes(p.status)))
     } catch { toast.error('Failed to load polls') }
     finally { setLoading(false) }
-  }, [])
+  }, [fetchCharts])
 
   useEffect(() => { void fetchPolls() }, [fetchPolls])
+
+  const handleRangeChange = (from: string, to: string) => {
+    setChartFrom(from)
+    setChartTo(to)
+    void fetchCharts(from, to)
+  }
 
   const fileToBase64 = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -446,6 +546,72 @@ export default function ReportsPage() {
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
         </button>
       </div>
+
+      {/* Chart date range picker */}
+      {chartData && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Date range:</span>
+          <div className="flex items-center gap-2">
+            <select value={chartFrom} onChange={e => handleRangeChange(e.target.value, chartTo)}
+              className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 cursor-pointer">
+              {monthOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <span className="text-slate-400 text-sm">to</span>
+            <select value={chartTo} onChange={e => handleRangeChange(chartFrom, e.target.value)}
+              className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 cursor-pointer">
+              {monthOpts.filter(o => o.value >= chartFrom).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <button onClick={() => { const now = new Date(); const t = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`; setChartFrom('2026-05'); setChartTo(t); void fetchCharts('2026-05', t) }}
+            className="text-xs text-indigo-500 hover:text-indigo-700 underline underline-offset-2 transition-colors">
+            Reset
+          </button>
+        </div>
+      )}
+
+      {/* Charts */}
+      {chartData && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {[
+            {
+              title: 'Month-wise Polls',
+              subtitle: 'Polls released per month',
+              data: chartData.monthlyPolls,
+              color: '#6366f1',
+              total: chartData.monthlyPolls.reduce((s, d) => s + d.count, 0),
+            },
+            {
+              title: 'Month-wise Responses',
+              subtitle: 'Responses collected per month',
+              data: chartData.monthlyResponses,
+              color: '#0891b2',
+              total: chartData.monthlyResponses.reduce((s, d) => s + d.count, 0),
+            },
+          ].map(chart => (
+            <div key={chart.title} className="rounded-2xl bg-white dark:bg-[#1a2035] border border-gray-100 dark:border-slate-700/50 shadow-sm p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">{chart.title}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{chart.subtitle}</p>
+                </div>
+                <div className="flex items-center gap-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1">
+                  <TrendingUp className="h-3 w-3 text-indigo-500" />
+                  <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{chart.total}</span>
+                </div>
+              </div>
+              <div className="text-gray-800 dark:text-slate-300">
+                <BarChart data={chart.data} color={chart.color} emptyText="No data yet" />
+              </div>
+              {/* month labels row */}
+              <div className="flex justify-between mt-1 px-1">
+                {chart.data.filter((_, i) => i === 0 || i === chart.data.length - 1).map(d => (
+                  <span key={d.month} className="text-[10px] text-gray-400 dark:text-slate-500">{d.label}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
         {loading ? (
