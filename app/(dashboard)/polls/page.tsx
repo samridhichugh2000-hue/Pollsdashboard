@@ -196,7 +196,7 @@ function PollsContent() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {statCards.map(({ key, label, value, color, bg, border, ring }) => (
           <button
             key={key}
