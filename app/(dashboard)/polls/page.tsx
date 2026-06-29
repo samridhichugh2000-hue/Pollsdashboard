@@ -140,7 +140,7 @@ function PollsContent() {
     { key: 'approval-pending', label: 'Approval Pending',        value: filterByCard(nonArchived, 'approval-pending').length, color: 'text-violet-700',  bg: 'bg-violet-50',  border: 'border-violet-200',  ring: 'ring-violet-400' },
     { key: 'active',           label: 'Active Polls',            value: filterByCard(nonArchived, 'active').length,           color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', ring: 'ring-emerald-400' },
     { key: 'closed',           label: 'Polls Closed',            value: filterByCard(nonArchived, 'closed').length,           color: 'text-slate-700',   bg: 'bg-slate-50',   border: 'border-slate-200',   ring: 'ring-slate-400' },
-    { key: 'result-sir',       label: 'Result Not Sent (Sir)',   value: filterByCard(nonArchived, 'result-sir').length,       color: 'text-orange-700',  bg: 'bg-orange-50',  border: 'border-orange-200',  ring: 'ring-orange-400' },
+    { key: 'result-sir',       label: 'Result Not Sent (Sir/Poll Requester)',   value: filterByCard(nonArchived, 'result-sir').length,       color: 'text-orange-700',  bg: 'bg-orange-50',  border: 'border-orange-200',  ring: 'ring-orange-400' },
     { key: 'total',            label: 'Total Polls',             value: nonArchived.length,                                   color: 'text-purple-700',  bg: 'bg-purple-50',  border: 'border-purple-200',  ring: 'ring-purple-400' },
   ]
 
