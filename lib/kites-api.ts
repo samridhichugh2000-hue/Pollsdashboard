@@ -25,19 +25,48 @@ type PollFields = Pick<Poll,
   'release_emails' | 'department' | 'requested_by' | 'deadline'
 >
 
+const KITES_BASE = 'https://api.koenig-solutions.com'
+
+interface KitesTokenResult {
+  accessToken: string
+  deviceToken: string
+}
+
+async function getKitesToken(username: string, password: string, role: string): Promise<KitesTokenResult> {
+  const res = await fetch(`${KITES_BASE}/api/Kites/Operator/GetToken`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userName: username, userPassword: password, userRole: role }),
+  })
+  if (!res.ok) throw new Error(`GetToken failed: ${res.status}`)
+  const json = await res.json() as { statuscode: number; content: { accessToken: string; deviceToken: string } }
+  if (json.statuscode !== 200) throw new Error(`GetToken error: ${json.statuscode}`)
+  return { accessToken: json.content.accessToken, deviceToken: json.content.deviceToken }
+}
+
 export async function pushPollToKites(
   poll: PollFields,
   options?: { htmlContent?: string; para?: string }
 ): Promise<KitesResult> {
   const apiKey = process.env.KITES_API_KEY
-  const accessToken = process.env.KITES_ACCESS_TOKEN
-  const deviceToken = process.env.KITES_DEVICE_TOKEN
+  const username = process.env.KITES_USERNAME
+  const password = process.env.KITES_PASSWORD
+  const role = process.env.KITES_ROLE
 
-  if (!apiKey || !accessToken || !deviceToken) {
-    return { success: false, error: 'Kites API credentials not configured (KITES_API_KEY / KITES_ACCESS_TOKEN / KITES_DEVICE_TOKEN)' }
+  if (!apiKey || !username || !password || !role) {
+    return { success: false, error: 'Kites API credentials not configured (KITES_API_KEY / KITES_USERNAME / KITES_PASSWORD / KITES_ROLE)' }
   }
 
-  const url = `https://api.koenig-solutions.com/api/Kites/Operator/common?apikey=${encodeURIComponent(apiKey)}&accessToken=${encodeURIComponent(accessToken)}&deviceToken=${encodeURIComponent(deviceToken)}`
+  let accessToken: string, deviceToken: string
+  try {
+    const tokens = await getKitesToken(username, password, role)
+    accessToken = tokens.accessToken
+    deviceToken = tokens.deviceToken
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to get Kites token' }
+  }
+
+  const url = `${KITES_BASE}/api/Kites/Operator/common?apikey=${encodeURIComponent(apiKey)}&accessToken=${encodeURIComponent(accessToken)}&deviceToken=${encodeURIComponent(deviceToken)}`
 
   const sendFrom = `${process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com'};`
 
