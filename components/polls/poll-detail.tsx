@@ -748,7 +748,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   <CardHeader><CardTitle>Draft Email Body</CardTitle></CardHeader>
                   <CardContent>
                     <div
-                      className="rounded-md bg-gray-50 p-3 text-sm text-gray-700 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 dark:bg-slate-900 dark:text-slate-200"
+                      className="rounded-md bg-gray-50 p-3 text-sm text-gray-700 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 dark:bg-slate-900 dark:text-slate-200 dark:[&_*]:!bg-transparent dark:[&_*]:!text-slate-200"
                       dangerouslySetInnerHTML={{ __html: sanitizeWordHtml(poll.draft_email_body) }}
                     />
                   </CardContent>
@@ -1545,7 +1545,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Draft Email Body</p>
                   <div
-                    className="rounded bg-white border border-gray-200 p-3 text-sm text-gray-700 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200"
+                    className="rounded bg-white border border-gray-200 p-3 text-sm text-gray-700 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:[&_*]:!bg-transparent dark:[&_*]:!text-slate-200"
                     dangerouslySetInnerHTML={{ __html: sanitizeWordHtml(poll.draft_email_body) }}
                   />
                 </div>
