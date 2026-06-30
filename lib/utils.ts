@@ -74,6 +74,13 @@ export function sanitizeWordHtml(html: string): string {
     .replace(/<meta[^>]*\/?>/gi, '')                            // meta tags
     .replace(/<link[^>]*\/?>/gi, '')                            // link tags
     .replace(/<\/?[ow]:[a-z]+[^>]*>/gi, '')                     // o:p, w:* namespace tags
+    .replace(/style="([^"]*)"/gi, (_, styles: string) => {
+      const cleaned = styles
+        .split(';')
+        .filter(s => !/^\s*(background(-color)?|color)\s*:/i.test(s))
+        .join(';')
+      return cleaned.trim() ? `style="${cleaned}"` : ''
+    })
     .trim()
 }
 
