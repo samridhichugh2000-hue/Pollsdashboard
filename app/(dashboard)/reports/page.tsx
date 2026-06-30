@@ -529,6 +529,7 @@ export default function ReportsPage() {
       })
       if (!res.ok) throw new Error((await res.json() as { error: string }).error)
       toast.success('Pushed to RMS successfully')
+      void fetchPolls()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Push to RMS failed')
     } finally { setPushingRmsId(null) }
@@ -654,12 +655,17 @@ export default function ReportsPage() {
                     Manage →
                   </button>
                 </div>
-                <div className="px-5 pb-3">
+                <div className="px-5 pb-3 flex items-center gap-3">
                   <button onClick={() => void handlePushToRms(poll)} disabled={pushingRmsId === poll.id}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20 px-3 py-1.5 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:bg-teal-100 transition-colors disabled:opacity-50">
                     {pushingRmsId === poll.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
                     Push to RMS
                   </button>
+                  {poll.rms_news_id && (
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      News ID: <span className="font-semibold text-teal-600 dark:text-teal-400">{poll.rms_news_id}</span>
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
