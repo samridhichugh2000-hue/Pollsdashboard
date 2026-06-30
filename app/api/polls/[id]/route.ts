@@ -571,9 +571,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         void XLSX.write(rmsWb, { type: 'base64', bookType: 'xlsx' })
 
         const responsesHtml = buildResponsesHtml(rmsEntries)
-        const para = `<p><strong>Topic:</strong> ${poll.topic}</p><p><strong>Department:</strong> ${poll.department}</p><p><strong>Total responses:</strong> ${rmsEntries.length}</p>`
 
-        const kitesResult = await pushPollToKites(poll, { htmlContent: responsesHtml, para })
+        const kitesResult = await pushPollToKites(poll, { para: responsesHtml })
 
         if (kitesResult.success) {
           const newsId = kitesResult.newsId ? String(kitesResult.newsId) : null

@@ -68,7 +68,7 @@ export async function pushPollToKites(
 
   const url = `${KITES_BASE}/api/Kites/Operator/common?apikey=${encodeURIComponent(apiKey)}&accessToken=${encodeURIComponent(accessToken)}&deviceToken=${encodeURIComponent(deviceToken)}`
 
-  const sendFrom = `${process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com'};`
+  const sendFrom = `${process.env.PRIYA_EMAIL ?? 'Priya.upadhyay@koenig-solutions.com'};`
 
   let sendTo: string | null = null
   if (poll.release_emails) {
@@ -87,8 +87,8 @@ export async function pushPollToKites(
 
   const payload: KitesPayload = {
     Type: 1,
-    EmpId: Number(process.env.KITES_EMP_ID ?? 3599),
-    CreatedBy: Number(process.env.KITES_CREATED_BY ?? 16384),
+    EmpId: Number(process.env.KITES_EMP_ID ?? 3904),
+    CreatedBy: Number(process.env.KITES_CREATED_BY ?? 18160),
     Subject: poll.subject || poll.topic,
     NewsURL: poll.ms_form_link ?? '',
     HtmlContent: htmlContent,
