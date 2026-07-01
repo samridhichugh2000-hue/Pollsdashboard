@@ -293,7 +293,7 @@ function FeedbackPageInner() {
     pending:            entries.filter(e => e.actionable == null).length,
     'process-improved': entries.filter(e => e.status === 'process-improved').length,
     'non-actionable':   entries.filter(e => e.actionable === false).length,
-    closed:             entries.filter(e => !!e.reply_sent_at).length,
+    closed:             entries.filter(e => e.status === 'completed').length,
   }
 
   const statCards: { key: CardKey; label: string; color: string; bg: string; border: string; ring: string }[] = [
@@ -312,7 +312,7 @@ function FeedbackPageInner() {
       || (activeCard === 'pending' && e.actionable == null)
       || (activeCard === 'process-improved' && e.status === 'process-improved')
       || (activeCard === 'non-actionable' && e.actionable === false)
-      || (activeCard === 'closed' && !!e.reply_sent_at)
+      || (activeCard === 'closed' && e.status === 'completed')
     const matchesSearch = !search || (e.respondent ?? e.email ?? '').toLowerCase().includes(search.toLowerCase())
       || e.answers.some(a => a.answer.toLowerCase().includes(search.toLowerCase()))
     return matchesCard && matchesSearch
