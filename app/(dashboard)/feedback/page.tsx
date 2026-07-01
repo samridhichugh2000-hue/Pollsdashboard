@@ -163,7 +163,7 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
             <select disabled={saving} value={entry.status ?? ''}
               onChange={e => void update({ status: e.target.value || null })}
               className="text-[11px] font-medium px-2 py-1 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer disabled:opacity-50">
-              <option value="">Statusâ€¦</option>
+              <option value="">Status…</option>
               <option value="wip">WIP</option>
               <option value="completed">Completed</option>
               <option value="process-improved">Process Improved</option>
@@ -179,11 +179,11 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
           {showReply && (
             <div className="flex gap-2 items-start">
               <textarea value={replyText} onChange={e => setReplyText(e.target.value)}
-                placeholder="Type your replyâ€¦" rows={2}
+                placeholder="Type your reply…" rows={2}
                 className="flex-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-gray-800 dark:text-slate-200 resize-none focus:outline-none focus:ring-2 focus:ring-purple-400" />
               <button disabled={saving || !replyText.trim()} onClick={() => void sendReply()}
                 className="text-xs font-semibold px-3 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50">
-                {saving ? 'â€¦' : 'Send'}
+                {saving ? '…' : 'Send'}
               </button>
             </div>
           )}
@@ -269,7 +269,18 @@ function FeedbackPageInner() {
   const patchEntry = (pollId: string, idx: number, patch: Partial<Entry>) => {
     setPolls(prev => prev.map(p => {
       if (p.id !== pollId || !p.entries) return p
-      return { ...p, entries: p.entries.map((e, i) => i === idx ? { ...e, ...patch } : e) }
+      const updated = p.entries.map((e, i) => i === idx ? { ...e, ...patch } : e)
+      return {
+        ...p,
+        entries: updated,
+        totalCount: updated.length,
+        pendingCount: updated.filter(e => e.actionable == null).length,
+        actionableCount: updated.filter(e => e.actionable === true).length,
+        completedCount: updated.filter(e => e.status === 'completed').length,
+        nonActionableCount: updated.filter(e => e.actionable === false).length,
+        rmsCount: updated.filter(e => e.classification === 'rms').length,
+        nonRmsCount: updated.filter(e => e.classification === 'non_rms').length,
+      }
     }))
   }
 
@@ -388,7 +399,7 @@ function FeedbackPageInner() {
                         </span>
                         {pendingCount !== null && pendingCount > 0 && (
                           <>
-                            <span className={`text-[10px] ${isActive ? 'text-white/40' : 'text-slate-300 dark:text-slate-600'}`}>Â·</span>
+                            <span className={`text-[10px] ${isActive ? 'text-white/40' : 'text-slate-300 dark:text-slate-600'}`}>·</span>
                             <span className={`text-[10px] font-medium ${isActive ? 'text-amber-200' : 'text-amber-600 dark:text-amber-400'}`}>
                               {pendingCount} pending
                             </span>
@@ -418,7 +429,7 @@ function FeedbackPageInner() {
             {/* Poll title */}
             <div className="flex-shrink-0">
               <h2 className="text-sm font-bold text-slate-800 dark:text-white truncate">{activePoll.topic}</h2>
-              <p className="text-xs text-slate-400">{activePoll.department} Â· {activePoll.requested_by}</p>
+              <p className="text-xs text-slate-400">{activePoll.department} · {activePoll.requested_by}</p>
             </div>
 
             {/* Stat cards */}
@@ -438,7 +449,7 @@ function FeedbackPageInner() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <input value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder="Search responsesâ€¦"
+                  placeholder="Search responses…"
                   className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e2535] pl-9 pr-3 py-2 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-400" />
               </div>
               {activeCard && (
