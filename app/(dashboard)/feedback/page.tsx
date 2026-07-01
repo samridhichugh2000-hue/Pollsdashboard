@@ -135,7 +135,7 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
             {entry.answers.map((a, i) => (
               <div key={i} className={`px-3 py-2.5 ${i > 0 ? 'border-t border-slate-100 dark:border-slate-700/60' : ''}`}>
                 <p className="text-[10px] font-semibold text-slate-400 mb-1">Q{i + 1}. {a.question}</p>
-                <p className="text-xs text-gray-700 dark:text-slate-200 whitespace-pre-wrap">{a.answer || 'â€”'}</p>
+                <p className="text-xs text-gray-700 dark:text-slate-200 whitespace-pre-wrap">{a.answer || '—'}</p>
               </div>
             ))}
           </div>
