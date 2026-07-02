@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { BarChart3, X, Loader2, RefreshCw, Clock, User, Mail, ChevronDown, ChevronUp, Save, ExternalLink, Send, Upload, Zap, TrendingUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { StatusBadge } from '@/components/polls/status-badge'
@@ -445,16 +445,14 @@ export default function ReportsPage() {
   const [polls, setPolls] = useState<Poll[]>([])
   const [loading, setLoading] = useState(true)
   const [managePoll, setManagePoll] = useState<Poll | null>(null)
-  const [uploadingId, setUploadingId] = useState<string | null>(null)
   const [pushingRmsId, setPushingRmsId] = useState<string | null>(null)
+  const [uploadingKoenigId, setUploadingKoenigId] = useState<string | null>(null)
   const [chartData, setChartData] = useState<ChartData | null>(null)
   const [chartFrom, setChartFrom] = useState('2026-05')
   const [chartTo, setChartTo] = useState(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
-  const uploadInputRef = useRef<HTMLInputElement>(null)
-  const uploadTargetPoll = useRef<Poll | null>(null)
   const monthOpts = allMonthOptions()
 
   const fetchCharts = useCallback(async (from?: string, to?: string) => {
@@ -487,37 +485,20 @@ export default function ReportsPage() {
     void fetchCharts(from, to)
   }
 
-  const fileToBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve((reader.result as string).split(',')[1])
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
-
-  const handleUploadClick = (poll: Poll) => {
-    uploadTargetPoll.current = poll
-    uploadInputRef.current?.click()
-  }
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    const poll = uploadTargetPoll.current
-    if (!file || !poll) return
-    e.target.value = ''
-    setUploadingId(poll.id)
+  const handleUploadToKoenig = async (poll: Poll) => {
+    setUploadingKoenigId(poll.id)
     try {
-      const base64 = await fileToBase64(file)
       const res = await fetch(`/api/polls/${poll.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'UPLOAD_RESPONSES', fileBase64: base64, fileName: file.name }),
+        body: JSON.stringify({ action: 'UPLOAD_TO_KOENIG' }),
       })
-      if (!res.ok) throw new Error((await res.json() as { error: string }).error)
-      toast.success('Responses uploaded successfully')
+      const data = await res.json() as { error?: string; success?: boolean; entriesCount?: number }
+      if (!res.ok) throw new Error(data.error)
+      toast.success(`Results uploaded to Koenig News (${data.entriesCount} responses)`)
       void fetchPolls()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed')
-    } finally { setUploadingId(null) }
+      toast.error(err instanceof Error ? err.message : 'Upload to Koenig News failed')
+    } finally { setUploadingKoenigId(null) }
   }
 
   const handlePushToRms = async (poll: Poll) => {
@@ -528,10 +509,10 @@ export default function ReportsPage() {
         body: JSON.stringify({ action: 'PUSH_TO_RMS' }),
       })
       if (!res.ok) throw new Error((await res.json() as { error: string }).error)
-      toast.success('Pushed to RMS successfully')
+      toast.success('Pushed to Koenig News successfully')
       void fetchPolls()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Push to RMS failed')
+      toast.error(err instanceof Error ? err.message : 'Push to Koenig News failed')
     } finally { setPushingRmsId(null) }
   }
 
@@ -645,10 +626,10 @@ export default function ReportsPage() {
                   <div className="flex justify-end">
                     <StatusBadge status={poll.status} />
                   </div>
-                  <button onClick={() => handleUploadClick(poll)} disabled={uploadingId === poll.id}
+                  <button onClick={() => void handleUploadToKoenig(poll)} disabled={uploadingKoenigId === poll.id}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-slate-300 hover:border-cyan-400 hover:text-cyan-600 transition-colors disabled:opacity-50 whitespace-nowrap">
-                    {uploadingId === poll.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                    Upload
+                    {uploadingKoenigId === poll.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    Upload Results
                   </button>
                   <button onClick={() => setManagePoll(poll)}
                     className="rounded-lg bg-cyan-50 dark:bg-cyan-900/20 px-3 py-1.5 text-xs font-semibold text-cyan-700 dark:text-cyan-400 hover:bg-cyan-100 transition-colors whitespace-nowrap">
@@ -659,7 +640,7 @@ export default function ReportsPage() {
                   <button onClick={() => void handlePushToRms(poll)} disabled={pushingRmsId === poll.id}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20 px-3 py-1.5 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:bg-teal-100 transition-colors disabled:opacity-50">
                     {pushingRmsId === poll.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-                    Push to RMS
+                    Push to Koenig News
                   </button>
                   {poll.rms_news_id && (
                     <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -674,7 +655,6 @@ export default function ReportsPage() {
       </div>
 
       {managePoll && <ManageDialog poll={managePoll} onClose={() => setManagePoll(null)} />}
-      <input ref={uploadInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => void handleFileChange(e)} />
     </div>
   )
 }

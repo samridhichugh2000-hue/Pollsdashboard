@@ -54,7 +54,7 @@ export async function pushPollToKites(
   const role = process.env.KITES_ROLE
 
   if (!apiKey || !username || !password || !role) {
-    return { success: false, error: 'Kites API credentials not configured (KITES_API_KEY / KITES_USERNAME / KITES_PASSWORD / KITES_ROLE)' }
+    return { success: false, error: 'Kites API credentials not configured' }
   }
 
   let accessToken: string, deviceToken: string
@@ -68,7 +68,9 @@ export async function pushPollToKites(
 
   const url = `${KITES_BASE}/api/Kites/Operator/common?apikey=${encodeURIComponent(apiKey)}&accessToken=${encodeURIComponent(accessToken)}&deviceToken=${encodeURIComponent(deviceToken)}`
 
-  const sendFrom = `${process.env.PRIYA_EMAIL ?? 'Priya.upadhyay@koenig-solutions.com'};`
+  const sendFrom = process.env.PRIYA_EMAIL
+    ? `${process.env.PRIYA_EMAIL};`
+    : 'Priya.upadhyay@koenig-solutions.com;'
 
   let sendTo: string | null = null
   if (poll.release_emails) {
@@ -113,14 +115,146 @@ export async function pushPollToKites(
       return { success: false, error: `Kites API ${res.status}: ${text}` }
     }
 
-    const newsId = (data as Record<string, unknown>)?.id
-      ?? (data as Record<string, unknown>)?.Id
-      ?? (data as Record<string, unknown>)?.newsId
+    // content is a JSON-encoded string: "[{\"Result\":3798}]"
+    let newsId: string | number | undefined
+    try {
+      const content = (data as Record<string, unknown>)?.content
+      const parsed = JSON.parse(typeof content === 'string' ? content : '[]') as { Result?: number }[]
+      newsId = parsed[0]?.Result
+    } catch { /* no id */ }
 
-    return { success: true, data, newsId: newsId as string | number | undefined }
+    return { success: true, data, newsId }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Network error' }
   }
+}
+
+// ─── Phase 2: Insert Poll Results ────────────────────────────────────────────
+
+interface InsertPayload {
+  KNewsId: string
+  PPTFIle?: string
+  Url?: string
+  email?: string
+  QuestionId?: string
+  Type: string
+}
+
+interface InsertApiResponse {
+  statuscode: number
+  message?: string
+  content?: unknown
+}
+
+async function callInsertPollApi(accessToken: string, deviceToken: string, payload: InsertPayload): Promise<InsertApiResponse> {
+  const apiKey = process.env.KITES_INSERT_POLL_API_KEY ?? '212'
+  const url = `${KITES_BASE}/api/Kites/Operator/common?apikey=${encodeURIComponent(apiKey)}&accessToken=${encodeURIComponent(accessToken)}&deviceToken=${encodeURIComponent(deviceToken)}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`Insert Poll API ${res.status}: ${text}`)
+  try { return JSON.parse(text) as InsertApiResponse } catch { throw new Error(`Non-JSON response: ${text}`) }
+}
+
+function parseInsertContent(content: unknown): Record<string, unknown>[] {
+  if (Array.isArray(content)) return content as Record<string, unknown>[]
+  if (typeof content === 'string') {
+    try { return JSON.parse(content) as Record<string, unknown>[] } catch { return [] }
+  }
+  return []
+}
+
+export interface UploadPollResultsOutcome {
+  success: boolean
+  error?: string
+  step?: string
+  questionResults?: { question: string; questionId: number; answersSubmitted: number }[]
+}
+
+export async function uploadPollResults(
+  newsId: string,
+  filePath: string,
+  entries: { email?: string; answers: { question: string; answer: string }[] }[],
+): Promise<UploadPollResultsOutcome> {
+  const username = process.env.KITES_INSERT_POLL_USERNAME
+  const password = process.env.KITES_INSERT_POLL_PASSWORD
+  const role = process.env.KITES_INSERT_POLL_ROLE
+  if (!username || !password || !role) {
+    return { success: false, error: 'Insert Poll API credentials not configured', step: 'auth' }
+  }
+
+  let accessToken: string, deviceToken: string
+  try {
+    const tokens = await getKitesToken(username, password, role)
+    accessToken = tokens.accessToken
+    deviceToken = tokens.deviceToken
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'GetToken failed', step: 'auth' }
+  }
+
+  // Type=1 — register repository file path
+  try {
+    const r1 = await callInsertPollApi(accessToken, deviceToken, { KNewsId: newsId, PPTFIle: filePath, Type: '1' })
+    const r1Str = JSON.stringify(r1)
+    if (r1.statuscode !== 200 || r1Str.toLowerCase().includes('failed')) {
+      return { success: false, error: `Type=1 failed (${r1.statuscode}): ${r1.message ?? r1Str}`, step: 'Type1' }
+    }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Type=1 error', step: 'Type1' }
+  }
+
+  // Derive unique ordered questions from first entry
+  const questions = entries[0]?.answers.map(a => a.question) ?? []
+  const questionResults: { question: string; questionId: number; answersSubmitted: number }[] = []
+
+  for (const question of questions) {
+    // Type=2 — register question with sequential QuestionId
+    const questionId = questionResults.length + 1
+    try {
+      const r2 = await callInsertPollApi(accessToken, deviceToken, {
+        KNewsId: newsId,
+        Url: question,
+        QuestionId: String(questionId),
+        Type: '2',
+      })
+      const r2Str = JSON.stringify(r2)
+      if (r2.statuscode !== 200 || r2Str.toLowerCase().includes('result file not exist')) {
+        return { success: false, error: `Type=2 failed for Q${questionId} "${question}": ${r2.message ?? r2Str}`, step: 'Type2' }
+      }
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : `Type=2 error for "${question}"`, step: 'Type2' }
+    }
+
+    // Type=3 — submit each respondent's answer for this question
+    let answersSubmitted = 0
+    for (const entry of entries) {
+      const answerObj = entry.answers.find(a => a.question === question)
+      if (!answerObj) continue
+      try {
+        const r3 = await callInsertPollApi(accessToken, deviceToken, {
+          KNewsId: newsId,
+          QuestionId: String(questionId),
+          Url: answerObj.answer,
+          email: entry.email ?? '',
+          Type: '3',
+        })
+        const r3Str = JSON.stringify(r3)
+        if (r3.statuscode !== 200 || r3Str.toLowerCase().includes('question not exist')) {
+          return { success: false, error: `Type=3 failed for Q${questionId}, ${entry.email ?? 'unknown'}: ${r3.message ?? r3Str}`, step: 'Type3' }
+        }
+        answersSubmitted++
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Type=3 error', step: 'Type3' }
+      }
+    }
+
+    questionResults.push({ question, questionId, answersSubmitted })
+  }
+
+  return { success: true, questionResults }
 }
 
 export function buildResponsesHtml(

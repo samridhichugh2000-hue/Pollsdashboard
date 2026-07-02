@@ -20,8 +20,10 @@ import { sendEmail, sendEmailGetId, replyToMessageWithHtml } from '@/lib/graph'
 import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, formatDate } from '@/lib/utils'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
-import { pushPollToKites, buildResponsesHtml } from '@/lib/kites-api'
+import { pushPollToKites, buildResponsesHtml, uploadPollResults } from '@/lib/kites-api'
 import * as XLSX from 'xlsx'
+import { writeFileSync, mkdirSync } from 'fs'
+import { join } from 'path'
 import type { Poll } from '@/types'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -537,9 +539,88 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (entries.length === 0) {
           return NextResponse.json({ error: 'No valid rows found in the file.' }, { status: 400 })
         }
+
         await upsertPollResponse(id, JSON.stringify(entries))
         await createAuditLog(id, 'RESPONSES_UPLOADED', userEmail, { count: entries.length, fileName })
+
+        // Push results to Koenig News if poll has a news ID
+        if (poll.rms_news_id) {
+          const outcome = await uploadPollResults(poll.rms_news_id, fileBase64, entries)
+          if (!outcome.success) {
+            await createAuditLog(id, 'RESULTS_UPLOAD_FAILED', userEmail, { error: outcome.error, step: outcome.step })
+            return NextResponse.json({
+              warning: `Responses saved but Koenig News upload failed at ${outcome.step}: ${outcome.error}`,
+              entriesCount: entries.length,
+            })
+          }
+          await updatePollStatus(id, 'RESULTS_UPLOADED')
+          await createAuditLog(id, 'RESULTS_UPLOADED', userEmail, {
+            newsId: poll.rms_news_id,
+            questions: outcome.questionResults?.length,
+            totalAnswers: outcome.questionResults?.reduce((s, q) => s + q.answersSubmitted, 0),
+          })
+          return NextResponse.json({ success: true, entriesCount: entries.length, questionResults: outcome.questionResults })
+        }
+
         break
+      }
+
+      case 'UPLOAD_TO_KOENIG': {
+        if (!poll.rms_news_id) {
+          return NextResponse.json({ error: 'This poll has not been pushed to Koenig News yet. Push it first to get a News ID.' }, { status: 400 })
+        }
+        const koenigResp = await getPollResponse(id)
+        if (!koenigResp?.response_data) {
+          return NextResponse.json({ error: 'No responses found for this poll. Add responses via Manage first.' }, { status: 400 })
+        }
+        interface KoenigEntry { email?: string; respondent?: string; submitted_at: string; answers: { question: string; answer: string }[] }
+        const koenigEntries: KoenigEntry[] = JSON.parse(koenigResp.response_data)
+        if (koenigEntries.length === 0) {
+          return NextResponse.json({ error: 'No responses to upload.' }, { status: 400 })
+        }
+
+        // Build Excel from stored responses
+        const koenigRows = koenigEntries.map((entry, i) => {
+          const row: Record<string, string> = {
+            '#': String(i + 1),
+            'Name': entry.respondent ?? '',
+            'Email': entry.email ?? '',
+            'Submitted At': new Date(entry.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+          }
+          entry.answers.forEach((a, qi) => { row[`Q${qi + 1}: ${a.question}`] = a.answer })
+          return row
+        })
+        const koenigHeaders = Object.keys(koenigRows[0] ?? {})
+        const koenigWs = XLSX.utils.aoa_to_sheet([
+          [`Poll: ${poll.topic}`],
+          [],
+          koenigHeaders,
+          ...koenigRows.map(r => koenigHeaders.map(h => r[h] ?? '')),
+        ])
+        const koenigWb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(koenigWb, koenigWs, 'Responses')
+
+        // Save to repository and pass the file path to the API
+        const repoDir = process.env.POLLS_REPO_PATH ?? 'C:\\KoenigPollsRepository'
+        mkdirSync(repoDir, { recursive: true })
+        const safeSlug = poll.topic.slice(0, 40).replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()
+        const repoFileName = `poll-${safeSlug}-${poll.rms_news_id}.xlsx`
+        const repoFilePath = join(repoDir, repoFileName)
+        const koenigBuffer = XLSX.write(koenigWb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+        writeFileSync(repoFilePath, koenigBuffer)
+
+        const outcome = await uploadPollResults(poll.rms_news_id, repoFilePath, koenigEntries)
+        if (!outcome.success) {
+          await createAuditLog(id, 'RESULTS_UPLOAD_FAILED', userEmail, { error: outcome.error, step: outcome.step })
+          return NextResponse.json({ error: `Koenig News upload failed at ${outcome.step}: ${outcome.error}` }, { status: 502 })
+        }
+        await updatePollStatus(id, 'RESULTS_UPLOADED')
+        await createAuditLog(id, 'RESULTS_UPLOADED', userEmail, {
+          newsId: poll.rms_news_id,
+          questions: outcome.questionResults?.length,
+          totalAnswers: outcome.questionResults?.reduce((s, q) => s + q.answersSubmitted, 0),
+        })
+        return NextResponse.json({ success: true, entriesCount: koenigEntries.length, questionResults: outcome.questionResults })
       }
 
       case 'PUSH_TO_RMS': {
@@ -549,30 +630,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
         interface RMSEntry { respondent?: string; email?: string; submitted_at: string; answers: { question: string; answer: string }[]; actionable?: boolean | null; classification?: string | null; status?: string | null; remarks?: string; reply_sent_at?: string }
         const rmsEntries: RMSEntry[] = JSON.parse(pushResp.response_data)
-        const rmsRows = rmsEntries.map((entry, i) => {
-          const row: Record<string, string> = {
-            '#': String(i + 1),
-            'Email': entry.email ?? 'Not provided',
-            'Name': entry.respondent ?? 'Anonymous',
-            'Submitted At': new Date(entry.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-          }
-          entry.answers.forEach((a, qi) => { row[`Q${qi + 1}: ${a.question}`] = a.answer })
-          row['Actionable'] = entry.actionable === true ? 'Yes' : entry.actionable === false ? 'No' : ''
-          row['Classification'] = entry.classification === 'rms' ? 'RMS' : entry.classification === 'non_rms' ? 'Non-RMS' : entry.classification === 'partial' ? 'Partial' : ''
-          row['Status'] = entry.status === 'wip' ? 'WIP' : entry.status === 'completed' ? 'Completed' : ''
-          row['Replied'] = entry.reply_sent_at ? 'Yes' : 'No'
-          row['Remarks'] = entry.remarks ?? ''
-          return row
-        })
-        const rmsWs = XLSX.utils.json_to_sheet(rmsRows)
-        rmsWs['!cols'] = Object.keys(rmsRows[0] ?? {}).map(key => ({ wch: Math.max(key.length, ...rmsRows.map(r => String(r[key] ?? '').length)) + 2 }))
-        const rmsWb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(rmsWb, rmsWs, 'Responses')
-        void XLSX.write(rmsWb, { type: 'base64', bookType: 'xlsx' })
 
         const responsesHtml = buildResponsesHtml(rmsEntries)
+        const para = `<p><strong>Topic:</strong> ${poll.topic}</p><p><strong>Department:</strong> ${poll.department}</p><p><strong>Total responses:</strong> ${rmsEntries.length}</p>`
 
-        const kitesResult = await pushPollToKites(poll, { para: responsesHtml })
+        const kitesResult = await pushPollToKites(poll, { htmlContent: responsesHtml, para })
 
         if (kitesResult.success) {
           const newsId = kitesResult.newsId ? String(kitesResult.newsId) : null
