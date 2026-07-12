@@ -42,7 +42,7 @@ function parseEntries(response: PollResponse | null): Entry[] {
   try { return JSON.parse(response.response_data) as Entry[] } catch { return [] }
 }
 
-const SENT_STATUSES = ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED', 'CLOSED', 'RESULTS_UPLOADED']
+const SENT_STATUSES = ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED', 'CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED']
 
 function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
   pollId: string

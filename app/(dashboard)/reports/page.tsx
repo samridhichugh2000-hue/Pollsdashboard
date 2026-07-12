@@ -9,7 +9,7 @@ import { StatusBadge } from '@/components/polls/status-badge'
 import { formatDateTime, formatRelative } from '@/lib/utils'
 import type { Poll, PollResponse } from '@/types'
 
-const RELEASED_STATUSES = ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED', 'CLOSED', 'RESULTS_UPLOADED']
+const RELEASED_STATUSES = ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED', 'CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED']
 
 interface ResponseEntry {
   respondent?: string
