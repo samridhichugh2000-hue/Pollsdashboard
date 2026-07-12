@@ -2,10 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   getRegularPollById, updateRegularPoll,
   createPoll, updatePoll, updatePollStatus, createAuditLog,
+  getRegularPollAttachments, getRegularPollAttachmentsMeta, replaceRegularPollAttachments,
+  replacePollAttachments,
 } from '@/lib/db/queries'
+import type { PollAttachment } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { sendEmailGetId } from '@/lib/graph'
 import { buildPollEmailHtml, formatDate } from '@/lib/utils'
+
+// Merge existing stored attachments with client-submitted new files and removals —
+// same three-way merge used by the one-off poll RELEASE_POLL flow.
+async function mergeAttachments(regularPollId: string, newAttachments: PollAttachment[], removeNames: string[]): Promise<PollAttachment[] | null> {
+  if (newAttachments.length === 0 && removeNames.length === 0) return null // nothing to change
+  const existing = await getRegularPollAttachments(regularPollId)
+  const removeSet = new Set(removeNames)
+  const kept = existing.filter(a => !removeSet.has(a.name))
+  const newNames = new Set(newAttachments.map(a => a.name))
+  const merged = [...kept.filter(a => !newNames.has(a.name)), ...newAttachments]
+  await replaceRegularPollAttachments(regularPollId, merged)
+  return merged
+}
 
 function advanceNextRunDate(current: string, frequency: string): string {
   const date = new Date(current)
@@ -18,7 +34,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const poll = await getRegularPollById(id)
   if (!poll) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  return NextResponse.json(poll)
+  const attachments = await getRegularPollAttachmentsMeta(id)
+  return NextResponse.json({ ...poll, attachments })
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -39,7 +56,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           if (key in body) updates[key] = body[key]
         }
         await updateRegularPoll(id, updates as Parameters<typeof updateRegularPoll>[1])
+
+        const newAttachments = (body.newAttachments as PollAttachment[] | undefined) ?? []
+        const removeAttachmentNames = (body.removeAttachmentNames as string[] | undefined) ?? []
+        await mergeAttachments(id, newAttachments, removeAttachmentNames)
         break
+      }
+
+      // Standalone attachment update — used from the "upcoming release" banner so
+      // the user can swap the file(s) without reopening the full edit form. This
+      // only changes what regular_poll_attachments holds for THIS template; every
+      // future release (auto or manual) reads that table fresh at send time, so
+      // the new file goes out from the very next release onward.
+      case 'UPDATE_ATTACHMENTS': {
+        const newAttachments = (body.newAttachments as PollAttachment[] | undefined) ?? []
+        const removeAttachmentNames = (body.removeAttachmentNames as string[] | undefined) ?? []
+        const merged = await mergeAttachments(id, newAttachments, removeAttachmentNames)
+        return NextResponse.json({ ok: true, attachments: (merged ?? await getRegularPollAttachmentsMeta(id)) })
       }
 
       case 'TOGGLE_ACTIVE': {
@@ -90,6 +123,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           deadline: formatDate(deadline),
         })
 
+        // Use whatever is currently stored against this cadence template — the
+        // original attachment if never updated, or the replacement if it was.
+        const attachments = await getRegularPollAttachments(id)
+
         const pollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
         const releaseMessageId = await sendEmailGetId({
           from: process.env.PRIYA_EMAIL!,
@@ -97,7 +134,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           bcc: recipients,
           subject,
           htmlBody: pollHtml,
+          ...(attachments.length > 0 && { attachments }),
         })
+
+        if (attachments.length > 0) await replacePollAttachments(poll.id, attachments)
 
         await updatePollStatus(poll.id, 'SENT', {
           sent_at: new Date().toISOString(),
@@ -107,6 +147,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await createAuditLog(poll.id, 'POLL_RELEASED', 'regular-poll-system', {
           regular_poll_id: id,
           template_name: template.name,
+          attachments: attachments.map(a => a.name),
         })
 
         // Advance the template's next run date

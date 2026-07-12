@@ -2,9 +2,9 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Plus, RefreshCw, CalendarClock, Edit2, Trash2, Play, Power, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, RefreshCw, CalendarClock, Edit2, Trash2, Play, Power, ChevronDown, ChevronUp, Paperclip, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -12,6 +12,117 @@ import { QuestionBuilder, parseQuestions } from '@/components/polls/question-bui
 import type { Question } from '@/components/polls/question-builder'
 import { RecipientPicker } from '@/components/polls/recipient-picker'
 import type { RegularPoll, RegularPollFrequency } from '@/types'
+
+interface AttachmentMeta { name: string; size: number }
+interface NewAttachment { name: string; contentType: string; contentBytes: string }
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve((reader.result as string).split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+async function filesToAttachments(files: File[]): Promise<NewAttachment[]> {
+  return Promise.all(files.map(async f => ({
+    name: f.name,
+    contentType: f.type || 'application/octet-stream',
+    contentBytes: await fileToBase64(f),
+  })))
+}
+
+function formatSize(bytes: number): string {
+  return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// Shared attachment picker — used both by the create/edit dialog (sets the
+// default attachment for every future release) and the "Update Attachment"
+// dialog opened from the upcoming-release banner (overrides it going forward).
+function AttachmentPicker({
+  existing, removedNames, onRemoveExisting, newFiles, onAddFiles, onRemoveNew,
+}: {
+  existing: AttachmentMeta[]
+  removedNames: string[]
+  onRemoveExisting: (name: string) => void
+  newFiles: File[]
+  onAddFiles: (files: File[]) => void
+  onRemoveNew: (index: number) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const visibleExisting = existing.filter(a => !removedNames.includes(a.name))
+  const total = visibleExisting.length + newFiles.length
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files ?? [])
+    const tooBig = selected.filter(f => f.size > 20 * 1024 * 1024)
+    if (tooBig.length) {
+      toast.error(`File(s) exceed 20 MB: ${tooBig.map(f => f.name).join(', ')}`)
+      e.target.value = ''
+      return
+    }
+    if (total + selected.length > 5) {
+      toast.error('Maximum 5 attachments allowed.')
+      e.target.value = ''
+      return
+    }
+    onAddFiles(selected)
+    e.target.value = ''
+  }
+
+  return (
+    <div className="space-y-2">
+      <label className="text-xs font-medium text-gray-700 dark:text-slate-300">
+        Attachments <span className="font-normal text-gray-400">(optional &middot; max 5 files &middot; 20 MB each)</span>
+      </label>
+      {visibleExisting.length > 0 && (
+        <div className="space-y-1.5">
+          {visibleExisting.map(file => (
+            <div key={file.name} className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 px-3 py-2 overflow-hidden">
+              <div className="flex items-center gap-2 min-w-0">
+                <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                <span className="text-sm text-gray-700 dark:text-slate-300 truncate">{file.name}</span>
+                <span className="text-xs text-gray-400 flex-shrink-0">{formatSize(file.size)}</span>
+              </div>
+              <button type="button" onClick={() => onRemoveExisting(file.name)}
+                className="ml-2 flex-shrink-0 text-gray-400 hover:text-rose-500 transition-colors">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {newFiles.length > 0 && (
+        <div className="space-y-1.5">
+          {newFiles.map((file, i) => (
+            <div key={i} className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 px-3 py-2 overflow-hidden">
+              <div className="flex items-center gap-2 min-w-0">
+                <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                <span className="text-sm text-gray-700 dark:text-slate-300 truncate">{file.name}</span>
+                <span className="text-xs text-gray-400 flex-shrink-0">{formatSize(file.size)}</span>
+              </div>
+              <button type="button" onClick={() => onRemoveNew(i)}
+                className="ml-2 flex-shrink-0 text-gray-400 hover:text-rose-500 transition-colors">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {total < 5 && (
+        <>
+          <input ref={inputRef} type="file" multiple className="hidden" onChange={handleChange} />
+          <button type="button" onClick={() => inputRef.current?.click()}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 dark:border-slate-600 px-4 py-2.5 text-sm text-gray-500 dark:text-slate-400 hover:border-cyan-400 hover:text-cyan-600 transition-colors">
+            <Paperclip className="h-4 w-4" />
+            {total === 0 ? 'Attach files' : 'Attach more files'}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -118,6 +229,15 @@ function CadencePageInner() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [formExistingAttachments, setFormExistingAttachments] = useState<AttachmentMeta[]>([])
+  const [formNewAttachments, setFormNewAttachments] = useState<File[]>([])
+  const [formRemovedAttachmentNames, setFormRemovedAttachmentNames] = useState<string[]>([])
+
+  const [attachPoll, setAttachPoll] = useState<RegularPoll | null>(null)
+  const [attachExisting, setAttachExisting] = useState<AttachmentMeta[]>([])
+  const [attachNewFiles, setAttachNewFiles] = useState<File[]>([])
+  const [attachRemoved, setAttachRemoved] = useState<string[]>([])
+  const [attachSaving, setAttachSaving] = useState(false)
 
   const [releaseId, setReleaseId] = useState<string | null>(null)
   const defaultDeadline = () => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString().split('T')[0] }
@@ -138,8 +258,19 @@ function CadencePageInner() {
 
   useEffect(() => { void fetchPolls() }, [fetchPolls])
 
-  const openCreate = () => { setEditingId(null); setForm(emptyForm); setFormOpen(true) }
-  const openEdit = (t: RegularPoll) => { setEditingId(t.id); setForm(formFromTemplate(t)); setFormOpen(true) }
+  const openCreate = () => {
+    setEditingId(null); setForm(emptyForm); setFormOpen(true)
+    setFormExistingAttachments([]); setFormNewAttachments([]); setFormRemovedAttachmentNames([])
+  }
+
+  const openEdit = async (t: RegularPoll) => {
+    setEditingId(t.id); setForm(formFromTemplate(t)); setFormOpen(true)
+    setFormNewAttachments([]); setFormRemovedAttachmentNames([])
+    try {
+      const data = await fetch(`/api/regular-polls/${t.id}`).then(r => r.ok ? r.json() : null) as { attachments?: AttachmentMeta[] } | null
+      setFormExistingAttachments(data?.attachments ?? [])
+    } catch { setFormExistingAttachments([]) }
+  }
 
   const saveForm = async () => {
     if (!form.name || !form.subject || !form.draft_email_body || !form.questions.length || !form.recipients.length) {
@@ -147,6 +278,7 @@ function CadencePageInner() {
     }
     setSaving(true)
     try {
+      const newAttachments = await filesToAttachments(formNewAttachments)
       const payload = {
         ...form,
         scheduled_day: Number(form.scheduled_day),
@@ -157,13 +289,13 @@ function CadencePageInner() {
       if (editingId) {
         await fetch(`/api/regular-polls/${editingId}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'UPDATE', ...payload }),
+          body: JSON.stringify({ action: 'UPDATE', ...payload, newAttachments, removeAttachmentNames: formRemovedAttachmentNames }),
         })
         toast.success('Cadence poll updated')
       } else {
         await fetch('/api/regular-polls', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ ...payload, attachments: newAttachments }),
         })
         toast.success('Cadence poll created')
       }
@@ -171,6 +303,31 @@ function CadencePageInner() {
       void fetchPolls()
     } catch { toast.error('Save failed') }
     finally { setSaving(false) }
+  }
+
+  const openAttachDialog = async (t: RegularPoll) => {
+    setAttachPoll(t); setAttachNewFiles([]); setAttachRemoved([])
+    try {
+      const data = await fetch(`/api/regular-polls/${t.id}`).then(r => r.ok ? r.json() : null) as { attachments?: AttachmentMeta[] } | null
+      setAttachExisting(data?.attachments ?? [])
+    } catch { setAttachExisting([]) }
+  }
+
+  const saveAttachDialog = async () => {
+    if (!attachPoll) return
+    setAttachSaving(true)
+    try {
+      const newAttachments = await filesToAttachments(attachNewFiles)
+      const res = await fetch(`/api/regular-polls/${attachPoll.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPDATE_ATTACHMENTS', newAttachments, removeAttachmentNames: attachRemoved }),
+      })
+      if (!res.ok) { toast.error('Failed to update attachment'); return }
+      toast.success('Attachment updated — it will be used for this release')
+      setAttachPoll(null)
+      void fetchPolls()
+    } catch { toast.error('Failed to update attachment') }
+    finally { setAttachSaving(false) }
   }
 
   const toggleActive = async (t: RegularPoll) => {
@@ -317,15 +474,24 @@ function CadencePageInner() {
               {upcomingPolls.length} poll{upcomingPolls.length > 1 ? 's' : ''} will auto-release {upcomingPolls.some(p => isDueTomorrow(p.next_run_date)) ? 'tomorrow' : 'today'} at 9 AM
             </span>
           </div>
-          <p className="text-xs text-amber-600 mb-3">Pause a poll now if you want to skip this cycle.</p>
+          <p className="text-xs text-amber-600 mb-3">Pause a poll now if you want to skip this cycle, or update its attachment before it goes out.</p>
           <div className="flex flex-wrap gap-2">
             {upcomingPolls.map(p => (
               <div key={p.id} className="inline-flex items-center gap-2 rounded-lg bg-amber-100 border border-amber-200 px-3 py-1.5">
                 <CalendarClock className="h-3 w-3 text-amber-600" />
                 <span className="text-sm font-medium text-amber-800">{p.name}</span>
                 <span className="text-xs text-amber-600">{isDueTomorrow(p.next_run_date) ? 'tomorrow' : 'today'}</span>
+                {(p.attachmentCount ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-0.5 text-xs text-amber-700">
+                    <Paperclip className="h-3 w-3" />{p.attachmentCount}
+                  </span>
+                )}
+                <button onClick={() => void openAttachDialog(p)}
+                  className="ml-1 inline-flex items-center gap-1 rounded-md bg-amber-200 hover:bg-amber-300 px-2 py-0.5 text-xs font-medium text-amber-800 transition-colors">
+                  <Paperclip className="h-3 w-3" /> Update Attachment
+                </button>
                 <button onClick={() => void toggleActive(p)}
-                  className="ml-1 rounded-md bg-amber-200 hover:bg-amber-300 px-2 py-0.5 text-xs font-medium text-amber-800 transition-colors">
+                  className="rounded-md bg-amber-200 hover:bg-amber-300 px-2 py-0.5 text-xs font-medium text-amber-800 transition-colors">
                   Pause
                 </button>
               </div>
@@ -392,6 +558,9 @@ function CadencePageInner() {
                           </span>
                           <span>&middot;</span>
                           <span>{recipientList.length} recipient{recipientList.length !== 1 ? 's' : ''}</span>
+                          {(t.attachmentCount ?? 0) > 0 && (
+                            <><span>&middot;</span><span className="inline-flex items-center gap-1"><Paperclip className="h-3 w-3" />{t.attachmentCount}</span></>
+                          )}
                           {t.last_run_date && <><span>&middot;</span><span>Last sent: {formatDate(t.last_run_date)}</span></>}
                           {t.auto_approve === 1 && <><span>&middot;</span><span className="text-cyan-600 font-medium">Auto-approve ON</span></>}
                         </div>
@@ -404,7 +573,7 @@ function CadencePageInner() {
                             <Play className="mr-1 h-3 w-3" /> Release Now
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit" onClick={() => openEdit(t)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit" onClick={() => void openEdit(t)}>
                           <Edit2 className="h-3.5 w-3.5 text-gray-500" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7" title={t.auto_approve ? 'Disable Auto-Approve' : 'Enable Auto-Approve'}
@@ -521,6 +690,19 @@ function CadencePageInner() {
               <label className="text-xs font-medium text-gray-700 mb-2 block">Recipients *</label>
               <RecipientPicker key={editingId ?? 'new-form'} value={form.recipients} onChange={emails => setForm(f => ({ ...f, recipients: emails }))} />
             </div>
+            <div className="pt-2 border-t border-gray-100 dark:border-slate-700">
+              <AttachmentPicker
+                existing={formExistingAttachments}
+                removedNames={formRemovedAttachmentNames}
+                onRemoveExisting={(name) => setFormRemovedAttachmentNames(prev => [...prev, name])}
+                newFiles={formNewAttachments}
+                onAddFiles={(files) => setFormNewAttachments(prev => [...prev, ...files])}
+                onRemoveNew={(i) => setFormNewAttachments(prev => prev.filter((_, j) => j !== i))}
+              />
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1.5">
+                This becomes the default attachment used on every future release of this poll, until updated.
+              </p>
+            </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button>
               <Button onClick={saveForm} disabled={saving}>{saving ? 'Saving...' : editingId ? 'Save Changes' : 'Create Cadence Poll'}</Button>
@@ -571,6 +753,32 @@ function CadencePageInner() {
                 <Button className="bg-amber-500 hover:bg-amber-600" onClick={doRelease} disabled={releasing}>
                   {releasing ? 'Releasing...' : 'Release Now'}
                 </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!attachPoll} onOpenChange={(open) => { if (!open) setAttachPoll(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Update Attachment{attachPoll ? ` — ${attachPoll.name}` : ''}</DialogTitle></DialogHeader>
+          {attachPoll && (
+            <div className="space-y-4 pt-2">
+              <p className="text-xs text-gray-500">
+                This poll releases {isDueTomorrow(attachPoll.next_run_date) ? 'tomorrow' : 'today'}. If you don&apos;t change anything here,
+                it will go out with the same attachment as when this cadence entry was created.
+              </p>
+              <AttachmentPicker
+                existing={attachExisting}
+                removedNames={attachRemoved}
+                onRemoveExisting={(name) => setAttachRemoved(prev => [...prev, name])}
+                newFiles={attachNewFiles}
+                onAddFiles={(files) => setAttachNewFiles(prev => [...prev, ...files])}
+                onRemoveNew={(i) => setAttachNewFiles(prev => prev.filter((_, j) => j !== i))}
+              />
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setAttachPoll(null)}>Cancel</Button>
+                <Button onClick={saveAttachDialog} disabled={attachSaving}>{attachSaving ? 'Saving...' : 'Save Attachment'}</Button>
               </div>
             </div>
           )}

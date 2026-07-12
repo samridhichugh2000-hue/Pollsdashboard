@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAllRegularPolls, createRegularPoll } from '@/lib/db/queries'
+import { getAllRegularPolls, createRegularPoll, replaceRegularPollAttachments, getRegularPollAttachmentCounts } from '@/lib/db/queries'
+import type { PollAttachment } from '@/lib/db/queries'
 import type { RegularPollFrequency } from '@/types'
 
 function computeNextRunDate(frequency: RegularPollFrequency, scheduledDay: number): string {
@@ -14,13 +15,13 @@ function computeNextRunDate(frequency: RegularPollFrequency, scheduledDay: numbe
 }
 
 export async function GET() {
-  const polls = await getAllRegularPolls()
-  return NextResponse.json(polls)
+  const [polls, counts] = await Promise.all([getAllRegularPolls(), getRegularPollAttachmentCounts()])
+  return NextResponse.json(polls.map(p => ({ ...p, attachmentCount: counts[p.id] ?? 0 })))
 }
 
 export async function POST(req: NextRequest) {
   const body = await req.json() as Record<string, unknown>
-  const { name, description, frequency, scheduled_day, department, subject, draft_email_body, questions, recipients } = body
+  const { name, description, frequency, scheduled_day, department, subject, draft_email_body, questions, recipients, attachments } = body
 
   if (!name || !frequency || !scheduled_day || !department || !subject || !draft_email_body || !questions || !recipients) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -46,6 +47,10 @@ export async function POST(req: NextRequest) {
     is_active: 1,
     auto_approve: 0,
   })
+
+  if (Array.isArray(attachments) && attachments.length > 0) {
+    await replaceRegularPollAttachments(poll.id, attachments as PollAttachment[])
+  }
 
   return NextResponse.json(poll, { status: 201 })
 }

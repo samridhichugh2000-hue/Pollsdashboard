@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getDueRegularPolls, updateRegularPoll, createPoll, updatePoll, updatePollStatus, createAuditLog } from '@/lib/db/queries'
+import { getDueRegularPolls, updateRegularPoll, createPoll, updatePoll, updatePollStatus, createAuditLog, getRegularPollAttachments, replacePollAttachments } from '@/lib/db/queries'
 import { sendEmailGetId } from '@/lib/graph'
 import { buildPollEmailHtml, formatDate } from '@/lib/utils'
 
@@ -56,6 +56,11 @@ export async function GET(req: Request) {
         deadline: formatDate(deadline),
       })
 
+      // Use whatever is currently stored against this cadence template — the
+      // original attachment if never updated, or the replacement if it was
+      // swapped via the "Update Attachment" action before this release fired.
+      const attachments = await getRegularPollAttachments(template.id)
+
       const pollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
       const releaseMessageId = await sendEmailGetId({
         from: process.env.PRIYA_EMAIL!,
@@ -63,7 +68,10 @@ export async function GET(req: Request) {
         bcc: recipients,
         subject: template.subject,
         htmlBody: pollHtml,
+        ...(attachments.length > 0 && { attachments }),
       })
+
+      if (attachments.length > 0) await replacePollAttachments(poll.id, attachments)
 
       await updatePollStatus(poll.id, 'SENT', {
         sent_at: new Date().toISOString(),
@@ -74,6 +82,7 @@ export async function GET(req: Request) {
       await createAuditLog(poll.id, 'POLL_AUTO_RELEASED', 'cron', {
         regular_poll_id: template.id,
         template_name: template.name,
+        attachments: attachments.map(a => a.name),
       })
 
       // Advance template's next run date so it doesn't re-trigger tomorrow

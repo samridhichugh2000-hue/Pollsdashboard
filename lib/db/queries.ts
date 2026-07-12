@@ -350,6 +350,55 @@ export async function createRegularPoll(fields: Omit<RegularPoll, 'id' | 'create
   return (await getRegularPollById(id))!
 }
 
+// ─── Cadence (Regular Poll) Attachments ────────────────────────────────────
+// Same shape/semantics as poll_attachments, but scoped to a cadence template
+// rather than a single released poll — the default attachment set reused on
+// every future auto-release until explicitly changed.
+
+export async function replaceRegularPollAttachments(regularPollId: string, attachments: PollAttachment[]): Promise<void> {
+  const db = getDb()
+  await db.execute({ sql: 'DELETE FROM regular_poll_attachments WHERE regular_poll_id = ?', args: [regularPollId] })
+  for (const a of attachments) {
+    await db.execute({
+      sql: 'INSERT INTO regular_poll_attachments (id, regular_poll_id, name, content_type, content_bytes) VALUES (?, ?, ?, ?, ?)',
+      args: [uuidv4(), regularPollId, a.name, a.contentType, a.contentBytes],
+    })
+  }
+}
+
+// Full attachments (including base64 bytes) — used when sending the release email.
+export async function getRegularPollAttachments(regularPollId: string): Promise<PollAttachment[]> {
+  const result = await getDb().execute({
+    sql: 'SELECT name, content_type, content_bytes FROM regular_poll_attachments WHERE regular_poll_id = ? ORDER BY created_at ASC',
+    args: [regularPollId],
+  })
+  return result.rows.map((r) => ({
+    name: r.name as string,
+    contentType: r.content_type as string,
+    contentBytes: r.content_bytes as string,
+  }))
+}
+
+// Lightweight metadata (no bytes) — used to list attachments in the UI.
+export async function getRegularPollAttachmentsMeta(regularPollId: string): Promise<{ name: string; size: number }[]> {
+  const result = await getDb().execute({
+    sql: 'SELECT name, length(content_bytes) AS b64len FROM regular_poll_attachments WHERE regular_poll_id = ? ORDER BY created_at ASC',
+    args: [regularPollId],
+  })
+  return result.rows.map((r) => {
+    const b64len = Number(r.b64len ?? 0)
+    return { name: r.name as string, size: Math.floor((b64len * 3) / 4) }
+  })
+}
+
+// Attachment counts for every template in one query — avoids N+1 when listing all cadence polls.
+export async function getRegularPollAttachmentCounts(): Promise<Record<string, number>> {
+  const result = await getDb().execute('SELECT regular_poll_id, COUNT(*) AS cnt FROM regular_poll_attachments GROUP BY regular_poll_id')
+  const counts: Record<string, number> = {}
+  for (const r of result.rows) counts[r.regular_poll_id as string] = Number(r.cnt)
+  return counts
+}
+
 export async function updateRegularPoll(id: string, fields: Partial<Omit<RegularPoll, 'id' | 'created_at'>>): Promise<void> {
   const now = new Date().toISOString()
   const allowed = ['name', 'description', 'frequency', 'scheduled_day', 'department', 'subject',

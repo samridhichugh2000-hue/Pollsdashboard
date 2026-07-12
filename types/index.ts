@@ -149,6 +149,7 @@ export interface RegularPoll {
   auto_approve: number // 1 or 0 (SQLite boolean)
   created_at: string
   updated_at: string
+  attachmentCount?: number // populated by GET /api/regular-polls, not a DB column
 }
 
 export const AUTHORIZED_SENDERS: AuthorizedSender[] = [

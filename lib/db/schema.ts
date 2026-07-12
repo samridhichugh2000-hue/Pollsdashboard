@@ -159,6 +159,23 @@ export async function runMigrations() {
     await db.execute(`ALTER TABLE regular_polls ADD COLUMN auto_approve INTEGER DEFAULT 0`)
   } catch { /* already exists */ }
 
+  // Attachments stored against a cadence (regular poll) template. Every
+  // auto-release (and manual "Release Now") reads this table fresh at send
+  // time, so updating it here changes what goes out on the NEXT release
+  // without touching anything else about the template.
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS regular_poll_attachments (
+        id TEXT PRIMARY KEY,
+        regular_poll_id TEXT NOT NULL REFERENCES regular_polls(id),
+        name TEXT NOT NULL,
+        content_type TEXT NOT NULL,
+        content_bytes TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+
   // Employee master cache — email is primary key (bulk API doesn't return emp_codes)
   try {
     await db.execute(`
