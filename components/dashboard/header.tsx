@@ -34,27 +34,10 @@ export function Header({ userName }: { userName?: string; userRole?: string; tit
   const pathname = usePathname()
   const [query, setQuery] = useState('')
   const [dark, setDark] = useState(true)
-  const [quarterLabel, setQuarterLabel] = useState(() => getQuarterLabel())
 
   useEffect(() => {
     const saved = localStorage.getItem('theme')
     setDark(saved === null ? true : saved === 'dark')
-  }, [])
-
-  useEffect(() => {
-    const update = () => {
-      const stored = localStorage.getItem('selectedQuarter')
-      if (!stored || stored === 'all') { setQuarterLabel('All Time'); return }
-      const [yearStr, qStr] = stored.split('-Q')
-      const year = parseInt(yearStr)
-      const q = parseInt(qStr)
-      const labels = ['Jan – Mar', 'Apr – Jun', 'Jul – Sep', 'Oct – Dec']
-      if (year && q >= 1 && q <= 4) setQuarterLabel(`${labels[q - 1]} ${year}`)
-      else setQuarterLabel(getQuarterLabel())
-    }
-    update()
-    window.addEventListener('quarterchange', update)
-    return () => window.removeEventListener('quarterchange', update)
   }, [])
 
   const toggleDark = () => {
@@ -76,6 +59,7 @@ export function Header({ userName }: { userName?: string; userRole?: string; tit
   }
 
   const pageLabel = Object.entries(PAGE_TITLES).find(([k]) => pathname === k || (k !== '/dashboard' && pathname.startsWith(k)))?.[1] ?? 'Dashboard'
+  const quarterLabel = getQuarterLabel()
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-100 bg-white dark:border-slate-800 dark:bg-[#161b27] px-6">

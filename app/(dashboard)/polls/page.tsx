@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Plus, RefreshCw, Copy, X, ChevronDown } from 'lucide-react'
+import { Plus, RefreshCw, Copy, X, CalendarRange } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -10,41 +10,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { PollsTable } from '@/components/polls/polls-table'
 import { PollForm } from '@/components/polls/poll-form'
 import type { Poll } from '@/types'
-
-// ─── Quarter helpers ─────────────────────────────────────────────────────────
-
-interface Quarter { key: string; label: string; short: string; from: Date; to: Date }
-
-function buildQuarters(): Quarter[] {
-  const DEFS = [
-    { q: 1, months: [0, 1, 2],   label: 'Jan – Mar', short: 'Q1' },
-    { q: 2, months: [3, 4, 5],   label: 'Apr – Jun', short: 'Q2' },
-    { q: 3, months: [6, 7, 8],   label: 'Jul – Sep', short: 'Q3' },
-    { q: 4, months: [9, 10, 11], label: 'Oct – Dec', short: 'Q4' },
-  ]
-  const now = new Date()
-  const quarters: Quarter[] = []
-  // App started Q2 2026
-  let y = 2026, q = 2
-  while (true) {
-    const def = DEFS[q - 1]
-    const from = new Date(y, def.months[0], 1)
-    const to   = new Date(y, def.months[2] + 1, 0, 23, 59, 59, 999)
-    quarters.push({ key: `${y}-Q${q}`, label: `${def.label} ${y}`, short: `${def.short} ${y}`, from, to })
-    if (y === now.getFullYear() && def.months.includes(now.getMonth())) break
-    q++; if (q > 4) { q = 1; y++ }
-  }
-  return quarters.reverse() // most recent first
-}
-
-function currentQuarterKey(): string {
-  const now = new Date()
-  const m = now.getMonth()
-  const q = m < 3 ? 1 : m < 6 ? 2 : m < 9 ? 3 : 4
-  return `${now.getFullYear()}-Q${q}`
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 type CardKey = 'not-sent' | 'approval-pending' | 'active' | 'closed' | 'result-sir' | 'total'
 const VALID_CARD_KEYS: CardKey[] = ['not-sent', 'approval-pending', 'active', 'closed', 'result-sir', 'total']
@@ -64,10 +29,9 @@ function PollsContent() {
   const [polls, setPolls] = useState<Poll[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [activeCard, setActiveCard] = useState<CardKey | null>(null)
-  const [quarters] = useState<Quarter[]>(() => buildQuarters())
-  const [selectedQuarter, setSelectedQuarter] = useState<string>(() => currentQuarterKey())
-  const [dropdownOpen, setDropdownOpen] = useState(false)
 
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -132,14 +96,6 @@ function PollsContent() {
 
   const nonArchived = polls.filter(p => p.status !== 'ARCHIVED')
 
-  // Persist selected quarter so the header can reflect it
-  useEffect(() => {
-    localStorage.setItem('selectedQuarter', selectedQuarter)
-    window.dispatchEvent(new Event('quarterchange'))
-  }, [selectedQuarter])
-
-  const activeQuarter = selectedQuarter === 'all' ? null : quarters.find(q => q.key === selectedQuarter) ?? null
-
   const applySearch = (list: Poll[]): Poll[] => {
     let result = list
     if (searchQuery) {
@@ -150,11 +106,13 @@ function PollsContent() {
         (p.requested_by ?? '').toLowerCase().includes(searchQuery)
       )
     }
-    if (activeQuarter) {
-      result = result.filter(p => {
-        const d = new Date(p.created_at)
-        return d >= activeQuarter.from && d <= activeQuarter.to
-      })
+    if (dateFrom) {
+      const from = new Date(dateFrom); from.setHours(0, 0, 0, 0)
+      result = result.filter(p => new Date(p.created_at) >= from)
+    }
+    if (dateTo) {
+      const to = new Date(dateTo); to.setHours(23, 59, 59, 999)
+      result = result.filter(p => new Date(p.created_at) <= to)
     }
     return result
   }
@@ -172,6 +130,8 @@ function PollsContent() {
     return applySearch(base)
   }
 
+  const hasDateFilter = dateFrom || dateTo
+  const clearDateFilter = () => { setDateFrom(''); setDateTo('') }
   const copyRequestLink = () => { navigator.clipboard.writeText(`${window.location.origin}/request`); toast.success('Request link copied') }
   const clearSearch = () => router.push('/polls')
 
@@ -205,10 +165,7 @@ function PollsContent() {
           {searchQuery ? (
             <p className="text-sm text-slate-500">Results for &quot;{searchQuery}&quot; — {filterByTab('all').length} found</p>
           ) : (
-            <p className="text-sm text-slate-500">
-              {applySearch(nonArchived).length} poll{applySearch(nonArchived).length !== 1 ? 's' : ''}
-              {activeQuarter ? <span className="text-purple-500"> · {activeQuarter.label}</span> : ''}
-            </p>
+            <p className="text-sm text-slate-500">{nonArchived.length} total polls</p>
           )}
         </div>
         <div className="flex gap-2">
@@ -251,46 +208,19 @@ function PollsContent() {
         ))}
       </div>
 
-      {/* Quarter filter */}
-      <div className="relative">
-        <button
-          onClick={() => setDropdownOpen(o => !o)}
-          className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e2535] shadow-sm px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:border-purple-300 dark:hover:border-purple-600 transition-colors min-w-[180px]"
-        >
-          <span className="text-slate-400">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
-          </span>
-          <span className="flex-1 text-left font-medium">
-            {selectedQuarter === 'all' ? 'All Time' : (quarters.find(q => q.key === selectedQuarter)?.label ?? 'Select quarter')}
-          </span>
-          <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
-        </button>
-
-        {dropdownOpen && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />
-            <div className="absolute left-0 top-full mt-1 z-20 w-52 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e2535] shadow-xl overflow-hidden">
-              <div className="py-1">
-                <button
-                  onClick={() => { setSelectedQuarter('all'); setDropdownOpen(false) }}
-                  className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${selectedQuarter === 'all' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                >
-                  All Time
-                </button>
-                <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
-                {quarters.map(q => (
-                  <button
-                    key={q.key}
-                    onClick={() => { setSelectedQuarter(q.key); setDropdownOpen(false) }}
-                    className={`w-full px-4 py-2.5 text-left text-sm transition-colors flex items-center justify-between ${selectedQuarter === q.key ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                  >
-                    <span>{q.label}</span>
-                    {q.key === currentQuarterKey() && <span className="text-[10px] font-semibold bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 px-1.5 py-0.5 rounded-full">Current</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
+      {/* Date range filter */}
+      <div className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e2535] shadow-sm px-4 py-2.5">
+        <CalendarRange className="h-4 w-4 text-slate-400 flex-shrink-0" />
+        <span className="text-xs text-slate-400 flex-shrink-0">From</span>
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+          className="bg-transparent text-sm text-slate-700 dark:text-slate-300 [color-scheme:light] dark:[color-scheme:dark] outline-none cursor-pointer" />
+        <span className="text-xs text-slate-400 flex-shrink-0">To</span>
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} min={dateFrom || undefined}
+          className="bg-transparent text-sm text-slate-700 dark:text-slate-300 [color-scheme:light] dark:[color-scheme:dark] outline-none cursor-pointer" />
+        {hasDateFilter && (
+          <button onClick={clearDateFilter} className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
+            <X className="h-3.5 w-3.5" /> Clear
+          </button>
         )}
       </div>
 
