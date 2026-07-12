@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 
 import Link from 'next/link'
+import { useQuarter } from '@/lib/use-quarter'
 
 interface PendingPoll {
   id: string
@@ -160,16 +161,21 @@ function FeedbackCategory({
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { from, to } = useQuarter()
   const [data, setData] = useState<OverviewData>(defaultData)
   const [loading, setLoading] = useState(true)
   const [showAllPending, setShowAllPending] = useState(false)
 
-  const fetchData = useCallback(() =>
-    fetch('/api/overview')
+  const fetchData = useCallback(() => {
+    const params = new URLSearchParams()
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    const qs = params.toString()
+    return fetch(`/api/overview${qs ? `?${qs}` : ''}`)
       .then(r => r.ok ? r.json() : defaultData)
       .then((d: OverviewData) => setData(d))
       .catch(console.error)
-  , [])
+  }, [from, to])
 
   useEffect(() => {
     fetchData().finally(() => setLoading(false))

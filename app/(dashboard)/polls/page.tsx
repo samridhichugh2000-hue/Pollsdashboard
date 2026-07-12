@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { PollsTable } from '@/components/polls/polls-table'
 import { PollForm } from '@/components/polls/poll-form'
+import { useQuarter, inQuarter } from '@/lib/use-quarter'
 import type { Poll } from '@/types'
 
 type CardKey = 'not-sent' | 'approval-pending' | 'active' | 'closed' | 'result-sir' | 'total'
@@ -33,6 +34,7 @@ function PollsContent() {
   const [dateTo, setDateTo] = useState('')
   const [activeCard, setActiveCard] = useState<CardKey | null>(null)
 
+  const quarter = useQuarter()
   const searchParams = useSearchParams()
   const router = useRouter()
   const searchQuery = searchParams.get('q')?.toLowerCase().trim() ?? ''
@@ -94,7 +96,9 @@ function PollsContent() {
     void fetchPolls()
   }
 
-  const nonArchived = polls.filter(p => p.status !== 'ARCHIVED')
+  // Restrict everything on this page to the quarter chosen in the header.
+  const quarterPolls = polls.filter(p => inQuarter(quarter, p.created_at))
+  const nonArchived = quarterPolls.filter(p => p.status !== 'ARCHIVED')
 
   const applySearch = (list: Poll[]): Poll[] => {
     let result = list
@@ -120,12 +124,12 @@ function PollsContent() {
   const filterByTab = (tab: string): Poll[] => {
     let base: Poll[]
     switch (tab) {
-      case 'inbox':    base = polls.filter(p => p.source === 'email'); break
-      case 'via-form': base = polls.filter(p => p.source === 'dashboard'); break
-      case 'active':   base = polls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)); break
-      case 'not-sent': base = polls.filter(p => p.status === 'DRAFT'); break
-      case 'closed':   base = polls.filter(p => ['CLOSED', 'ARCHIVED', 'REJECTED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status)); break
-      default:         base = [...polls]
+      case 'inbox':    base = quarterPolls.filter(p => p.source === 'email'); break
+      case 'via-form': base = quarterPolls.filter(p => p.source === 'dashboard'); break
+      case 'active':   base = quarterPolls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)); break
+      case 'not-sent': base = quarterPolls.filter(p => p.status === 'DRAFT'); break
+      case 'closed':   base = quarterPolls.filter(p => ['CLOSED', 'ARCHIVED', 'REJECTED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status)); break
+      default:         base = [...quarterPolls]
     }
     return applySearch(base)
   }

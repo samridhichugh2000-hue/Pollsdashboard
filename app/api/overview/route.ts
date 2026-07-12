@@ -1,8 +1,24 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db/client'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const db = getDb()
+
+  // Optional quarter bounds (ISO). When present, restrict polls (by created_at)
+  // and their responses to the selected range.
+  const fromParam = req.nextUrl.searchParams.get('from')
+  const toParam = req.nextUrl.searchParams.get('to')
+  const fromMs = fromParam ? new Date(fromParam).getTime() : null
+  const toMs = toParam ? new Date(toParam).getTime() : null
+  const inRange = (dateStr: string | null | undefined): boolean => {
+    if (fromMs == null && toMs == null) return true
+    if (!dateStr) return false
+    const t = new Date(dateStr).getTime()
+    if (Number.isNaN(t)) return false
+    if (fromMs != null && t < fromMs) return false
+    if (toMs != null && t > toMs) return false
+    return true
+  }
 
   const [pollsRes, regularPollsRes, feedbackRes, kpiRes, responsesRes] = await Promise.all([
     db.execute({ sql: 'SELECT id, topic, status, source, requested_by, department, created_at, rms_task_id, results_uploaded_at, closed_at FROM polls WHERE status != ? ORDER BY created_at DESC', args: ['ARCHIVED'] }),
@@ -12,7 +28,7 @@ export async function GET() {
     db.execute('SELECT poll_id, response_data FROM poll_responses').catch(() => ({ rows: [] })),
   ])
 
-  const polls = pollsRes.rows as unknown as Array<{
+  const allPolls = pollsRes.rows as unknown as Array<{
     id: string
     topic: string
     status: string
@@ -24,6 +40,9 @@ export async function GET() {
     results_uploaded_at: string | null
     closed_at: string | null
   }>
+
+  // Filter polls to the selected quarter (by creation date); responses follow their poll.
+  const polls = allPolls.filter(p => inRange(p.created_at))
 
   const regularPolls = regularPollsRes.rows as unknown as Array<{
     id: string
@@ -63,7 +82,9 @@ export async function GET() {
   const totalPolls = polls.length
   const totalPending = polls.filter(p => PENDING_STATUSES.includes(p.status)).length
 
-  const responseRows = responsesRes.rows as unknown as Array<{ poll_id: string; response_data: string | null }>
+  const pollIdSet = new Set(polls.map(p => p.id))
+  const responseRows = (responsesRes.rows as unknown as Array<{ poll_id: string; response_data: string | null }>)
+    .filter(r => pollIdSet.has(r.poll_id))
   const openPollIds = new Set(polls.filter(p => !CLOSED_STATUSES.includes(p.status)).map(p => p.id))
 
   // Count individual poll responses across all polls

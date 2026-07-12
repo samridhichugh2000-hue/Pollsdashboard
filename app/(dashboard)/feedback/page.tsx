@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { MessageSquare, RefreshCw, CheckCircle2, XCircle, Clock, X, Send, ChevronDown, Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { formatRelative } from '@/lib/utils'
+import { useQuarter, inQuarter } from '@/lib/use-quarter'
 import { toast } from 'sonner'
 import type { Poll, PollResponse } from '@/types'
 
@@ -196,6 +197,7 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
 function FeedbackPageInner() {
   const [polls, setPolls] = useState<PollWithEntries[]>([])
   const [loadingPolls, setLoadingPolls] = useState(true)
+  const quarter = useQuarter()
   const searchParams = useSearchParams()
   const [selectedPoll, setSelectedPoll] = useState<string | null>(searchParams.get('poll'))
   const [panelOpen, setPanelOpen] = useState(true)
@@ -287,6 +289,9 @@ function FeedbackPageInner() {
   const activePoll = polls.find(p => p.id === selectedPoll)
   const entries = activePoll?.entries ?? []
 
+  // Poll list restricted to the quarter chosen in the header.
+  const visiblePolls = polls.filter(p => inQuarter(quarter, p.created_at))
+
   const counts: Record<CardKey, number> = {
     total:              entries.length,
     actionable:         entries.filter(e => e.actionable === true).length,
@@ -349,7 +354,7 @@ function FeedbackPageInner() {
           {panelOpen && (
             <div>
               <h1 className="text-base font-bold text-slate-800 dark:text-white">Poll Responses</h1>
-              <p className="text-xs text-slate-400">{polls.length} polls</p>
+              <p className="text-xs text-slate-400">{visiblePolls.length} polls</p>
             </div>
           )}
           <div className={`flex items-center gap-1 ${panelOpen ? '' : 'flex-col w-full'}`}>
@@ -372,13 +377,13 @@ function FeedbackPageInner() {
             <div className="flex items-center justify-center py-16">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
             </div>
-          ) : polls.length === 0 ? (
+          ) : visiblePolls.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2">
               <MessageSquare className="h-7 w-7 text-gray-200 dark:text-slate-700" />
               <p className="text-xs text-gray-400">No polls found</p>
             </div>
           ) : (
-            polls.map(poll => {
+            visiblePolls.map(poll => {
               const isActive = selectedPoll === poll.id
               const respCount = poll.totalCount
               const pendingCount = poll.pendingCount
