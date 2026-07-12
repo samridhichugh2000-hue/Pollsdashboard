@@ -6,6 +6,14 @@
   --teal-bg: #0e7490;
   --teal-dark: #0c6478;
   --teal-deeper: #0a5568;
+  /* Native form controls (date pickers, text inputs, the dd-mm-yyyy hint,
+     calendar icon, select chrome) take their colours from color-scheme.
+     Pin it to the APP theme so it never follows the OS setting. */
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
 }
 
 body {
@@ -16,6 +24,23 @@ body {
 .dark body {
   background: #0f1117;
   color: #e2e8f0;
+}
+
+/* Safety net: any bare <input>/<textarea>/<select> that forgets to set its
+   own text colour still stays readable in both themes. Utility classes
+   (text-*, placeholder:*) always win over these, so intentional styling is
+   never overridden — this only catches the ones that specify nothing. */
+input, textarea, select {
+  color: #111827;
+}
+input::placeholder, textarea::placeholder {
+  color: #9ca3af;
+}
+.dark input, .dark textarea, .dark select {
+  color: #e2e8f0;
+}
+.dark input::placeholder, .dark textarea::placeholder {
+  color: #64748b;
 }
 
 /* Scrollbar styling */

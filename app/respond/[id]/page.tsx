@@ -232,7 +232,7 @@ export default function RespondPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={`yourname@${ALLOWED_DOMAIN}`}
                 required
-                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 [color-scheme:light] outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition"
               />
               <p className="text-xs text-gray-400">Only @{ALLOWED_DOMAIN} addresses are accepted.</p>
             </div>
@@ -256,7 +256,7 @@ export default function RespondPage() {
                     onChange={(e) => setAnswer(i, e.target.value)}
                     rows={3}
                     placeholder="Your answer..."
-                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition resize-none"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 [color-scheme:light] outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition resize-none"
                   />
                 )}
               </div>
