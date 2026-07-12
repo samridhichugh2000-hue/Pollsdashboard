@@ -885,7 +885,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                 </>
               )}
 
-              {['CLOSED', 'RESULTS_UPLOADED'].includes(poll.status) && (
+              {['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(poll.status) && (
                 <>
                   <Button
                     className="w-full"
@@ -1044,7 +1044,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
       </div>
 
       {/* Poll Responses — full width */}
-      {['SENT', 'REMINDER_SENT', 'CLOSED', 'RESULTS_UPLOADED', 'ARCHIVED', 'RMS_PUBLISHED'].includes(poll.status) && (() => {
+      {['SENT', 'REMINDER_SENT', 'CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED', 'ARCHIVED', 'RMS_PUBLISHED'].includes(poll.status) && (() => {
         type EntryType = {
           email?: string
           respondent?: string
