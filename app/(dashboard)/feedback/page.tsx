@@ -6,7 +6,6 @@ import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { MessageSquare, RefreshCw, CheckCircle2, XCircle, Clock, X, Send, ChevronDown, Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { formatRelative } from '@/lib/utils'
-import { useQuarter, inQuarter } from '@/lib/use-quarter'
 import { toast } from 'sonner'
 import type { Poll, PollResponse } from '@/types'
 
@@ -197,7 +196,6 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
 function FeedbackPageInner() {
   const [polls, setPolls] = useState<PollWithEntries[]>([])
   const [loadingPolls, setLoadingPolls] = useState(true)
-  const quarter = useQuarter()
   const searchParams = useSearchParams()
   const [selectedPoll, setSelectedPoll] = useState<string | null>(searchParams.get('poll'))
   const [panelOpen, setPanelOpen] = useState(true)
@@ -289,8 +287,10 @@ function FeedbackPageInner() {
   const activePoll = polls.find(p => p.id === selectedPoll)
   const entries = activePoll?.entries ?? []
 
-  // Poll list restricted to the quarter chosen in the header.
-  const visiblePolls = polls.filter(p => inQuarter(quarter, p.created_at))
+  // Poll Responses must always show every poll with response data, regardless
+  // of when the poll was created — reviewing feedback isn't quarter-scoped,
+  // and hiding polls here reads as data loss.
+  const visiblePolls = polls
 
   const counts: Record<CardKey, number> = {
     total:              entries.length,
