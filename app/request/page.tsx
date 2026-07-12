@@ -332,7 +332,7 @@ export default function PublicRequestPage() {
         )}
 
         {/* Form card */}
-        <div className="rounded-3xl bg-white shadow-2xl px-7 py-7">
+        <div data-public-form className="rounded-3xl bg-white shadow-2xl px-7 py-7">
           <form onSubmit={handleSubmit} className="space-y-5">
 
             {error && (

@@ -43,6 +43,21 @@ input::placeholder, textarea::placeholder {
   color: #64748b;
 }
 
+/* Public poll forms (respond / request) always sit on a white card, so their
+   fields must always be black text on white — regardless of the visitor's OS
+   theme. !important so nothing (cache, utilities, OS color-scheme) can defeat it. */
+[data-public-form] input,
+[data-public-form] textarea,
+[data-public-form] select {
+  color: #111827 !important;
+  background-color: #ffffff !important;
+  color-scheme: light !important;
+}
+[data-public-form] input::placeholder,
+[data-public-form] textarea::placeholder {
+  color: #9ca3af !important;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

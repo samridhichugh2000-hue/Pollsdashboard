@@ -214,7 +214,7 @@ export default function RespondPage() {
           </p>
         </div>
 
-        <div className="rounded-3xl bg-white shadow-2xl px-7 py-7">
+        <div data-public-form className="rounded-3xl bg-white shadow-2xl px-7 py-7">
           <form onSubmit={handleSubmit} className="space-y-6">
 
             {submitError && (
@@ -232,7 +232,8 @@ export default function RespondPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={`yourname@${ALLOWED_DOMAIN}`}
                 required
-                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 [color-scheme:light] outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition"
+                style={{ color: '#111827', backgroundColor: '#ffffff', colorScheme: 'light' }}
+                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm placeholder-gray-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition"
               />
               <p className="text-xs text-gray-400">Only @{ALLOWED_DOMAIN} addresses are accepted.</p>
             </div>
@@ -256,7 +257,8 @@ export default function RespondPage() {
                     onChange={(e) => setAnswer(i, e.target.value)}
                     rows={3}
                     placeholder="Your answer..."
-                    className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 [color-scheme:light] outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition resize-none"
+                    style={{ color: '#111827', backgroundColor: '#ffffff', colorScheme: 'light' }}
+                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm placeholder-gray-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition resize-none"
                   />
                 )}
               </div>
