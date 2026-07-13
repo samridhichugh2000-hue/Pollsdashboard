@@ -6,6 +6,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Server errors aren't always JSON — a platform-level failure (e.g. Vercel's
+// 413 "Request Entity Too Large" when a request body is too big) returns
+// plain text, and calling res.json() on that throws a confusing
+// "Unexpected token ... is not valid JSON" instead of the real problem.
+// Always route error responses through this instead of `res.json()` directly.
+export async function getErrorMessage(res: Response, fallback = 'Request failed'): Promise<string> {
+  if (res.status === 413) return 'The request was too large — try attaching smaller or fewer files.'
+  let text = ''
+  try { text = await res.text() } catch { return `${fallback} (${res.status})` }
+  try {
+    const json = JSON.parse(text) as { error?: string }
+    if (json?.error) return json.error
+  } catch { /* not JSON */ }
+  return text.trim() ? text.slice(0, 200) : `${fallback} (${res.status})`
+}
+
 // SQLite CURRENT_TIMESTAMP stores as "2026-04-30 12:00:00" (no Z) — browsers
 // treat that as local time. Append Z so it's always parsed as UTC.
 function parseDate(date: string | Date): Date {

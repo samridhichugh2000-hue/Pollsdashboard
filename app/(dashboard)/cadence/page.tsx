@@ -11,10 +11,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { QuestionBuilder, parseQuestions } from '@/components/polls/question-builder'
 import type { Question } from '@/components/polls/question-builder'
 import { RecipientPicker } from '@/components/polls/recipient-picker'
+import { getErrorMessage } from '@/lib/utils'
 import type { RegularPoll, RegularPollFrequency } from '@/types'
 
 interface AttachmentMeta { name: string; size: number }
 interface NewAttachment { name: string; contentType: string; contentBytes: string }
+
+// Attachments are base64-encoded (~33% larger) and sent as JSON. Vercel
+// serverless functions hard-cap the request body at 4.5 MB regardless of app
+// config, so these limits keep the encoded payload safely under that ceiling.
+const MAX_ATTACHMENT_FILE_MB = 3
+const MAX_ATTACHMENT_FILE_BYTES = MAX_ATTACHMENT_FILE_MB * 1024 * 1024
+const MAX_ATTACHMENT_TOTAL_MB = 3
+const MAX_ATTACHMENT_TOTAL_BYTES = MAX_ATTACHMENT_TOTAL_MB * 1024 * 1024
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -56,14 +65,22 @@ function AttachmentPicker({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files ?? [])
-    const tooBig = selected.filter(f => f.size > 20 * 1024 * 1024)
+    const tooBig = selected.filter(f => f.size > MAX_ATTACHMENT_FILE_BYTES)
     if (tooBig.length) {
-      toast.error(`File(s) exceed 20 MB: ${tooBig.map(f => f.name).join(', ')}`)
+      toast.error(`File(s) exceed ${MAX_ATTACHMENT_FILE_MB} MB: ${tooBig.map(f => f.name).join(', ')}`)
       e.target.value = ''
       return
     }
     if (total + selected.length > 5) {
       toast.error('Maximum 5 attachments allowed.')
+      e.target.value = ''
+      return
+    }
+    const existingBytes = visibleExisting.reduce((sum, a) => sum + a.size, 0)
+    const newBytes = newFiles.reduce((sum, f) => sum + f.size, 0)
+    const selectedBytes = selected.reduce((sum, f) => sum + f.size, 0)
+    if (existingBytes + newBytes + selectedBytes > MAX_ATTACHMENT_TOTAL_BYTES) {
+      toast.error(`Attachments must total ${MAX_ATTACHMENT_TOTAL_MB} MB or less — the request will be rejected otherwise.`)
       e.target.value = ''
       return
     }
@@ -74,7 +91,7 @@ function AttachmentPicker({
   return (
     <div className="space-y-2">
       <label className="text-xs font-medium text-gray-700 dark:text-slate-300">
-        Attachments <span className="font-normal text-gray-400">(optional &middot; max 5 files &middot; 20 MB each)</span>
+        Attachments <span className="font-normal text-gray-400">(optional &middot; max 5 files &middot; {MAX_ATTACHMENT_TOTAL_MB} MB total)</span>
       </label>
       {visibleExisting.length > 0 && (
         <div className="space-y-1.5">
@@ -370,7 +387,7 @@ function CadencePageInner() {
           questions: JSON.stringify(releaseForm.questions.filter(q => q.text.trim())), deadline: releaseForm.deadline,
         }),
       })
-      if (!res.ok) { const d = await res.json() as { error?: string }; toast.error(d.error ?? 'Release failed'); return }
+      if (!res.ok) { toast.error(await getErrorMessage(res, 'Release failed')); return }
       toast.success('Poll released successfully!')
       setReleaseId(null)
       void fetchPolls()

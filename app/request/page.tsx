@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Loader2, CheckCircle2, ClipboardList, ChevronDown, X, Plus, Paperclip } from 'lucide-react'
 import { QuestionBuilder, parseQuestions } from '@/components/polls/question-builder'
 import type { Question } from '@/components/polls/question-builder'
+import { getErrorMessage } from '@/lib/utils'
 
 interface HuntGroup { id: string; name: string; email: string }
 interface Sender { id: string; name: string; email: string }
@@ -18,7 +19,13 @@ const TIMELINE_STEPS = [
 
 const ALLOWED_DOMAIN = 'koenig-solutions.com'
 const MAX_FILES = 5
-const MAX_FILE_BYTES = 20 * 1024 * 1024 // 20 MB
+// Attachments are base64-encoded (~33% larger) and sent as JSON. Vercel
+// serverless functions hard-cap the request body at 4.5 MB regardless of app
+// config, so these limits keep the encoded payload safely under that ceiling.
+const MAX_FILE_MB = 3
+const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
+const MAX_TOTAL_MB = 3
+const MAX_TOTAL_BYTES = MAX_TOTAL_MB * 1024 * 1024
 
 function parseEmails(text: string): string[] {
   return text.split(/[\s,;]+/).map(e => e.trim().toLowerCase()).filter(e => e.includes('@'))
@@ -142,12 +149,18 @@ export default function PublicRequestPage() {
     const combined = [...attachments, ...selected]
     const tooBig = selected.filter(f => f.size > MAX_FILE_BYTES)
     if (tooBig.length) {
-      setError(`File(s) exceed 5 MB limit: ${tooBig.map(f => f.name).join(', ')}`)
+      setError(`File(s) exceed ${MAX_FILE_MB} MB limit: ${tooBig.map(f => f.name).join(', ')}`)
       e.target.value = ''
       return
     }
     if (combined.length > MAX_FILES) {
       setError(`You can attach up to ${MAX_FILES} files.`)
+      e.target.value = ''
+      return
+    }
+    const totalBytes = combined.reduce((sum, f) => sum + f.size, 0)
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      setError(`Attachments must total ${MAX_TOTAL_MB} MB or less.`)
       e.target.value = ''
       return
     }
@@ -229,7 +242,7 @@ export default function PublicRequestPage() {
           frequency_start_date: isFrequent ? frequencyStartDate : undefined,
         }),
       })
-      if (!res.ok) { const d = await res.json() as { error: string }; throw new Error(d.error) }
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Submission failed'))
       setSubmitted(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -559,7 +572,7 @@ export default function PublicRequestPage() {
             {/* Attachments */}
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Attachments <span className="normal-case font-normal text-gray-400">(optional, max {MAX_FILES} files · 20 MB each)</span>
+                Attachments <span className="normal-case font-normal text-gray-400">(optional, max {MAX_FILES} files · {MAX_TOTAL_MB} MB total)</span>
               </label>
 
               {/* Attached file chips */}

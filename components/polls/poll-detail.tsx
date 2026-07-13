@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { StatusBadge } from './status-badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { formatDate, formatDateTime, formatRelative, isApprovalOverdue, normalizeBodyForEditor, sanitizeWordHtml } from '@/lib/utils'
+import { formatDate, formatDateTime, formatRelative, isApprovalOverdue, normalizeBodyForEditor, sanitizeWordHtml, getErrorMessage } from '@/lib/utils'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import type { Poll, PollApproval, AuditLog, PollResponse } from '@/types'
 import { QuestionBuilder, parseQuestions } from './question-builder'
@@ -27,6 +27,16 @@ interface PollDetailProps {
 function parseEmails(text: string): string[] {
   return text.split(/[\n,;]+/).map(e => e.trim()).filter(e => e.includes('@'))
 }
+
+// Attachments are base64-encoded (~33% larger) and sent as JSON in the PATCH
+// body. Vercel serverless functions hard-cap the request body at 4.5 MB
+// regardless of app config, so these limits must keep the encoded payload —
+// plus the rest of the JSON (email body, recipients, etc.) — safely under
+// that ceiling. A per-file cap alone isn't enough; the combined total matters.
+const MAX_ATTACHMENT_FILE_MB = 3
+const MAX_ATTACHMENT_FILE_BYTES = MAX_ATTACHMENT_FILE_MB * 1024 * 1024
+const MAX_ATTACHMENT_TOTAL_MB = 3
+const MAX_ATTACHMENT_TOTAL_BYTES = MAX_ATTACHMENT_TOTAL_MB * 1024 * 1024
 
 export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: initialResponse }: PollDetailProps) {
   const [poll, setPoll] = useState(initialPoll)
@@ -163,10 +173,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...extra }),
       })
-      if (!res.ok) {
-        const data = await res.json() as { error: string }
-        throw new Error(data.error)
-      }
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Action failed'))
       const updated = await res.json() as Poll
       setPoll(updated)
       toast.success(`Action completed: ${action.replace(/_/g, ' ')}`)
@@ -190,10 +197,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'UPDATE_ENTRY_ACTIONABLE', entryIndex: index, actionable, remarks, classification: cls }),
       })
-      if (!res.ok) {
-        const d = await res.json() as { error: string }
-        throw new Error(d.error)
-      }
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Save failed'))
       const updated = entries.map((e, i) => i === index ? { ...e, actionable, remarks, classification: cls } : e)
       setResponse(prev => prev ? { ...prev, response_data: JSON.stringify(updated) } : prev)
       toast.success('Saved')
@@ -220,10 +224,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'UPDATE_ENTRY_ACTIONABLE', entryIndex: index, actionable: entries[index]?.actionable ?? null, remarks, classification: cls, status: next }),
       })
-      if (!res.ok) {
-        const d = await res.json() as { error: string }
-        throw new Error(d.error)
-      }
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Save failed'))
       const updated = entries.map((e, i) => i === index ? { ...e, status: next } : e)
       setResponse(prev => prev ? { ...prev, response_data: JSON.stringify(updated) } : prev)
       toast.success('Saved')
@@ -246,10 +247,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'REPLY_TO_RESPONDENT', entryIndex: index, replyMessage }),
       })
-      if (!res.ok) {
-        const d = await res.json() as { error: string }
-        throw new Error(d.error)
-      }
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Save failed'))
       type EntryType = Record<string, unknown>
       const entries = JSON.parse(response.response_data) as EntryType[]
       const updated = entries.map((e, i) => i === index ? { ...e, reply_message: replyMessage, reply_sent_at: new Date().toISOString() } : e)
@@ -271,10 +269,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'REGENERATE_DRAFT', section, keywords, tone, useKeywords }),
       })
-      if (!res.ok) {
-        const data = await res.json() as { error: string }
-        throw new Error(data.error)
-      }
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Save failed'))
       const updated = await res.json() as Poll
       setPoll(updated)
       // Local state will be synced via useEffect
@@ -300,10 +295,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
           deadline: editDeadline,
         }),
       })
-      if (!res.ok) {
-        const data = await res.json() as { error: string }
-        throw new Error(data.error)
-      }
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Save failed'))
       const updated = await res.json() as Poll
       setPoll(updated)
       toast.success('Draft saved successfully')
@@ -327,10 +319,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'UPDATE_QUESTIONS', questions: JSON.stringify(cleaned) }),
       })
-      if (!res.ok) {
-        const data = await res.json() as { error: string }
-        throw new Error(data.error)
-      }
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Save failed'))
       const updated = await res.json() as Poll
       setPoll(updated)
       toast.success('Questions updated')
@@ -351,15 +340,21 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
 
   const handleReleaseFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files ?? [])
-    const tooBig = selected.filter(f => f.size > 20 * 1024 * 1024)
+    const tooBig = selected.filter(f => f.size > MAX_ATTACHMENT_FILE_BYTES)
     if (tooBig.length) {
-      toast.error(`File(s) exceed 20 MB: ${tooBig.map(f => f.name).join(', ')}`)
+      toast.error(`File(s) exceed ${MAX_ATTACHMENT_FILE_MB} MB: ${tooBig.map(f => f.name).join(', ')}`)
       e.target.value = ''
       return
     }
     const combined = [...releaseAttachments, ...selected]
     if (combined.length > 5) {
       toast.error('Maximum 5 attachments allowed.')
+      e.target.value = ''
+      return
+    }
+    const totalBytes = combined.reduce((sum, f) => sum + f.size, 0)
+    if (totalBytes > MAX_ATTACHMENT_TOTAL_BYTES) {
+      toast.error(`Attachments must total ${MAX_ATTACHMENT_TOTAL_MB} MB or less — the request will be rejected otherwise.`)
       e.target.value = ''
       return
     }
@@ -676,7 +671,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   <CardTitle className="flex items-center gap-2">
                     <Paperclip className="h-4 w-4 text-gray-400 dark:text-slate-500" />
                     Attachments
-                    <span className="text-xs font-normal text-gray-400 dark:text-slate-500">(optional · max 5 files · 20 MB each)</span>
+                    <span className="text-xs font-normal text-gray-400 dark:text-slate-500">(optional · max 5 files · {MAX_ATTACHMENT_TOTAL_MB} MB total)</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
@@ -1383,7 +1378,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
           {/* Attachments */}
           <div className="space-y-2 pt-1 border-t border-gray-100 dark:border-slate-700">
             <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide dark:text-slate-400">
-              Attachments <span className="normal-case font-normal text-gray-400 dark:text-slate-500">(optional · max 5 files · 20 MB each)</span>
+              Attachments <span className="normal-case font-normal text-gray-400 dark:text-slate-500">(optional · max 5 files · {MAX_ATTACHMENT_TOTAL_MB} MB total)</span>
             </Label>
 
             {/* Files carried over from the approval step (saved server-side) */}
