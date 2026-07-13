@@ -75,7 +75,7 @@ export function Sidebar() {
         )}
         {!collapsed && (
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-800 dark:text-white leading-tight">PollsHQ</p>
+            <p className="text-sm font-bold text-slate-800 dark:text-white leading-tight">PollS</p>
             <p className="text-xs text-slate-400 leading-tight">HR Dashboard</p>
           </div>
         )}
