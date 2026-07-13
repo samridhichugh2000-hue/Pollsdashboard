@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Plus, RefreshCw, CalendarClock, Edit2, Trash2, Play, Power, ChevronDown, ChevronUp, Paperclip, X } from 'lucide-react'
+import { Plus, RefreshCw, CalendarClock, Edit2, Trash2, Play, Power, ChevronDown, ChevronUp, Paperclip, X, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -571,8 +571,8 @@ function CadencePageInner() {
                       dueToday ? 'bg-red-50 dark:bg-red-900/10' : dueTomorrow ? 'bg-amber-50 dark:bg-amber-900/10' : ''
                     }`}>
                       <td className="border border-gray-200 dark:border-slate-700 px-5 py-3 text-gray-900 dark:text-slate-100 font-medium">{t.name}</td>
-                      <td className="border border-gray-200 dark:border-slate-700 px-4 py-3 text-center text-gray-600 dark:text-slate-400">{isMonthly ? 'Y' : '—'}</td>
-                      <td className="border border-gray-200 dark:border-slate-700 px-4 py-3 text-center text-gray-600 dark:text-slate-400">{isQuarterly ? 'Y' : '—'}</td>
+                      <td className="border border-gray-200 dark:border-slate-700 px-4 py-3 text-center text-gray-600 dark:text-slate-400">{isMonthly ? <Check className="h-5 w-5 text-emerald-600 inline" /> : '—'}</td>
+                      <td className="border border-gray-200 dark:border-slate-700 px-4 py-3 text-center text-gray-600 dark:text-slate-400">{isQuarterly ? <Check className="h-5 w-5 text-emerald-600 inline" /> : '—'}</td>
                       <td className="border border-gray-200 dark:border-slate-700 px-4 py-3 text-gray-600 dark:text-slate-400">{t.last_run_date ? formatDate(t.last_run_date) : '—'}</td>
                       <td className={`border border-gray-200 dark:border-slate-700 px-4 py-3 font-medium ${dueToday ? 'text-red-600' : dueTomorrow ? 'text-amber-600' : 'text-gray-600 dark:text-slate-400'}`}>{formatDate(t.next_run_date)}</td>
                       <td className="border border-gray-200 dark:border-slate-700 px-4 py-3">
