@@ -538,118 +538,70 @@ function CadencePageInner() {
             <Button size="sm" className="mt-4" onClick={openCreate}><Plus className="mr-1.5 h-3.5 w-3.5" /> Add Cadence Poll</Button></>}
           </div>
         ) : (
-          <div className="divide-y divide-gray-50 dark:divide-slate-700/50">
-            {filteredPolls
-              .slice()
-              .sort((a, b) => new Date(a.next_run_date).getTime() - new Date(b.next_run_date).getTime())
-              .map((t) => {
-                const dueToday = t.is_active && isDueToday(t.next_run_date)
-                const dueTomorrow = t.is_active && isDueTomorrow(t.next_run_date)
-                const due = dueToday || dueTomorrow
-                const isExpanded = expanded === t.id
-                const recipientList: string[] = JSON.parse(t.recipients)
-                const questionList = parseQuestions(t.questions)
+          <table className="w-full text-sm">
+            <thead className="border-b border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <tr>
+                <th className="px-5 py-3 text-left font-semibold text-gray-700 dark:text-slate-300">Poll Name</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-700 dark:text-slate-300 w-12">M</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-700 dark:text-slate-300 w-12">Q</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-slate-300">Last Run</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-slate-300">Next Date</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-slate-300">Status</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-700 dark:text-slate-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
+              {filteredPolls
+                .slice()
+                .sort((a, b) => new Date(a.next_run_date).getTime() - new Date(b.next_run_date).getTime())
+                .map((t) => {
+                  const dueToday = t.is_active && isDueToday(t.next_run_date)
+                  const dueTomorrow = t.is_active && isDueTomorrow(t.next_run_date)
+                  const isMonthly = t.frequency === 'monthly'
+                  const isQuarterly = t.frequency === 'quarterly'
 
-                return (
-                  <div key={t.id} className={`transition-colors ${dueToday ? 'bg-red-50/40 dark:bg-red-900/10' : due ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}>
-                    <div className="flex items-center gap-4 px-5 py-4">
-                      <div className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${
-                        !t.is_active ? 'bg-gray-300' : dueToday ? 'bg-red-400 shadow-[0_0_6px_2px_rgba(248,113,113,0.4)]' : dueTomorrow ? 'bg-amber-400 shadow-[0_0_6px_2px_rgba(251,191,36,0.4)]' : 'bg-emerald-400'
-                      }`} />
+                  let statusText = '—'
+                  if (!t.is_active) statusText = 'Paused'
+                  else if (dueToday) statusText = 'Overdue'
+                  else if (dueTomorrow) statusText = 'Tomorrow'
+                  else if (t.last_run_date) statusText = 'Done'
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-gray-900 dark:text-slate-100 text-sm">{t.name}</span>
-                          <FrequencyBadge frequency={t.frequency} />
-                          {!t.is_active && <span className="text-xs text-gray-400">(Paused)</span>}
-                          {dueToday && <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Overdue &mdash; releasing today</span>}
-                          {dueTomorrow && <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Releases tomorrow</span>}
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 dark:text-slate-500 flex-wrap">
-                          <span>{t.department}</span>
-                          <span>&middot;</span>
-                          <span>Day {t.scheduled_day} of month</span>
-                          <span>&middot;</span>
-                          <span className={dueToday ? 'text-red-600 font-medium' : dueTomorrow ? 'text-amber-600 font-medium' : ''}>
-                            Next: {formatDate(t.next_run_date)}
-                          </span>
-                          <span>&middot;</span>
-                          <span>{recipientList.length} recipient{recipientList.length !== 1 ? 's' : ''}</span>
-                          {(t.attachmentCount ?? 0) > 0 && (
-                            <><span>&middot;</span><span className="inline-flex items-center gap-1"><Paperclip className="h-3 w-3" />{t.attachmentCount}</span></>
-                          )}
-                          {t.last_run_date && <><span>&middot;</span><span>Last sent: {formatDate(t.last_run_date)}</span></>}
-                          {t.auto_approve === 1 && <><span>&middot;</span><span className="text-cyan-600 font-medium">Auto-approve ON</span></>}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {dueToday && (
-                          <Button size="sm" variant="outline" className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
-                            onClick={() => openRelease(t)}>
-                            <Play className="mr-1 h-3 w-3" /> Release Now
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit" onClick={() => void openEdit(t)}>
-                          <Edit2 className="h-3.5 w-3.5 text-gray-500" />
+                  return (
+                    <tr key={t.id} className={`hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors ${
+                      dueToday ? 'bg-red-50/40 dark:bg-red-900/10' : dueTomorrow ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''
+                    }`}>
+                      <td className="px-5 py-4 text-gray-900 dark:text-slate-100 font-medium">{t.name}</td>
+                      <td className="px-4 py-4 text-center text-gray-600 dark:text-slate-400">{isMonthly ? 'Y' : '—'}</td>
+                      <td className="px-4 py-4 text-center text-gray-600 dark:text-slate-400">{isQuarterly ? 'Y' : '—'}</td>
+                      <td className="px-4 py-4 text-gray-600 dark:text-slate-400">{t.last_run_date ? formatDate(t.last_run_date) : '—'}</td>
+                      <td className={`px-4 py-4 font-medium ${dueToday ? 'text-red-600' : dueTomorrow ? 'text-amber-600' : 'text-gray-600 dark:text-slate-400'}`}>{formatDate(t.next_run_date)}</td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${
+                          !t.is_active ? 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300' :
+                          dueToday ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
+                          dueTomorrow ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                          t.last_run_date ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
+                          'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300'
+                        }`}>
+                          {statusText}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-right space-x-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 inline-flex" title="Edit" onClick={() => void openEdit(t)}>
+                          <Edit2 className="h-3.5 w-3.5 text-gray-500 dark:text-slate-400" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title={t.auto_approve ? 'Disable Auto-Approve' : 'Enable Auto-Approve'}
-                          onClick={() => void toggleAutoApprove(t)}>
-                          <Power className={`h-3.5 w-3.5 ${t.auto_approve ? 'text-cyan-500' : 'text-gray-300'}`} />
+                        <Button variant="ghost" size="icon" className="h-7 w-7 inline-flex" title={t.is_active ? 'Pause' : 'Activate'} onClick={() => void toggleActive(t)}>
+                          <Power className={`h-3.5 w-3.5 ${t.is_active ? 'text-emerald-500' : 'text-gray-400 dark:text-slate-500'}`} />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title={t.is_active ? 'Pause' : 'Activate'} onClick={() => void toggleActive(t)}>
-                          <Power className={`h-3.5 w-3.5 ${t.is_active ? 'text-emerald-500' : 'text-gray-400'}`} />
+                        <Button variant="ghost" size="icon" className="h-7 w-7 inline-flex" title="Delete" onClick={() => { if (confirm('Delete this cadence poll template?')) void deletePoll(t.id) }}>
+                          <Trash2 className="h-3.5 w-3.5 text-gray-400 dark:text-slate-500 hover:text-rose-500" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Delete"
-                          onClick={() => { if (confirm('Delete this cadence poll template?')) void deletePoll(t.id) }}>
-                          <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-rose-500" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpanded(isExpanded ? null : t.id)}>
-                          {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-gray-400" /> : <ChevronDown className="h-3.5 w-3.5 text-gray-400" />}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="px-5 pb-5 grid grid-cols-1 gap-4 md:grid-cols-3 bg-gray-50/60 border-t border-gray-100">
-                        <div className="pt-4">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Recipients</p>
-                          <div className="space-y-1">
-                            {recipientList.map(r => <p key={r} className="text-xs text-gray-600 truncate">{r}</p>)}
-                          </div>
-                        </div>
-                        <div className="pt-4">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Questions</p>
-                          <ol className="space-y-2">
-                            {questionList.map((q, i) => (
-                              <li key={i} className="flex items-start gap-2">
-                                <span className="text-xs font-bold text-gray-400 flex-shrink-0 mt-0.5">{i+1}.</span>
-                                <div className="min-w-0">
-                                  <p className="text-xs text-gray-700">{q.text}</p>
-                                  <span className={`inline-block mt-0.5 rounded-full px-1.5 py-px text-[10px] font-medium ${
-                                    q.type === 'rating' ? 'bg-amber-100 text-amber-700' :
-                                    q.type === 'yes_no' ? 'bg-emerald-100 text-emerald-700' :
-                                    q.type === 'multiple_choice' ? 'bg-purple-100 text-purple-700' :
-                                    'bg-blue-100 text-blue-700'
-                                  }`}>
-                                    {q.type === 'open_ended' ? 'Open Ended' : q.type === 'rating' ? 'Rating' : q.type === 'yes_no' ? 'Yes/No' : 'Multiple Choice'}
-                                  </span>
-                                </div>
-                              </li>
-                            ))}
-                          </ol>
-                        </div>
-                        <div className="pt-4">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Email Preview</p>
-                          <p className="text-xs font-medium text-gray-700 mb-1">{t.subject}</p>
-                          <p className="text-xs text-gray-500 line-clamp-4 whitespace-pre-wrap">{t.draft_email_body}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-          </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+            </tbody>
+          </table>
         )}
       </div>
 
