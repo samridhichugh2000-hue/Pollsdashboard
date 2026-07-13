@@ -517,9 +517,9 @@ function CadencePageInner() {
         </div>
       )}
 
-      <div id="cadence-table" className="rounded-2xl bg-white dark:bg-[#1e2535] shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
+      <div id="cadence-table" className="rounded-2xl bg-white dark:bg-[#1e2535] shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] overflow-x-auto">
         {activeFilter !== 'all' && (
-          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
             <span className="text-xs font-semibold text-slate-600">
               Showing: <span className="capitalize text-slate-800">{activeFilter === 'upcoming' ? 'Upcoming this week' : activeFilter}</span> &middot; {filteredPolls.length} poll{filteredPolls.length !== 1 ? 's' : ''}
             </span>
@@ -538,19 +538,19 @@ function CadencePageInner() {
             <Button size="sm" className="mt-4" onClick={openCreate}><Plus className="mr-1.5 h-3.5 w-3.5" /> Add Cadence Poll</Button></>}
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <tr>
-                <th className="px-5 py-3 text-left font-semibold text-gray-700 dark:text-slate-300">Poll Name</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700 dark:text-slate-300 w-12">M</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700 dark:text-slate-300 w-12">Q</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-slate-300">Last Run</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-slate-300">Next Date</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-slate-300">Status</th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-700 dark:text-slate-300">Actions</th>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-purple-600 text-white">
+                <th className="border border-gray-300 dark:border-slate-600 px-5 py-3 text-left font-semibold">Poll Name</th>
+                <th className="border border-gray-300 dark:border-slate-600 px-4 py-3 text-center font-semibold w-12">M</th>
+                <th className="border border-gray-300 dark:border-slate-600 px-4 py-3 text-center font-semibold w-12">Q</th>
+                <th className="border border-gray-300 dark:border-slate-600 px-4 py-3 text-left font-semibold">Last Run</th>
+                <th className="border border-gray-300 dark:border-slate-600 px-4 py-3 text-left font-semibold">Next Date</th>
+                <th className="border border-gray-300 dark:border-slate-600 px-4 py-3 text-left font-semibold">Status</th>
+                <th className="border border-gray-300 dark:border-slate-600 px-4 py-3 text-right font-semibold">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
+            <tbody>
               {filteredPolls
                 .slice()
                 .sort((a, b) => new Date(a.next_run_date).getTime() - new Date(b.next_run_date).getTime())
@@ -567,16 +567,16 @@ function CadencePageInner() {
                   else if (t.last_run_date) statusText = 'Done'
 
                   return (
-                    <tr key={t.id} className={`hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors ${
-                      dueToday ? 'bg-red-50/40 dark:bg-red-900/10' : dueTomorrow ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''
+                    <tr key={t.id} className={`border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800/30 ${
+                      dueToday ? 'bg-red-50 dark:bg-red-900/10' : dueTomorrow ? 'bg-amber-50 dark:bg-amber-900/10' : ''
                     }`}>
-                      <td className="px-5 py-4 text-gray-900 dark:text-slate-100 font-medium">{t.name}</td>
-                      <td className="px-4 py-4 text-center text-gray-600 dark:text-slate-400">{isMonthly ? 'Y' : '—'}</td>
-                      <td className="px-4 py-4 text-center text-gray-600 dark:text-slate-400">{isQuarterly ? 'Y' : '—'}</td>
-                      <td className="px-4 py-4 text-gray-600 dark:text-slate-400">{t.last_run_date ? formatDate(t.last_run_date) : '—'}</td>
-                      <td className={`px-4 py-4 font-medium ${dueToday ? 'text-red-600' : dueTomorrow ? 'text-amber-600' : 'text-gray-600 dark:text-slate-400'}`}>{formatDate(t.next_run_date)}</td>
-                      <td className="px-4 py-4">
-                        <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${
+                      <td className="border border-gray-200 dark:border-slate-700 px-5 py-3 text-gray-900 dark:text-slate-100 font-medium">{t.name}</td>
+                      <td className="border border-gray-200 dark:border-slate-700 px-4 py-3 text-center text-gray-600 dark:text-slate-400">{isMonthly ? 'Y' : '—'}</td>
+                      <td className="border border-gray-200 dark:border-slate-700 px-4 py-3 text-center text-gray-600 dark:text-slate-400">{isQuarterly ? 'Y' : '—'}</td>
+                      <td className="border border-gray-200 dark:border-slate-700 px-4 py-3 text-gray-600 dark:text-slate-400">{t.last_run_date ? formatDate(t.last_run_date) : '—'}</td>
+                      <td className={`border border-gray-200 dark:border-slate-700 px-4 py-3 font-medium ${dueToday ? 'text-red-600' : dueTomorrow ? 'text-amber-600' : 'text-gray-600 dark:text-slate-400'}`}>{formatDate(t.next_run_date)}</td>
+                      <td className="border border-gray-200 dark:border-slate-700 px-4 py-3">
+                        <span className={`inline-block px-2.5 py-1 rounded text-xs font-medium ${
                           !t.is_active ? 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300' :
                           dueToday ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
                           dueTomorrow ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
@@ -586,7 +586,7 @@ function CadencePageInner() {
                           {statusText}
                         </span>
                       </td>
-                      <td className="px-4 py-4 text-right space-x-1">
+                      <td className="border border-gray-200 dark:border-slate-700 px-4 py-3 text-right space-x-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7 inline-flex" title="Edit" onClick={() => void openEdit(t)}>
                           <Edit2 className="h-3.5 w-3.5 text-gray-500 dark:text-slate-400" />
                         </Button>
