@@ -84,6 +84,7 @@ export default function ParticipationPage() {
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null)
   const [filterParticipated, setFilterParticipated] = useState<'all' | 'yes' | 'no'>('all')
   const [filterDept, setFilterDept] = useState('all')
+  const [activeCard, setActiveCard] = useState<'total' | 'participated' | 'never' | null>(null)
   const [sortField, setSortField] = useState<'name' | 'count' | 'dept'>('count')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const syncedOnce = useRef(false)
@@ -143,6 +144,8 @@ export default function ParticipationPage() {
     .filter(p => {
       if (filterParticipated === 'yes' && p.participation_count === 0) return false
       if (filterParticipated === 'no' && p.participation_count > 0) return false
+      if (activeCard === 'participated' && p.participation_count < 2) return false
+      if (activeCard === 'never' && p.participation_count !== 0) return false
       if (filterDept !== 'all' && p.department_name !== filterDept) return false
       if (!search) return true
       const q = search.toLowerCase()
@@ -195,15 +198,26 @@ export default function ParticipationPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Total employees', value: loading ? '—' : totalEmployees.toLocaleString(), color: '' },
-          { label: 'Participated in ≥2 polls', value: loading ? '—' : participated.toLocaleString(), color: 'text-emerald-600 dark:text-emerald-400' },
-          { label: 'Never participated', value: loading ? '—' : notParticipated.toLocaleString(), color: 'text-red-500 dark:text-red-400' },
-        ].map(c => (
-          <div key={c.label} className="bg-white dark:bg-[#1a2035] border border-gray-100 dark:border-slate-700 rounded-xl p-4">
-            <div className="text-[13px] text-gray-500 dark:text-slate-400 mb-1">{c.label}</div>
-            <div className={`text-[22px] font-medium ${c.color || 'text-gray-900 dark:text-white'}`}>{c.value}</div>
-          </div>
-        ))}
+          { key: 'total' as const, label: 'Total employees', value: loading ? '—' : totalEmployees.toLocaleString(), color: '', ring: 'ring-purple-400' },
+          { key: 'participated' as const, label: 'Participated in ≥2 polls', value: loading ? '—' : participated.toLocaleString(), color: 'text-emerald-600 dark:text-emerald-400', ring: 'ring-emerald-400' },
+          { key: 'never' as const, label: 'Never participated', value: loading ? '—' : notParticipated.toLocaleString(), color: 'text-red-500 dark:text-red-400', ring: 'ring-red-400' },
+        ].map(c => {
+          const isActive = c.key === 'total' ? activeCard === null : activeCard === c.key
+          const handleClick = () => {
+            if (c.key === 'total') { setActiveCard(null); return }
+            setActiveCard(prev => prev === c.key ? null : c.key)
+          }
+          return (
+            <button
+              key={c.label}
+              onClick={handleClick}
+              className={`text-left bg-white dark:bg-[#1a2035] border border-gray-100 dark:border-slate-700 rounded-xl p-4 transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${isActive ? `ring-2 ${c.ring} shadow-md -translate-y-0.5` : ''}`}
+            >
+              <div className="text-[13px] text-gray-500 dark:text-slate-400 mb-1">{c.label}</div>
+              <div className={`text-[22px] font-medium ${c.color || 'text-gray-900 dark:text-white'}`}>{c.value}</div>
+            </button>
+          )
+        })}
       </div>
 
       {/* Toolbar */}
@@ -231,8 +245,8 @@ export default function ParticipationPage() {
           <option value="yes">Participated</option>
           <option value="no">Never participated</option>
         </select>
-        {(search || filterDept !== 'all' || filterParticipated !== 'all') && (
-          <button onClick={() => { setSearch(''); setFilterDept('all'); setFilterParticipated('all') }}
+        {(search || filterDept !== 'all' || filterParticipated !== 'all' || activeCard !== null) && (
+          <button onClick={() => { setSearch(''); setFilterDept('all'); setFilterParticipated('all'); setActiveCard(null) }}
             className="flex items-center gap-1 h-[34px] px-2.5 rounded border border-gray-200 dark:border-slate-700 text-[12px] text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 bg-white dark:bg-slate-800 transition-colors">
             <X className="h-3 w-3" /> Clear
           </button>
