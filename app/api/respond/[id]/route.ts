@@ -7,6 +7,20 @@ import { v4 as uuidv4 } from 'uuid'
 
 const CLOSED_STATUSES = ['CLOSED', 'ARCHIVED', 'RESULTS_UPLOADED']
 const ALLOWED_DOMAIN = 'koenig-solutions.com'
+const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// A poll released to at least one non-koenig-solutions.com recipient is treated
+// as external-facing: the respondent's real email (whatever domain) is required
+// and stored as-is — it must never be forced/rewritten to @koenig-solutions.com.
+function isExternalPoll(releaseEmailsJson: string | null | undefined): boolean {
+  if (!releaseEmailsJson) return false
+  try {
+    const emails = JSON.parse(releaseEmailsJson) as string[]
+    return emails.some(e => !e.toLowerCase().endsWith(`@${ALLOWED_DOMAIN}`))
+  } catch {
+    return false
+  }
+}
 
 // GET — fetch poll questions (public, no auth)
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -30,6 +44,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     subject: poll.subject,
     deadline: poll.deadline,
     questions,
+    isExternal: isExternalPoll(poll.release_emails),
   })
 }
 
@@ -48,12 +63,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     email?: string
   }
 
-  // Validate email domain
   const email = body.email?.trim().toLowerCase()
   if (!email) {
-    return NextResponse.json({ error: 'Your Koenig Solutions email is required.' }, { status: 400 })
+    return NextResponse.json({ error: 'Your email is required.' }, { status: 400 })
   }
-  if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
+
+  // External-facing polls accept the respondent's real email, whatever the
+  // domain — it is stored exactly as submitted, never rewritten or replaced.
+  // Internal polls keep the existing @koenig-solutions.com requirement.
+  if (isExternalPoll(poll.release_emails)) {
+    if (!BASIC_EMAIL_RE.test(email)) {
+      return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 })
+    }
+  } else if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
     return NextResponse.json({ error: `Only @${ALLOWED_DOMAIN} email addresses are allowed.` }, { status: 403 })
   }
 

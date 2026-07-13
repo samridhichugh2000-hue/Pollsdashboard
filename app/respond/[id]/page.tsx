@@ -10,11 +10,13 @@ interface PollData {
   subject?: string | null
   deadline: string | null
   questions: Array<string | { text: string; type: string; options?: string[] }>
+  isExternal?: boolean
 }
 
 type Answer = { question: string; answer: string }
 
 const ALLOWED_DOMAIN = 'koenig-solutions.com'
+const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function normalizeQuestion(q: string | { text: string; type: string; options?: string[] }): { text: string; type: string; options?: string[] } {
   return typeof q === 'string'
@@ -133,10 +135,15 @@ export default function RespondPage() {
 
     const trimmedEmail = email.trim().toLowerCase()
     if (!trimmedEmail) {
-      setSubmitError('Please enter your Koenig Solutions email address.')
+      setSubmitError(poll?.isExternal ? 'Please enter your email address.' : 'Please enter your Koenig Solutions email address.')
       return
     }
-    if (!trimmedEmail.endsWith(`@${ALLOWED_DOMAIN}`)) {
+    if (poll?.isExternal) {
+      if (!BASIC_EMAIL_RE.test(trimmedEmail)) {
+        setSubmitError('Please enter a valid email address.')
+        return
+      }
+    } else if (!trimmedEmail.endsWith(`@${ALLOWED_DOMAIN}`)) {
       setSubmitError(`Only @${ALLOWED_DOMAIN} email addresses are allowed.`)
       return
     }
@@ -221,21 +228,21 @@ export default function RespondPage() {
               <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{submitError}</div>
             )}
 
-            {/* Email — required, domain locked */}
+            {/* Email — domain locked for internal polls, any real email for external ones */}
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Your Koenig Solutions Email <span className="text-red-400">*</span>
+                {poll.isExternal ? 'Your Email' : 'Your Koenig Solutions Email'} <span className="text-red-400">*</span>
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={`yourname@${ALLOWED_DOMAIN}`}
+                placeholder={poll.isExternal ? 'you@example.com' : `yourname@${ALLOWED_DOMAIN}`}
                 required
                 style={{ color: '#111827', backgroundColor: '#ffffff', colorScheme: 'light' }}
                 className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm placeholder-gray-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition"
               />
-              <p className="text-xs text-gray-400">Only @{ALLOWED_DOMAIN} addresses are accepted.</p>
+              {!poll.isExternal && <p className="text-xs text-gray-400">Only @{ALLOWED_DOMAIN} addresses are accepted.</p>}
             </div>
 
             {/* Questions */}
