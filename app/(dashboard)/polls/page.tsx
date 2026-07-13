@@ -97,8 +97,9 @@ function PollsContent() {
   }
 
   // Restrict everything on this page to the quarter chosen in the header.
-  const quarterPolls = polls.filter(p => inQuarter(quarter, p.created_at))
-  const nonArchived = quarterPolls.filter(p => p.status !== 'ARCHIVED')
+  // Archived polls have their own dedicated page and must never show up here.
+  const quarterPolls = polls.filter(p => inQuarter(quarter, p.created_at) && p.status !== 'ARCHIVED')
+  const nonArchived = quarterPolls
 
   const applySearch = (list: Poll[]): Poll[] => {
     let result = list
@@ -128,7 +129,7 @@ function PollsContent() {
       case 'via-form': base = quarterPolls.filter(p => p.source === 'dashboard'); break
       case 'active':   base = quarterPolls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)); break
       case 'not-sent': base = quarterPolls.filter(p => p.status === 'DRAFT'); break
-      case 'closed':   base = quarterPolls.filter(p => ['CLOSED', 'ARCHIVED', 'REJECTED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status)); break
+      case 'closed':   base = quarterPolls.filter(p => ['CLOSED', 'REJECTED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status)); break
       default:         base = [...quarterPolls]
     }
     return applySearch(base)
