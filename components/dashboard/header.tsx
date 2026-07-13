@@ -101,13 +101,16 @@ export function Header({ userName }: { userName?: string; userRole?: string; tit
 
   const pageLabel = Object.entries(PAGE_TITLES).find(([k]) => pathname === k || (k !== '/dashboard' && pathname.startsWith(k)))?.[1] ?? 'Dashboard'
   const quarterLabel = keyToLabel(selectedQuarter)
+  // Participation has its own date-range picker instead — the header quarter
+  // selector doesn't apply to it and would be misleading if shown.
+  const showQuarterPicker = !pathname.startsWith('/participation')
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-100 bg-white dark:border-slate-800 dark:bg-[#161b27] px-6">
       {/* Left: title + subtitle */}
       <div>
         <h1 className="text-base font-bold text-slate-800 dark:text-white leading-tight">Polls Dashboard</h1>
-        <p className="text-xs text-slate-400 leading-tight">{pageLabel} · {quarterLabel}</p>
+        <p className="text-xs text-slate-400 leading-tight">{pageLabel}{showQuarterPicker ? ` · ${quarterLabel}` : ''}</p>
       </div>
 
       {/* Right: search + quarter + bell + theme */}
@@ -120,36 +123,38 @@ export function Header({ userName }: { userName?: string; userRole?: string; tit
             className="bg-transparent text-xs text-slate-700 dark:text-slate-200 placeholder-slate-400 outline-none w-36" />
         </form>
 
-        {/* Quarter dropdown */}
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setDropdownOpen(o => !o)}
-            className="flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 px-3 text-xs font-medium text-slate-600 dark:text-slate-300 hover:border-purple-300 dark:hover:border-purple-600 transition-colors"
-          >
-            <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
-            {quarterLabel}
-            <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
+        {/* Quarter dropdown — not shown on Participation, which has its own date range picker */}
+        {showQuarterPicker && (
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setDropdownOpen(o => !o)}
+              className="flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 px-3 text-xs font-medium text-slate-600 dark:text-slate-300 hover:border-purple-300 dark:hover:border-purple-600 transition-colors"
+            >
+              <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+              {quarterLabel}
+              <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-          {dropdownOpen && (
-            <div className="absolute right-0 top-full mt-1.5 z-50 w-48 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e2535] shadow-xl overflow-hidden">
-              <div className="py-1">
-                <button onClick={() => selectQuarter('all')}
-                  className={`w-full px-4 py-2.5 text-left text-xs transition-colors ${selectedQuarter === 'all' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                  All Time
-                </button>
-                <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
-                {quarters.map(q => (
-                  <button key={q.key} onClick={() => selectQuarter(q.key)}
-                    className={`w-full px-4 py-2.5 text-left text-xs transition-colors flex items-center justify-between ${selectedQuarter === q.key ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                    <span>{q.label}</span>
-                    {q.isCurrent && <span className="text-[9px] font-bold bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 px-1.5 py-0.5 rounded-full">Current</span>}
+            {dropdownOpen && (
+              <div className="absolute right-0 top-full mt-1.5 z-50 w-48 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e2535] shadow-xl overflow-hidden">
+                <div className="py-1">
+                  <button onClick={() => selectQuarter('all')}
+                    className={`w-full px-4 py-2.5 text-left text-xs transition-colors ${selectedQuarter === 'all' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                    All Time
                   </button>
-                ))}
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+                  {quarters.map(q => (
+                    <button key={q.key} onClick={() => selectQuarter(q.key)}
+                      className={`w-full px-4 py-2.5 text-left text-xs transition-colors flex items-center justify-between ${selectedQuarter === q.key ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                      <span>{q.label}</span>
+                      {q.isCurrent && <span className="text-[9px] font-bold bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 px-1.5 py-0.5 rounded-full">Current</span>}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Notification bell */}
         <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-purple-300 transition-colors relative">

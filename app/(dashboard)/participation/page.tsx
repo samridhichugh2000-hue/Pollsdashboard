@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { BarChart2, Download, Loader2, RefreshCw, X } from 'lucide-react'
+import { BarChart2, CalendarRange, Download, Loader2, RefreshCw, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Participant } from '@/app/api/participation/route'
 
@@ -85,6 +85,8 @@ export default function ParticipationPage() {
   const [filterParticipated, setFilterParticipated] = useState<'all' | 'yes' | 'no'>('all')
   const [filterDept, setFilterDept] = useState('all')
   const [activeCard, setActiveCard] = useState<'total' | 'participated' | 'never' | null>(null)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [sortField, setSortField] = useState<'name' | 'count' | 'dept'>('count')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const syncedOnce = useRef(false)
@@ -133,14 +135,31 @@ export default function ParticipationPage() {
     else { setSortField(field); setSortDir('desc') }
   }
 
+  // Recompute each participant's poll list/count against the selected date
+  // range (by response submitted_at). With no range set this is a no-op —
+  // every poll matches, so counts are identical to the all-time totals.
+  const inDateRange = (submittedAt: string | null): boolean => {
+    if (!dateFrom && !dateTo) return true
+    if (!submittedAt) return false
+    const t = new Date(submittedAt).getTime()
+    if (Number.isNaN(t)) return false
+    if (dateFrom && t < new Date(dateFrom).setHours(0, 0, 0, 0)) return false
+    if (dateTo && t > new Date(dateTo).setHours(23, 59, 59, 999)) return false
+    return true
+  }
+  const rangedParticipants = participants.map(p => {
+    const polls = p.polls.filter(pl => inDateRange(pl.submitted_at))
+    return { ...p, polls, participation_count: polls.length }
+  })
+
   const depts = Array.from(new Set(participants.map(p => p.department_name).filter(Boolean))).sort() as string[]
 
-  const participated = participants.filter(p => p.participation_count >= 2).length
-  const notParticipated = participants.filter(p => p.participation_count === 0).length
-  const totalResponses = participants.reduce((s, p) => s + p.participation_count, 0)
-  const avgPolls = participants.length > 0 ? (totalResponses / participants.length).toFixed(1) : '0'
+  const participated = rangedParticipants.filter(p => p.participation_count >= 2).length
+  const notParticipated = rangedParticipants.filter(p => p.participation_count === 0).length
+  const totalResponses = rangedParticipants.reduce((s, p) => s + p.participation_count, 0)
+  const avgPolls = rangedParticipants.length > 0 ? (totalResponses / rangedParticipants.length).toFixed(1) : '0'
 
-  const filtered = participants
+  const filtered = rangedParticipants
     .filter(p => {
       if (filterParticipated === 'yes' && p.participation_count === 0) return false
       if (filterParticipated === 'no' && p.participation_count > 0) return false
@@ -245,8 +264,26 @@ export default function ParticipationPage() {
           <option value="yes">Participated</option>
           <option value="no">Never participated</option>
         </select>
-        {(search || filterDept !== 'all' || filterParticipated !== 'all' || activeCard !== null) && (
-          <button onClick={() => { setSearch(''); setFilterDept('all'); setFilterParticipated('all'); setActiveCard(null) }}
+        <div className="flex items-center gap-1.5 h-[34px] border border-gray-200 dark:border-slate-700 rounded px-2.5 bg-white dark:bg-slate-800">
+          <CalendarRange className="h-3.5 w-3.5 text-gray-400 dark:text-slate-500 flex-shrink-0" />
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            max={dateTo || undefined}
+            className="bg-transparent text-[12px] text-gray-700 dark:text-slate-300 outline-none [color-scheme:light] dark:[color-scheme:dark]"
+          />
+          <span className="text-[12px] text-gray-400 dark:text-slate-500">to</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            min={dateFrom || undefined}
+            className="bg-transparent text-[12px] text-gray-700 dark:text-slate-300 outline-none [color-scheme:light] dark:[color-scheme:dark]"
+          />
+        </div>
+        {(search || filterDept !== 'all' || filterParticipated !== 'all' || activeCard !== null || dateFrom || dateTo) && (
+          <button onClick={() => { setSearch(''); setFilterDept('all'); setFilterParticipated('all'); setActiveCard(null); setDateFrom(''); setDateTo('') }}
             className="flex items-center gap-1 h-[34px] px-2.5 rounded border border-gray-200 dark:border-slate-700 text-[12px] text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 bg-white dark:bg-slate-800 transition-colors">
             <X className="h-3 w-3" /> Clear
           </button>
