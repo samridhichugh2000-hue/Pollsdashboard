@@ -326,8 +326,8 @@ function FeedbackPageInner() {
     return matchesCard && matchesSearch
   }
 
-  const totalPolls = polls.length
-  const sum = (key: keyof PollWithEntries) => polls.reduce((acc, p) => acc + ((p[key] as number | null) ?? 0), 0)
+  const totalPolls = visiblePolls.length
+  const sum = (key: keyof PollWithEntries) => visiblePolls.reduce((acc, p) => acc + ((p[key] as number | null) ?? 0), 0)
   const globalCards = [
     { label: 'Total Suggestions', sub: `out of ${totalPolls} polls`, value: sum('totalCount'), color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-800' },
     { label: 'Pending for Action', sub: null, value: sum('pendingCount'), color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800' },
