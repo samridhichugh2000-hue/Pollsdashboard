@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard,
   ClipboardList,
@@ -15,6 +16,7 @@ import {
   BarChart2,
   PanelLeftClose,
   PanelLeftOpen,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -115,16 +117,30 @@ export function Sidebar() {
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 text-xs font-bold text-white">
             SC
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100">Samridhi Chugh</p>
             <p className="text-[10px] text-slate-400">HR Admin</p>
           </div>
+          <button
+            onClick={() => void signOut({ callbackUrl: '/login' })}
+            title="Log out"
+            className="flex-shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-rose-500 transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       ) : (
-        <div className="mx-1.5 mt-4 flex justify-center rounded-xl bg-slate-50 dark:bg-slate-800/60 py-2" title="Samridhi Chugh">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-600 text-xs font-bold text-white">
+        <div className="mx-1.5 mt-4 flex flex-col items-center gap-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 py-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-600 text-xs font-bold text-white" title="Samridhi Chugh">
             SC
           </div>
+          <button
+            onClick={() => void signOut({ callbackUrl: '/login' })}
+            title="Log out"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-rose-500 transition-colors"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
         </div>
       )}
     </aside>
