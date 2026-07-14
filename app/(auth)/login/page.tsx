@@ -39,11 +39,6 @@ function LoginForm() {
     }
   }
 
-  const handleMicrosoft = async () => {
-    setLoading(true)
-    await signIn('microsoft-entra-id', { callbackUrl })
-  }
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <Card className="w-full max-w-md">
@@ -56,35 +51,6 @@ function LoginForm() {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Microsoft SSO */}
-          <Button
-            className="w-full"
-            variant="outline"
-            onClick={handleMicrosoft}
-            disabled={loading}
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none">
-                <rect x="1" y="1" width="10" height="10" fill="#F25022" />
-                <rect x="13" y="1" width="10" height="10" fill="#7FBA00" />
-                <rect x="1" y="13" width="10" height="10" fill="#00A4EF" />
-                <rect x="13" y="13" width="10" height="10" fill="#FFB900" />
-              </svg>
-            )}
-            Sign in with Microsoft
-          </Button>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200" />
-            </div>
-            <div className="relative flex justify-center text-xs text-gray-400">
-              <span className="bg-white px-2">or continue with email</span>
-            </div>
-          </div>
-
           {/* Email + Password */}
           <form onSubmit={handleCredentials} className="space-y-4">
             {error && (
