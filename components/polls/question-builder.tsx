@@ -79,8 +79,14 @@ export function QuestionBuilder({ questions, onChange, maxQuestions = 10 }: Ques
   }
 
   const updateOption = (qi: number, oi: number, value: string) => {
+    // Multi-select respondent answers are serialized as a ", "-joined string
+    // (app/respond/[id]/page.tsx) and split back on the same delimiter — an
+    // option containing a literal ", " would corrupt that round-trip, so it's
+    // disallowed at the source instead of every consumer having to guard
+    // against it.
+    const safeValue = value.replace(/,\s*/g, '; ')
     onChange(questions.map((item, idx) => idx === qi
-      ? { ...item, options: (item.options ?? []).map((o, i) => i === oi ? value : o) }
+      ? { ...item, options: (item.options ?? []).map((o, i) => i === oi ? safeValue : o) }
       : item
     ))
   }

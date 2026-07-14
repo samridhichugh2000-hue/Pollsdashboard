@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
 import { getDb } from '@/lib/db/client'
 import { runMigrations } from '@/lib/db/schema'
 
 const KOENIG_BASE = 'https://api.koenig-solutions.com'
-const KOENIG_USER = 'Samridhi_GetEmployeeDeta'
-const KOENIG_PASS = 'JZ4Xf8KxU!bH'
-const KOENIG_ROLE = 'Get Employee Details (PMS)'
-const API_KEY = '236'
+const KOENIG_USER = process.env.KOENIG_EMPLOYEE_USERNAME!
+const KOENIG_PASS = process.env.KOENIG_EMPLOYEE_PASSWORD!
+const KOENIG_ROLE = process.env.KOENIG_EMPLOYEE_ROLE!
+const API_KEY = process.env.KOENIG_EMPLOYEE_API_KEY!
 
 interface KoenigEmployee {
   first_name: string | null
@@ -39,6 +40,9 @@ async function fetchAllEmployees(): Promise<KoenigEmployee[]> {
 }
 
 export async function GET() {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   await runMigrations()
   const db = getDb()
   const rows = await db.execute(`
@@ -49,10 +53,20 @@ export async function GET() {
 }
 
 export async function POST() {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   await runMigrations()
   const db = getDb()
 
   const employees = await fetchAllEmployees()
+
+  // Never wipe the table on an empty/failed fetch — a transient upstream
+  // hiccup (rate limit, bad token) would otherwise silently delete every
+  // previously-synced employee with nothing to replace them.
+  if (employees.length === 0) {
+    return NextResponse.json({ synced: 0, message: 'Upstream returned no employees — sync aborted, existing data untouched.', complete: false }, { status: 502 })
+  }
 
   // Wipe and replace so removed employees don't linger
   await db.execute(`DELETE FROM employees`)
@@ -63,15 +77,16 @@ export async function POST() {
     if (!email.toLowerCase().includes('@koenig-solutions.com')) continue
     await db.execute({
       sql: `INSERT INTO employees (email_address, emp_code, first_name, last_name, manager_name, department_name, designation_name, synced_at)
-            VALUES (?, NULL, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(email_address) DO UPDATE SET
+              emp_code = excluded.emp_code,
               first_name = excluded.first_name,
               last_name = excluded.last_name,
               manager_name = excluded.manager_name,
               department_name = excluded.department_name,
               designation_name = excluded.designation_name,
               synced_at = CURRENT_TIMESTAMP`,
-      args: [email, emp.first_name, emp.last_name, emp.manager_name, emp.deparment_name, emp.designation_name],
+      args: [email, emp.emp_code ?? null, emp.first_name, emp.last_name, emp.manager_name, emp.deparment_name, emp.designation_name],
     })
     synced++
   }

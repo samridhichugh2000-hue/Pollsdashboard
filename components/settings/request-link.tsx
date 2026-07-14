@@ -17,7 +17,7 @@ export function RequestLink() {
   }
 
   return (
-    <div className="rounded-2xl bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] overflow-hidden">
+    <div className="rounded-2xl bg-white dark:bg-[#1e2535] shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] overflow-hidden">
       {/* Header band */}
       <div className="flex items-center gap-3 bg-cyan-600 px-5 py-4">
         <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/20">
@@ -31,14 +31,14 @@ export function RequestLink() {
 
       <div className="p-5 space-y-4">
         {/* URL display */}
-        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-          <span className="flex-1 truncate text-sm font-mono text-gray-700">{url}</span>
+        <div className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 px-4 py-3">
+          <span className="flex-1 truncate text-sm font-mono text-gray-700 dark:text-slate-300">{url}</span>
           <button
             onClick={copy}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
               copied
-                ? 'bg-emerald-50 text-emerald-600'
-                : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'
+                ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                : 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-100 dark:hover:bg-cyan-900/50'
             }`}
           >
             {copied ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
@@ -50,11 +50,11 @@ export function RequestLink() {
             href="/request"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-1.5 rounded-xl border border-gray-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
           >
             <ExternalLink className="h-4 w-4" /> Preview Page
           </a>
-          <div className="flex-1 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          <div className="flex-1 rounded-xl bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
             External users can only submit requests — they cannot view the dashboard or any poll data.
           </div>
         </div>

@@ -23,14 +23,24 @@ export async function GET(req: Request) {
     return NextResponse.json({ deleted: 0 })
   }
 
-  // Delete related data first (FK order), then the polls themselves
+  // Delete related data first (FK order), then the polls themselves — all in
+  // one batch/transaction so a crash mid-run can't leave some polls' evidence
+  // tables purged while the poll row itself (or other polls in the same
+  // batch) survives untouched.
+  const statements: [string, string[]][] = []
   for (const id of ids) {
-    await db.execute({ sql: `DELETE FROM audit_logs WHERE poll_id = ?`, args: [id] })
-    await db.execute({ sql: `DELETE FROM poll_responses WHERE poll_id = ?`, args: [id] })
-    await db.execute({ sql: `DELETE FROM poll_approvals WHERE poll_id = ?`, args: [id] })
-    await db.execute({ sql: `DELETE FROM poll_approval_tokens WHERE poll_id = ?`, args: [id] })
-    await db.execute({ sql: `DELETE FROM polls WHERE id = ?`, args: [id] })
+    statements.push(
+      [`DELETE FROM audit_logs WHERE poll_id = ?`, [id]],
+      [`DELETE FROM poll_responses WHERE poll_id = ?`, [id]],
+      [`DELETE FROM poll_approvals WHERE poll_id = ?`, [id]],
+      [`DELETE FROM poll_approval_tokens WHERE poll_id = ?`, [id]],
+      [`DELETE FROM poll_attachments WHERE poll_id = ?`, [id]],
+      [`DELETE FROM feedback_items WHERE poll_id = ?`, [id]],
+      [`DELETE FROM closure_items WHERE poll_id = ?`, [id]],
+      [`DELETE FROM polls WHERE id = ?`, [id]],
+    )
   }
+  await db.batch(statements)
 
   // Audit the cleanup itself against the first deleted poll (best-effort)
   try {

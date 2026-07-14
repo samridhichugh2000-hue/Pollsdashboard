@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { auth } from '@/lib/auth'
 import { getDb } from '@/lib/db/client'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -18,7 +19,9 @@ async function checkRateLimit(userId: string, type: string): Promise<boolean> {
 }
 
 export async function POST(req: NextRequest) {
-  const userId = req.headers.get('x-user-email') ?? 'anonymous'
+  const session = await auth()
+  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.email
 
   const allowed = await checkRateLimit(userId, 'questions')
   if (!allowed) {

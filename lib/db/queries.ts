@@ -2,6 +2,12 @@ import { getDb } from './client'
 import type { Poll, PollApproval, PollResponse, User, AuditLog, PollStatus, CreatePollInput } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 
+// Single source of truth for "this poll is closed" across KPI, overview, and
+// reports — these three previously each had their own, disagreeing list
+// (e.g. KPI omitting RESULTS_SHARED while overview included it), which is
+// exactly why the same poll could count as closed on one page and not another.
+export const CLOSED_POLL_STATUSES: PollStatus[] = ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED']
+
 // ─── Polls ───────────────────────────────────────────────────────────────────
 
 export async function getAllPolls(): Promise<Poll[]> {
@@ -77,6 +83,16 @@ export async function createPoll(input: CreatePollInput): Promise<Poll> {
   return (await getPollById(id))!
 }
 
+// Same allow-list discipline as updatePoll() below — extra's keys ultimately
+// get interpolated into the SQL column list, so an unvalidated key is a
+// SQL-injection-via-column-name vector even though every current call site
+// only ever passes hardcoded literals.
+const POLL_STATUS_EXTRA_ALLOWED = [
+  'sent_at', 'reminder_at', 'reminder_sent_at', 'second_reminder_sent_at', 'closure_alert_sent_at',
+  'approved_at', 'closed_at', 'results_uploaded_at', 'release_emails', 'release_message_id',
+  'rms_task_id', 'rms_news_id', 'archived_from_status',
+]
+
 export async function updatePollStatus(id: string, status: PollStatus, extra?: Record<string, string | null>): Promise<void> {
   const now = new Date().toISOString()
   const setClauses = ['status = ?', 'updated_at = ?']
@@ -84,6 +100,7 @@ export async function updatePollStatus(id: string, status: PollStatus, extra?: R
 
   if (extra) {
     for (const [key, value] of Object.entries(extra)) {
+      if (!POLL_STATUS_EXTRA_ALLOWED.includes(key)) throw new Error(`updatePollStatus: column not allowed: ${key}`)
       setClauses.push(`${key} = ?`)
       args.push(value)
     }
@@ -94,6 +111,32 @@ export async function updatePollStatus(id: string, status: PollStatus, extra?: R
     sql: `UPDATE polls SET ${setClauses.join(', ')} WHERE id = ?`,
     args,
   })
+}
+
+// Atomically claim a single "already sent" marker column before firing an
+// email/side-effect. Returns false if another invocation already claimed it
+// (the UPDATE affects zero rows), so the caller knows to skip — this closes
+// the race where two overlapping cron runs both read the same unclaimed row
+// and both send.
+const CLAIMABLE_COLUMNS = ['closure_alert_sent_at', 'second_reminder_sent_at', 'results_uploaded_at']
+
+export async function claimPollColumn(id: string, column: typeof CLAIMABLE_COLUMNS[number], value: string): Promise<boolean> {
+  if (!CLAIMABLE_COLUMNS.includes(column)) throw new Error(`claimPollColumn: column not allowed: ${column}`)
+  const result = await getDb().execute({
+    sql: `UPDATE polls SET ${column} = ?, updated_at = ? WHERE id = ? AND ${column} IS NULL`,
+    args: [value, new Date().toISOString(), id],
+  })
+  return result.rowsAffected === 1
+}
+
+// Atomically transition SENT -> REMINDER_SENT. Guards on the poll still being
+// in SENT so two overlapping cron invocations can't both send the 1st reminder.
+export async function claimReminderSent(id: string, reminderSentAt: string): Promise<boolean> {
+  const result = await getDb().execute({
+    sql: `UPDATE polls SET status = 'REMINDER_SENT', reminder_sent_at = ?, updated_at = ? WHERE id = ? AND status = 'SENT'`,
+    args: [reminderSentAt, new Date().toISOString(), id],
+  })
+  return result.rowsAffected === 1
 }
 
 export async function updatePoll(id: string, fields: Partial<Poll>): Promise<void> {
@@ -169,11 +212,13 @@ export async function getKPIData() {
   const iso = startOfMonth.toISOString()
   const db = getDb()
 
+  const closedPh = CLOSED_POLL_STATUSES.map(() => '?').join(', ')
+
   const [totalRes, approvalRes, activeRes, closedRes, rmsRes, resultsRes] = await Promise.all([
     db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE created_at >= ? AND status != 'ARCHIVED'", args: [iso] }),
     db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE status = 'AWAITING_APPROVAL'", args: [] }),
     db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE status IN ('SENT', 'REMINDER_SENT', 'RMS_PUBLISHED')", args: [] }),
-    db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE status IN ('CLOSED', 'RESULTS_UPLOADED') AND closed_at >= ?", args: [iso] }),
+    db.execute({ sql: `SELECT COUNT(*) as count FROM polls WHERE status IN (${closedPh}) AND closed_at >= ?`, args: [...CLOSED_POLL_STATUSES, iso] }),
     db.execute({ sql: "SELECT COUNT(*) as total, SUM(CASE WHEN rms_task_id IS NOT NULL THEN 1 ELSE 0 END) as created FROM polls WHERE created_at >= ? AND status != 'ARCHIVED'", args: [iso] }),
     db.execute({ sql: "SELECT COUNT(*) as total, SUM(CASE WHEN results_uploaded_at IS NOT NULL THEN 1 ELSE 0 END) as uploaded FROM polls WHERE closed_at >= ? AND status != 'ARCHIVED'", args: [iso] }),
   ])
@@ -284,10 +329,20 @@ export async function getAuditLogsByPoll(pollId: string): Promise<AuditLog[]> {
 // ─── Approval Tokens ──────────────────────────────────────────────────────────
 
 export async function createApprovalToken(pollId: string): Promise<string> {
+  const db = getDb()
   const id = uuidv4()
   const token = uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '') // 64-char hex token
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-  await getDb().execute({
+
+  // Invalidate any still-unused tokens from a previous SEND_FOR_APPROVAL —
+  // otherwise an old approval-request email clicked after the poll was
+  // edited/re-sent/already released can regress the poll's status.
+  await db.execute({
+    sql: `UPDATE poll_approval_tokens SET used_at = ? WHERE poll_id = ? AND used_at IS NULL`,
+    args: [new Date().toISOString(), pollId],
+  })
+
+  await db.execute({
     sql: 'INSERT INTO poll_approval_tokens (id, poll_id, token, expires_at) VALUES (?, ?, ?, ?)',
     args: [id, pollId, token, expiresAt],
   })
@@ -397,6 +452,19 @@ export async function getRegularPollAttachmentCounts(): Promise<Record<string, n
   const counts: Record<string, number> = {}
   for (const r of result.rows) counts[r.regular_poll_id as string] = Number(r.cnt)
   return counts
+}
+
+// Atomically advance a cadence template's next_run_date, guarded on it still
+// matching the value we read when we decided this template was due. If two
+// overlapping cron invocations both see the same due template, only one
+// UPDATE affects a row — the other gets rowsAffected === 0 and must skip
+// creating/sending anything for this cycle.
+export async function claimRegularPollRun(id: string, expectedCurrentNextRunDate: string, newNextRunDate: string): Promise<boolean> {
+  const result = await getDb().execute({
+    sql: `UPDATE regular_polls SET next_run_date = ?, updated_at = ? WHERE id = ? AND next_run_date = ?`,
+    args: [newNextRunDate, new Date().toISOString(), id, expectedCurrentNextRunDate],
+  })
+  return result.rowsAffected === 1
 }
 
 export async function updateRegularPoll(id: string, fields: Partial<Omit<RegularPoll, 'id' | 'created_at'>>): Promise<void> {

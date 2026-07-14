@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useCallback } from 'react'
 import { cn, sanitizeWordHtml } from '@/lib/utils'
+import { sanitizeHtml } from '@/lib/sanitize-html'
 
 interface RichTextEditorProps {
   value: string
@@ -49,7 +50,7 @@ export function RichTextEditor({
   // Sync external value → DOM only when not focused (avoids cursor jump while typing)
   useEffect(() => {
     if (editorRef.current && !isFocused.current) {
-      editorRef.current.innerHTML = value
+      editorRef.current.innerHTML = sanitizeHtml(value)
     }
   }, [value])
 
@@ -61,9 +62,11 @@ export function RichTextEditor({
     e.preventDefault()
     const html = e.clipboardData.getData('text/html')
     const text = e.clipboardData.getData('text/plain')
-    // Strip Word/Outlook overhead when HTML contains MSO markers, then fall back to plain text
+    // Strip Word/Outlook overhead when HTML contains MSO markers, then always
+    // run through the real sanitizer — sanitizeWordHtml only strips Office
+    // cruft, it is not an XSS guard.
     const isWord = /mso-|ProgId=|<!--\[if gte mso/i.test(html)
-    const content = html ? (isWord ? sanitizeWordHtml(html) : html) : text.replace(/\n/g, '<br>')
+    const content = html ? sanitizeHtml(isWord ? sanitizeWordHtml(html) : html) : text.replace(/\n/g, '<br>')
     insertHtmlAtCursor(content)
     if (editorRef.current) onChange(editorRef.current.innerHTML)
   }, [onChange])

@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createPoll, updatePoll, createRegularPoll } from '@/lib/db/queries'
+import { runMigrations } from '@/lib/db/schema'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
-import { formatDate } from '@/lib/utils'
+import { formatDate, escapeHtml } from '@/lib/utils'
 import { sendEmail } from '@/lib/graph'
 
 export async function POST(req: NextRequest) {
   try {
+    await runMigrations()
     const body = await req.json() as {
       requester_name: string
       requester_email: string
@@ -120,18 +122,18 @@ export async function POST(req: NextRequest) {
           : ''
 
         const contextLine = body.context?.trim()
-          ? `<tr><td style="padding:6px 12px;color:#6b7280;font-size:13px;">Context</td><td style="padding:6px 12px;font-size:13px;">${body.context.trim()}</td></tr>`
+          ? `<tr><td style="padding:6px 12px;color:#6b7280;font-size:13px;">Context</td><td style="padding:6px 12px;font-size:13px;">${escapeHtml(body.context.trim())}</td></tr>`
           : ''
 
         const questionsSection = body.questions?.filter(q => q.trim()).length
           ? `<p style="margin:20px 0 8px;font-weight:600;font-size:14px;">Questions Submitted</p>
 <ol style="margin:0;padding-left:20px;font-size:13px;color:#374151;">
-  ${body.questions.filter(q => q.trim()).map(q => `<li style="margin-bottom:4px;">${q}</li>`).join('')}
+  ${body.questions.filter(q => q.trim()).map(q => `<li style="margin-bottom:4px;">${escapeHtml(q)}</li>`).join('')}
 </ol>`
           : ''
 
         const attachmentNote = body.attachments?.length
-          ? `<p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Attachments included: <strong>${body.attachments.map(a => a.name).join(', ')}</strong></p>`
+          ? `<p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Attachments included: <strong>${escapeHtml(body.attachments.map(a => a.name).join(', '))}</strong></p>`
           : ''
 
         const htmlBody = `
@@ -140,21 +142,21 @@ export async function POST(req: NextRequest) {
     <h2 style="margin:0;color:#fff;font-size:20px;">Poll Request Received</h2>
   </div>
   <div style="background:#f9fafb;padding:24px 32px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none;">
-    <p style="margin:0 0 20px;font-size:14px;">Hi <strong>${requester_name}</strong>,</p>
+    <p style="margin:0 0 20px;font-size:14px;">Hi <strong>${escapeHtml(requester_name)}</strong>,</p>
     <p style="margin:0 0 20px;font-size:14px;">Thank you! Your poll request has been received and is under review. Here is a summary of what was submitted:</p>
 
     <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:6px;border:1px solid #e5e7eb;margin-bottom:8px;">
       <tr style="background:#f3f4f6;">
         <td style="padding:6px 12px;color:#6b7280;font-size:13px;width:130px;">Topic</td>
-        <td style="padding:6px 12px;font-size:13px;font-weight:600;">${topic}</td>
+        <td style="padding:6px 12px;font-size:13px;font-weight:600;">${escapeHtml(topic)}</td>
       </tr>
       <tr>
         <td style="padding:6px 12px;color:#6b7280;font-size:13px;">Department</td>
-        <td style="padding:6px 12px;font-size:13px;">${department}</td>
+        <td style="padding:6px 12px;font-size:13px;">${escapeHtml(department)}</td>
       </tr>
       <tr style="background:#f3f4f6;">
         <td style="padding:6px 12px;color:#6b7280;font-size:13px;">Requested By</td>
-        <td style="padding:6px 12px;font-size:13px;">${requester_name} &lt;${requester_email}&gt;</td>
+        <td style="padding:6px 12px;font-size:13px;">${escapeHtml(requester_name)} &lt;${escapeHtml(requester_email)}&gt;</td>
       </tr>
       ${contextLine}
       ${frequencyLine}

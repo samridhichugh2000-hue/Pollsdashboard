@@ -81,11 +81,11 @@ export function HuntGroupsManager() {
           {groups.map((g) => (
             <div
               key={g.id}
-              className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm"
+              className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 px-3 py-2 text-sm"
             >
               <div className="min-w-0">
-                <p className="font-medium text-gray-900 truncate">{g.name}</p>
-                <p className="text-xs text-gray-500 truncate">{g.email}</p>
+                <p className="font-medium text-gray-900 dark:text-slate-100 truncate">{g.name}</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400 truncate">{g.email}</p>
               </div>
               <Button
                 variant="ghost"
@@ -103,7 +103,7 @@ export function HuntGroupsManager() {
           ))}
         </div>
 
-        <form onSubmit={handleAdd} className="flex flex-col gap-2 rounded-lg border border-dashed border-gray-300 p-4 sm:flex-row">
+        <form onSubmit={handleAdd} className="flex flex-col gap-2 rounded-lg border border-dashed border-gray-300 dark:border-slate-600 p-4 sm:flex-row">
           <Input
             placeholder="Group name (e.g. Finance Team)"
             value={name}

@@ -5,7 +5,7 @@ import { sendEmail } from '@/lib/graph'
 import { buildAutoResponseHtml } from '@/lib/utils'
 import { v4 as uuidv4 } from 'uuid'
 
-const CLOSED_STATUSES = ['CLOSED', 'ARCHIVED', 'RESULTS_UPLOADED']
+const CLOSED_STATUSES = ['CLOSED', 'ARCHIVED', 'RESULTS_UPLOADED', 'RESULTS_SHARED']
 const ALLOWED_DOMAIN = 'koenig-solutions.com'
 const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -102,7 +102,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (existing.rows.length > 0) {
     const currentData = existing.rows[0].response_data as string | null
-    const currentArray: unknown[] = currentData ? JSON.parse(currentData) : []
+    const currentArray: Array<{ email?: string }> = currentData ? JSON.parse(currentData) : []
+
+    // Server-side dedup — the client also gates re-submission via
+    // localStorage, but that's trivially bypassed (private window, different
+    // browser, cleared storage) and was the only thing enforcing this until
+    // now. single_response defaults to on (matches createPoll()'s default).
+    if (poll.single_response !== 0 && currentArray.some(e => e.email?.toLowerCase() === email)) {
+      return NextResponse.json({ error: 'You have already submitted a response to this poll.' }, { status: 409 })
+    }
+
     currentArray.push(newEntry)
     await db.execute({
       sql: 'UPDATE poll_responses SET response_data = ?, fetched_at = CURRENT_TIMESTAMP WHERE poll_id = ?',

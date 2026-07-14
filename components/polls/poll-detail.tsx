@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { StatusBadge } from './status-badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { formatDate, formatDateTime, formatRelative, isApprovalOverdue, normalizeBodyForEditor, sanitizeWordHtml, getErrorMessage } from '@/lib/utils'
+import { sanitizeHtml } from '@/lib/sanitize-html'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import type { Poll, PollApproval, AuditLog, PollResponse } from '@/types'
 import { QuestionBuilder, parseQuestions } from './question-builder'
@@ -24,8 +25,12 @@ interface PollDetailProps {
   response: PollResponse | null
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// A single malformed address in the bcc/to array can make Graph reject the
+// entire send — validate each one properly instead of just checking for "@".
 function parseEmails(text: string): string[] {
-  return text.split(/[\n,;]+/).map(e => e.trim()).filter(e => e.includes('@'))
+  return text.split(/[\n,;]+/).map(e => e.trim()).filter(e => EMAIL_RE.test(e))
 }
 
 // Attachments are base64-encoded (~33% larger) and sent as JSON in the PATCH
@@ -744,7 +749,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   <CardContent>
                     <div
                       className="rounded-md bg-gray-50 p-3 text-sm text-gray-700 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 dark:bg-slate-900 dark:text-slate-200"
-                      dangerouslySetInnerHTML={{ __html: sanitizeWordHtml(poll.draft_email_body) }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(sanitizeWordHtml(poll.draft_email_body)) }}
                     />
                   </CardContent>
                 </Card>
@@ -1541,7 +1546,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Draft Email Body</p>
                   <div
                     className="rounded bg-white border border-gray-200 p-3 text-sm text-gray-700 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:[&_*]:!bg-transparent dark:[&_*]:!text-slate-200"
-                    dangerouslySetInnerHTML={{ __html: sanitizeWordHtml(poll.draft_email_body) }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(sanitizeWordHtml(poll.draft_email_body)) }}
                   />
                 </div>
               )}

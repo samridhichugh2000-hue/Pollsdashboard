@@ -6,6 +6,7 @@ import {
   createAuditLog,
 } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
+import { runMigrations } from '@/lib/db/schema'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { formatDate } from '@/lib/utils'
 import { pushPollToKites } from '@/lib/kites-api'
@@ -34,7 +35,13 @@ export async function PATCH(req: NextRequest) {
       const { ids } = body
       if (!Array.isArray(ids) || ids.length === 0) return NextResponse.json({ error: 'ids required' }, { status: 400 })
       const ph = ids.map(() => '?').join(', ')
-      await getDb().execute({ sql: `UPDATE polls SET status = 'CLOSED' WHERE id IN (${ph}) AND status = 'ARCHIVED'`, args: ids })
+      // Restore whatever status the poll was archived FROM, instead of
+      // always forcing CLOSED — a poll archived while e.g. AWAITING_APPROVAL
+      // should come back to AWAITING_APPROVAL, not disappear into CLOSED.
+      await getDb().execute({
+        sql: `UPDATE polls SET status = COALESCE(archived_from_status, 'CLOSED'), archived_from_status = NULL WHERE id IN (${ph}) AND status = 'ARCHIVED'`,
+        args: ids,
+      })
       return NextResponse.json({ unarchived: ids.length })
     }
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
@@ -52,8 +59,10 @@ export async function DELETE(req: NextRequest) {
     }
     const db = getDb()
     const ph = ids.map(() => '?').join(', ')
-    // Delete child rows first to satisfy FK constraints
-    for (const table of ['poll_attachments', 'poll_approvals', 'poll_responses', 'audit_logs', 'poll_approval_tokens']) {
+    // Delete child rows first to satisfy FK constraints. feedback_items and
+    // closure_items were previously missing from this list — deleting a poll
+    // left them orphaned, pointing at a poll_id that no longer exists.
+    for (const table of ['poll_attachments', 'poll_approvals', 'poll_responses', 'audit_logs', 'poll_approval_tokens', 'feedback_items', 'closure_items']) {
       await db.execute({ sql: `DELETE FROM ${table} WHERE poll_id IN (${ph})`, args: ids }).catch(() => {})
     }
     await db.execute({ sql: `DELETE FROM polls WHERE id IN (${ph})`, args: ids })
@@ -67,6 +76,7 @@ export async function DELETE(req: NextRequest) {
 export async function POST(req: NextRequest) {
 
   try {
+    await runMigrations()
     const body = await req.json() as CreatePollInput & { questions?: string[]; recipient_email?: string }
 
     if (!body.topic || !body.department) {

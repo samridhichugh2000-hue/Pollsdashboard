@@ -26,6 +26,23 @@ import { writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import type { Poll } from '@/types'
 
+// Matches the client-side limit in components/polls/poll-detail.tsx — that
+// limit is enforced there for UX, but a modified client or a direct API call
+// could skip it, so it must also be enforced here.
+const MAX_ATTACHMENT_FILE_BYTES = 3 * 1024 * 1024
+const MAX_ATTACHMENT_TOTAL_BYTES = 3 * 1024 * 1024
+
+function validateAttachmentSizes(attachments: PollAttachment[]): string | null {
+  let total = 0
+  for (const a of attachments) {
+    const size = Math.floor((a.contentBytes.length * 3) / 4)
+    if (size > MAX_ATTACHMENT_FILE_BYTES) return `Attachment "${a.name}" exceeds the 3 MB per-file limit.`
+    total += size
+  }
+  if (total > MAX_ATTACHMENT_TOTAL_BYTES) return 'Attachments exceed the 3 MB total limit.'
+  return null
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const poll = await getPollById(id)
@@ -93,6 +110,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           ? (body.attachments as PollAttachment[])
           : []
 
+        if (approvalAttachments.length > 0) {
+          const sizeError = validateAttachmentSizes(approvalAttachments)
+          if (sizeError) return NextResponse.json({ error: sizeError }, { status: 400 })
+        }
+
         // Persist the attachments so they survive through to release (and a page
         // refresh / approval from another device). Only overwrite when files were
         // actually supplied — re-sending for approval without re-picking files must
@@ -116,6 +138,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'APPROVE': {
+        if (poll.status !== 'AWAITING_APPROVAL') {
+          return NextResponse.json({ error: `Cannot approve a poll in ${poll.status} status.` }, { status: 409 })
+        }
         await createApproval(id, 'approved', body.notes as string, userEmail)
         await updatePollStatus(id, 'APPROVED', { approved_at: new Date().toISOString() })
         await createAuditLog(id, 'POLL_APPROVED', userEmail, { notes: body.notes })
@@ -123,6 +148,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'RELEASE_POLL': {
+        if (poll.status !== 'APPROVED') {
+          return NextResponse.json({ error: `Cannot release a poll in ${poll.status} status — a double-click or retry after this poll already released would otherwise re-send to every recipient.` }, { status: 409 })
+        }
         const allEmails = body.allEmails as string[]
         if (!allEmails?.length) {
           return NextResponse.json({ error: 'Select at least one recipient.' }, { status: 400 })
@@ -161,6 +189,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           ...keptStored.filter((a) => !newNames.has(a.name)),
           ...newAttachments,
         ]
+
+        const releaseSizeError = validateAttachmentSizes(releaseAttachments)
+        if (releaseSizeError) return NextResponse.json({ error: releaseSizeError }, { status: 400 })
 
         const pollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
         const releaseMessageId = await sendEmailGetId({
@@ -266,8 +297,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'ARCHIVE': {
-        await updatePollStatus(id, 'ARCHIVED')
-        await createAuditLog(id, 'POLL_ARCHIVED', userEmail)
+        // Record the pre-archive status so unarchiving can restore it instead
+        // of always forcing CLOSED regardless of what the poll actually was.
+        await updatePollStatus(id, 'ARCHIVED', { archived_from_status: poll.status })
+        await createAuditLog(id, 'POLL_ARCHIVED', userEmail, { from_status: poll.status })
         break
       }
 
@@ -452,6 +485,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'SHARE_RESULTS': {
+        if (!['CLOSED', 'RESULTS_SHARED'].includes(poll.status)) {
+          return NextResponse.json({ error: `Cannot share results for a poll in ${poll.status} status — it must be closed first.` }, { status: 409 })
+        }
         const shareRecipients = Array.isArray(body.recipients) && (body.recipients as string[]).length > 0
           ? (body.recipients as string[])
           : [process.env.RESULTS_RECIPIENT_EMAIL ?? 'ea@koenig-solutions.com']
@@ -503,7 +539,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           attachments: [attachment],
         })
 
-        await updatePollStatus(id, 'RESULTS_SHARED', { results_uploaded_at: new Date().toISOString() })
+        await updatePollStatus(id, 'RESULTS_SHARED')
         await createAuditLog(id, 'RESULTS_SHARED', userEmail, { recipients: shareRecipients })
         break
       }
@@ -521,7 +557,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (rows.length === 0) {
           return NextResponse.json({ error: 'No data rows found in the file.' }, { status: 400 })
         }
-        const entries = rows.map(row => {
+        const uploadedEntries = rows.map(row => {
           const keys = Object.keys(row)
           const emailKey = keys.find(k => k.toLowerCase() === 'email') ?? ''
           const nameKey = keys.find(k => ['name', 'respondent'].includes(k.toLowerCase())) ?? ''
@@ -536,12 +572,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             .map(([k, v]) => ({ question: k.replace(/^Q\d+:\s*/i, '').trim(), answer: String(v ?? '').trim() }))
           return { email, respondent, submitted_at, answers }
         }).filter(e => e.answers.length > 0)
-        if (entries.length === 0) {
+        if (uploadedEntries.length === 0) {
           return NextResponse.json({ error: 'No valid rows found in the file.' }, { status: 400 })
         }
 
+        // Merge with whatever responses already exist (e.g. from the public
+        // form) instead of overwriting — a prior overwrite here silently
+        // discarded every response collected before this upload.
+        interface StoredEntry { email?: string; respondent?: string; submitted_at: string; answers: { question: string; answer: string }[] }
+        const existingResp = await getPollResponse(id)
+        const existingEntries: StoredEntry[] = existingResp?.response_data ? JSON.parse(existingResp.response_data) : []
+        const uploadedEmails = new Set(uploadedEntries.map(e => e.email).filter(Boolean))
+        const entries = [...existingEntries.filter(e => !e.email || !uploadedEmails.has(e.email)), ...uploadedEntries]
+
         await upsertPollResponse(id, JSON.stringify(entries))
-        await createAuditLog(id, 'RESPONSES_UPLOADED', userEmail, { count: entries.length, fileName })
+        await createAuditLog(id, 'RESPONSES_UPLOADED', userEmail, { count: uploadedEntries.length, totalAfterMerge: entries.length, fileName })
 
         // Push results to Koenig News if poll has a news ID
         if (poll.rms_news_id) {
@@ -553,7 +598,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
               entriesCount: entries.length,
             })
           }
-          await updatePollStatus(id, 'RESULTS_UPLOADED')
+          await updatePollStatus(id, 'RESULTS_UPLOADED', { results_uploaded_at: new Date().toISOString() })
           await createAuditLog(id, 'RESULTS_UPLOADED', userEmail, {
             newsId: poll.rms_news_id,
             questions: outcome.questionResults?.length,
@@ -614,7 +659,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           await createAuditLog(id, 'RESULTS_UPLOAD_FAILED', userEmail, { error: outcome.error, step: outcome.step })
           return NextResponse.json({ error: `Koenig News upload failed at ${outcome.step}: ${outcome.error}` }, { status: 502 })
         }
-        await updatePollStatus(id, 'RESULTS_UPLOADED')
+        await updatePollStatus(id, 'RESULTS_UPLOADED', { results_uploaded_at: new Date().toISOString() })
         await createAuditLog(id, 'RESULTS_UPLOADED', userEmail, {
           newsId: poll.rms_news_id,
           questions: outcome.questionResults?.length,

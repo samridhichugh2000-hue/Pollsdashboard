@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
 import { getInboxMessages, markEmailAsRead, isSystemNotificationEmail } from '@/lib/graph'
 import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
+import { runMigrations } from '@/lib/db/schema'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
 import { formatDate } from '@/lib/utils'
@@ -30,7 +32,11 @@ async function getAuthorizedEmails(): Promise<Set<string>> {
 
 // GET — return today's poll-related emails, classified by Claude
 export async function GET() {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   try {
+    await runMigrations()
     const priyaEmail = process.env.PRIYA_EMAIL!
 
     // Midnight UTC → include all emails received today
@@ -49,7 +55,11 @@ export async function GET() {
 
 // POST — convert a specific email into a poll draft
 export async function POST(req: NextRequest) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   try {
+    await runMigrations()
     const body = await req.json() as {
       messageId: string
       conversationId: string

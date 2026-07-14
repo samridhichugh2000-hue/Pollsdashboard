@@ -85,11 +85,11 @@ export function SendersManager() {
           {senders.map((sender) => (
             <li
               key={sender.id}
-              className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-2.5 text-sm"
+              className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 px-4 py-2.5 text-sm"
             >
               <div>
-                <p className="font-medium text-gray-900">{sender.name}</p>
-                <p className="text-gray-500">{sender.email}</p>
+                <p className="font-medium text-gray-900 dark:text-slate-100">{sender.name}</p>
+                <p className="text-gray-500 dark:text-slate-400">{sender.email}</p>
               </div>
               <Button
                 variant="ghost"
@@ -108,7 +108,7 @@ export function SendersManager() {
         </ul>
 
         {/* Add new sender */}
-        <form onSubmit={handleAdd} className="flex flex-col gap-2 rounded-lg border border-dashed border-gray-300 p-4 sm:flex-row">
+        <form onSubmit={handleAdd} className="flex flex-col gap-2 rounded-lg border border-dashed border-gray-300 dark:border-slate-600 p-4 sm:flex-row">
           <Input
             placeholder="Full name"
             value={name}

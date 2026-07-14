@@ -15,8 +15,8 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-800">Settings</h2>
-        <p className="text-sm text-slate-500">System configuration and user management</p>
+        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Settings</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">System configuration and user management</p>
       </div>
 
       <RequestLink />
@@ -36,13 +36,13 @@ export default async function SettingsPage() {
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="pb-2 text-left font-medium text-gray-600">Job</th>
-                  <th className="pb-2 text-left font-medium text-gray-600">Schedule</th>
-                  <th className="pb-2 text-left font-medium text-gray-600">Purpose</th>
+                <tr className="border-b border-gray-100 dark:border-slate-700">
+                  <th className="pb-2 text-left font-medium text-gray-600 dark:text-slate-400">Job</th>
+                  <th className="pb-2 text-left font-medium text-gray-600 dark:text-slate-400">Schedule</th>
+                  <th className="pb-2 text-left font-medium text-gray-600 dark:text-slate-400">Purpose</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
                 {[
                   { name: 'poll-inbox-reader', schedule: 'Every 15 min', purpose: 'Read Outlook, detect poll requests' },
                   { name: 'reminder-scheduler', schedule: 'Daily 9:00 AM', purpose: 'Send reminders for active polls' },
@@ -50,9 +50,9 @@ export default async function SettingsPage() {
                   { name: 'rms-retry', schedule: 'Every 30 min', purpose: 'Retry failed RMS task / publish' },
                 ].map((job) => (
                   <tr key={job.name}>
-                    <td className="py-2.5 font-mono text-xs text-gray-800">{job.name}</td>
-                    <td className="py-2.5 text-gray-600">{job.schedule}</td>
-                    <td className="py-2.5 text-gray-600">{job.purpose}</td>
+                    <td className="py-2.5 font-mono text-xs text-gray-800 dark:text-slate-200">{job.name}</td>
+                    <td className="py-2.5 text-gray-600 dark:text-slate-400">{job.schedule}</td>
+                    <td className="py-2.5 text-gray-600 dark:text-slate-400">{job.purpose}</td>
                   </tr>
                 ))}
               </tbody>
@@ -83,7 +83,7 @@ export default async function SettingsPage() {
             ].map(({ rule, enforced }) => (
               <li key={rule} className="flex items-center gap-2">
                 <span className={`h-2 w-2 rounded-full ${enforced ? 'bg-green-500' : 'bg-red-400'}`} />
-                <span className="text-gray-700">{rule}</span>
+                <span className="text-gray-700 dark:text-slate-300">{rule}</span>
                 <Badge variant={enforced ? 'success' : 'destructive'} className="ml-auto text-xs">
                   {enforced ? 'Enforced' : 'Disabled'}
                 </Badge>
@@ -105,31 +105,31 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             {users.length === 0 ? (
-              <p className="text-sm text-gray-400">No users found.</p>
+              <p className="text-sm text-gray-400 dark:text-slate-500">No users found.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-100 text-sm">
+                <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-700 text-sm">
                   <thead>
                     <tr>
-                      <th className="pb-2 text-left font-medium text-gray-600">Name</th>
-                      <th className="pb-2 text-left font-medium text-gray-600">Email</th>
-                      <th className="pb-2 text-left font-medium text-gray-600">Role</th>
-                      <th className="pb-2 text-left font-medium text-gray-600">Auth</th>
-                      <th className="pb-2 text-left font-medium text-gray-600">Created</th>
+                      <th className="pb-2 text-left font-medium text-gray-600 dark:text-slate-400">Name</th>
+                      <th className="pb-2 text-left font-medium text-gray-600 dark:text-slate-400">Email</th>
+                      <th className="pb-2 text-left font-medium text-gray-600 dark:text-slate-400">Role</th>
+                      <th className="pb-2 text-left font-medium text-gray-600 dark:text-slate-400">Auth</th>
+                      <th className="pb-2 text-left font-medium text-gray-600 dark:text-slate-400">Created</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
                     {users.map((u) => (
                       <tr key={u.id}>
-                        <td className="py-2.5 font-medium text-gray-900">{u.name}</td>
-                        <td className="py-2.5 text-gray-600">{u.email}</td>
+                        <td className="py-2.5 font-medium text-gray-900 dark:text-slate-100">{u.name}</td>
+                        <td className="py-2.5 text-gray-600 dark:text-slate-400">{u.email}</td>
                         <td className="py-2.5">
                           <Badge variant={u.role === 'super_admin' ? 'default' : 'secondary'} className="capitalize text-xs">
                             {u.role.replace('_', ' ')}
                           </Badge>
                         </td>
-                        <td className="py-2.5 capitalize text-gray-600">{u.auth_provider}</td>
-                        <td className="py-2.5 text-gray-600">{formatDate(u.created_at)}</td>
+                        <td className="py-2.5 capitalize text-gray-600 dark:text-slate-400">{u.auth_provider}</td>
+                        <td className="py-2.5 text-gray-600 dark:text-slate-400">{formatDate(u.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -141,12 +141,12 @@ export default async function SettingsPage() {
       )}
 
       {/* Pending Items */}
-      <Card className="border-yellow-200 bg-yellow-50">
+      <Card className="border-yellow-200 dark:border-yellow-900/50 bg-yellow-50 dark:bg-yellow-900/20">
         <CardHeader>
-          <CardTitle className="text-yellow-800">Pending Configuration (Required Before Go-Live)</CardTitle>
+          <CardTitle className="text-yellow-800 dark:text-yellow-300">Pending Configuration (Required Before Go-Live)</CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-2 text-sm text-yellow-800">
+          <ul className="space-y-2 text-sm text-yellow-800 dark:text-yellow-300">
             {[
               'RMS API base URL + auth method (Steps 5, 9, 11)',
               'RMS API field schema (Task + News Panel)',

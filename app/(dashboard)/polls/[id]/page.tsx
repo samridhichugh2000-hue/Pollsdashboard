@@ -19,14 +19,20 @@ export default function PollDetailPage() {
   const [notFound404, setNotFound404] = useState(false)
 
   useEffect(() => {
+    // Guard against navigating poll A -> poll B before A's request resolves;
+    // without this, A's slower response can land after B's and overwrite
+    // poll B's freshly-loaded detail with poll A's stale data.
+    let ignore = false
+    setLoading(true)
     fetch(`/api/polls/${id}`)
       .then((r) => {
-        if (r.status === 404) { setNotFound404(true); return null }
+        if (r.status === 404) { if (!ignore) setNotFound404(true); return null }
         return r.json()
       })
-      .then((d) => { if (d) setData(d as PollDetailData) })
+      .then((d) => { if (d && !ignore) setData(d as PollDetailData) })
       .catch(console.error)
-      .finally(() => setLoading(false))
+      .finally(() => { if (!ignore) setLoading(false) })
+    return () => { ignore = true }
   }, [id])
 
   if (loading) {

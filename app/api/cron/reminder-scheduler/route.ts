@@ -1,14 +1,7 @@
 import { NextResponse } from 'next/server'
-import { getPollsByStatus, updatePollStatus, createAuditLog } from '@/lib/db/queries'
+import { getPollsByStatus, claimReminderSent, claimPollColumn, createAuditLog } from '@/lib/db/queries'
 import { replyToMessageWithHtml } from '@/lib/graph'
-import { buildPollEmailHtml, formatDate, getNextWorkingDay } from '@/lib/utils'
-import { isWeekend } from 'date-fns'
-
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
-
-function toISTDateStr(date: Date): string {
-  return new Date(date.getTime() + IST_OFFSET_MS).toISOString().split('T')[0]
-}
+import { buildPollEmailHtml, formatDate, getNextWorkingDay, toISTDateStr, isISTWeekend } from '@/lib/utils'
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
@@ -17,12 +10,10 @@ export async function GET(req: Request) {
   }
 
   const today = new Date()
-  if (isWeekend(today)) {
+  if (isISTWeekend(today)) {
     return NextResponse.json({ message: 'Weekend — no reminders today', sent: 0 })
   }
 
-  const todayStart = new Date(today)
-  todayStart.setHours(0, 0, 0, 0)
   const todayISTDate = toISTDateStr(today)
 
   let sent = 0
@@ -42,10 +33,11 @@ export async function GET(req: Request) {
       const sendDate = new Date(poll.sent_at)
       const reminderDate = poll.reminder_at ? new Date(poll.reminder_at) : getNextWorkingDay(sendDate)
 
-      const reminderStart = new Date(reminderDate)
-      reminderStart.setHours(0, 0, 0, 0)
-
-      if (todayStart < reminderStart) continue
+      // Compare IST calendar days as strings, not raw Date/setHours — the
+      // Vercel runtime's "local" timezone is UTC, so truncating with
+      // setHours(0,0,0,0) anchors to UTC midnight and can be up to 5.5 hours
+      // off from the true IST calendar day boundary.
+      if (toISTDateStr(today) < toISTDateStr(reminderDate)) continue
 
       const releaseEmails: string[] = poll.release_emails ? JSON.parse(poll.release_emails) : []
       if (!releaseEmails.length) {
@@ -58,12 +50,13 @@ export async function GET(req: Request) {
         continue
       }
 
-      try {
-        // Mark as sent FIRST so a failed email never causes repeated sends.
-        await updatePollStatus(poll.id, 'REMINDER_SENT', {
-          reminder_sent_at: new Date().toISOString(),
-        })
+      // Atomically claim (SENT -> REMINDER_SENT) before sending — if two
+      // overlapping cron invocations reach this poll together, only one
+      // UPDATE actually matches (WHERE status = 'SENT'), so only one sends.
+      const claimed = await claimReminderSent(poll.id, new Date().toISOString())
+      if (!claimed) continue
 
+      try {
         const deadline = poll.deadline ? formatDate(poll.deadline) : 'today'
         const htmlBody = buildPollEmailHtml({
           emailBody: `<p>This is a friendly reminder to participate in our poll: <strong>${poll.topic}</strong></p>`,
@@ -99,12 +92,11 @@ export async function GET(req: Request) {
       continue
     }
 
-    try {
-      // Mark as sent FIRST so a failed email never causes repeated sends.
-      await updatePollStatus(poll.id, 'REMINDER_SENT', {
-        second_reminder_sent_at: new Date().toISOString(),
-      })
+    // Atomically claim before sending — see 1st-reminder block above.
+    const claimed = await claimPollColumn(poll.id, 'second_reminder_sent_at', new Date().toISOString())
+    if (!claimed) continue
 
+    try {
       const htmlBody = buildPollEmailHtml({
         emailBody: `<p>A gentle reminder — today is the <strong>last day</strong> to complete our poll: <strong>${poll.topic}</strong>. Please share your response before end of day.</p>`,
         msFormLink: poll.ms_form_link,

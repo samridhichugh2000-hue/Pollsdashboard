@@ -1,19 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse } from '@/lib/db/queries'
 import { sendEmail, getFormResponses } from '@/lib/graph'
-import { buildResultsEmailHtml } from '@/lib/utils'
+import { buildResultsEmailHtml, toISTDateStr, istMinutesOfDay } from '@/lib/utils'
 import * as XLSX from 'xlsx'
 
 const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
-
-function toISTDateStr(date: Date): string {
-  return new Date(date.getTime() + IST_OFFSET_MS).toISOString().split('T')[0]
-}
-
-function istHour(date: Date): number {
-  return new Date(date.getTime() + IST_OFFSET_MS).getUTCHours()
-}
+const CLOSE_GATE_IST_MINUTES = 23 * 60 + 50 // 11:50 PM IST
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
@@ -24,7 +16,7 @@ export async function GET(req: Request) {
   const now = new Date()
 
   // Hard gate: never close polls before 11:50 PM IST regardless of when the cron fires.
-  if (istHour(now) < 23) {
+  if (istMinutesOfDay(now) < CLOSE_GATE_IST_MINUTES) {
     return NextResponse.json({ closed: 0, message: 'Too early — polls only close after 11:50 PM IST' })
   }
 

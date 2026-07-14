@@ -166,21 +166,24 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [showAllPending, setShowAllPending] = useState(false)
 
-  const fetchData = useCallback(() => {
+  const fetchData = useCallback((ignoreRef: { current: boolean }) => {
     const params = new URLSearchParams()
     if (from) params.set('from', from)
     if (to) params.set('to', to)
     const qs = params.toString()
     return fetch(`/api/overview${qs ? `?${qs}` : ''}`)
       .then(r => r.ok ? r.json() : defaultData)
-      .then((d: OverviewData) => setData(d))
+      .then((d: OverviewData) => { if (!ignoreRef.current) setData(d) })
       .catch(console.error)
   }, [from, to])
 
   useEffect(() => {
-    fetchData().finally(() => setLoading(false))
-    const interval = setInterval(fetchData, 60_000)
-    return () => clearInterval(interval)
+    // Guard against a slower request for a since-changed quarter resolving
+    // after a newer one and overwriting fresh data with stale data.
+    const ignoreRef = { current: false }
+    fetchData(ignoreRef).finally(() => { if (!ignoreRef.current) setLoading(false) })
+    const interval = setInterval(() => void fetchData(ignoreRef), 60_000)
+    return () => { ignoreRef.current = true; clearInterval(interval) }
   }, [fetchData])
 
   const kpiCards = [
@@ -198,7 +201,7 @@ export default function DashboardPage() {
       icon: Clock,
       color: 'text-cyan-600',
       iconBg: 'bg-cyan-50',
-      onClick: () => router.push('/polls'),
+      onClick: () => router.push('/polls?card=pending'),
     },
     {
       label: 'Total Suggestions Received',

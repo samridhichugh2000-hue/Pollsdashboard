@@ -50,6 +50,25 @@ export async function runMigrations() {
     await db.execute(`ALTER TABLE polls ADD COLUMN closure_alert_sent_at DATETIME`)
   } catch { /* already exists */ }
 
+  // createPoll() has always written these two columns, but the migration to
+  // create them was never added — a fresh/restored database would throw
+  // "table polls has no column named recipient_email" on the very first
+  // createPoll() call (manual poll creation, inbox import, and public
+  // poll-request all go through it).
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN recipient_email TEXT`)
+  } catch { /* already exists */ }
+
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN single_response INTEGER DEFAULT 1`)
+  } catch { /* already exists */ }
+
+  // Records what status a poll was archived from, so BULK_UNARCHIVE can
+  // restore it instead of always forcing CLOSED.
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN archived_from_status TEXT`)
+  } catch { /* already exists */ }
+
   // One-time approval tokens sent via email
   try {
     await db.execute(`
@@ -191,6 +210,35 @@ export async function runMigrations() {
       )
     `)
   } catch { /* already exists */ }
+  // Authorized senders allow-list — queried by inbox-reader/inbox routes and
+  // managed via /api/senders, but this CREATE TABLE never existed anywhere in
+  // the checked-in schema. Worked in production only because the table had
+  // been created manually, out-of-band, against the live DB.
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS authorized_senders (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+
+  // Hunt groups (named recipient shortcuts used by RecipientPicker) — same
+  // gap as authorized_senders: queried/written by app/api/hunt-groups/* but
+  // never created anywhere in the checked-in schema.
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS hunt_groups (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+
   // Migrate old emp_code-keyed table to email-keyed
   try {
     const cols = await db.execute(`PRAGMA table_info(employees)`)

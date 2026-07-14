@@ -152,5 +152,11 @@ export async function GET() {
     const tsRow = await db.execute(`SELECT MAX(synced_at) as ts FROM employees`)
     lastSyncedAt = (tsRow.rows[0] as unknown as { ts: string | null })?.ts ?? null
   }
-  return NextResponse.json({ participants, employeeSynced, totalEmployees: employees.length, lastSyncedAt })
+  // Count only employees with an email — same population as `participants`
+  // (built by filtering on emp.email_address). Previously this counted every
+  // non-blue-collar employee including ones with no email, so "Total
+  // employees" could show a number the table below could never reach even
+  // with zero filters applied.
+  const totalEmployees = employees.filter(e => e.email_address).length
+  return NextResponse.json({ participants, employeeSynced, totalEmployees, lastSyncedAt })
 }

@@ -12,8 +12,14 @@ import { PollForm } from '@/components/polls/poll-form'
 import { useQuarter, inQuarter } from '@/lib/use-quarter'
 import type { Poll } from '@/types'
 
-type CardKey = 'not-sent' | 'approval-pending' | 'active' | 'closed' | 'result-sir' | 'total'
-const VALID_CARD_KEYS: CardKey[] = ['not-sent', 'approval-pending', 'active', 'closed', 'result-sir', 'total']
+type CardKey = 'not-sent' | 'approval-pending' | 'active' | 'closed' | 'result-sir' | 'total' | 'pending'
+const VALID_CARD_KEYS: CardKey[] = ['not-sent', 'approval-pending', 'active', 'closed', 'result-sir', 'total', 'pending']
+
+// Same status set as the dashboard's "Total Pending Polls" KPI (app/api/overview/route.ts
+// PENDING_STATUSES) — that card's onClick used to route here with no matching
+// filter at all, so clicking it landed on the fully unfiltered list instead
+// of reproducing the count it showed.
+const PENDING_STATUSES = ['DETECTED', 'DRAFT', 'FORM_CREATED', 'AWAITING_APPROVAL', 'APPROVED', 'RMS_TASK_CREATED', 'REJECTED', 'RMS_TASK_FAILED', 'RMS_PUBLISH_FAILED', 'SEND_FAILED']
 
 function filterByCard(polls: Poll[], key: CardKey): Poll[] {
   switch (key) {
@@ -23,6 +29,7 @@ function filterByCard(polls: Poll[], key: CardKey): Poll[] {
     case 'closed':           return polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status))
     case 'result-sir':       return polls.filter(p => p.status === 'CLOSED')
     case 'total':            return polls.filter(p => p.status !== 'ARCHIVED')
+    case 'pending':          return polls.filter(p => PENDING_STATUSES.includes(p.status))
   }
 }
 
@@ -41,7 +48,10 @@ function PollsContent() {
   const cardParam = searchParams.get('card') as CardKey | null
 
   useEffect(() => {
-    if (cardParam && VALID_CARD_KEYS.includes(cardParam)) setActiveCard(cardParam)
+    // Previously only ever SET activeCard when a card param was present, and
+    // never cleared it — navigating from a filtered dashboard link back to
+    // plain /polls (e.g. via the sidebar) left the old filter stuck active.
+    setActiveCard(cardParam && VALID_CARD_KEYS.includes(cardParam) ? cardParam : null)
   }, [cardParam])
 
   const fetchPolls = useCallback(async () => {
@@ -140,13 +150,18 @@ function PollsContent() {
   const copyRequestLink = () => { navigator.clipboard.writeText(`${window.location.origin}/request`); toast.success('Request link copied') }
   const clearSearch = () => router.push('/polls')
 
+  // Every count below is run through applySearch, same as cardPolls further
+  // down — otherwise the printed number disagrees with what actually shows
+  // once the user has a search term or date filter active and then clicks
+  // a card (the card used to show the unfiltered count, but clicking it
+  // opened the search/date-narrowed table).
   const statCards: { key: CardKey; label: string; value: number; color: string; bg: string; border: string; ring: string }[] = [
-    { key: 'not-sent',         label: 'Not Sent for Approval',  value: filterByCard(nonArchived, 'not-sent').length,         color: 'text-cyan-700',    bg: 'bg-cyan-50',    border: 'border-cyan-200',    ring: 'ring-cyan-400' },
-    { key: 'approval-pending', label: 'Approval Pending',        value: filterByCard(nonArchived, 'approval-pending').length, color: 'text-violet-700',  bg: 'bg-violet-50',  border: 'border-violet-200',  ring: 'ring-violet-400' },
-    { key: 'active',           label: 'Active Polls',            value: filterByCard(nonArchived, 'active').length,           color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', ring: 'ring-emerald-400' },
-    { key: 'closed',           label: 'Polls Closed',            value: filterByCard(nonArchived, 'closed').length,           color: 'text-slate-700',   bg: 'bg-slate-50',   border: 'border-slate-200',   ring: 'ring-slate-400' },
-    { key: 'result-sir',       label: 'Result Not Sent (Sir/Poll Requester)',   value: filterByCard(nonArchived, 'result-sir').length,       color: 'text-orange-700',  bg: 'bg-orange-50',  border: 'border-orange-200',  ring: 'ring-orange-400' },
-    { key: 'total',            label: 'Total Polls',             value: nonArchived.length,                                   color: 'text-purple-700',  bg: 'bg-purple-50',  border: 'border-purple-200',  ring: 'ring-purple-400' },
+    { key: 'not-sent',         label: 'Not Sent for Approval',  value: applySearch(filterByCard(nonArchived, 'not-sent')).length,         color: 'text-cyan-700',    bg: 'bg-cyan-50',    border: 'border-cyan-200',    ring: 'ring-cyan-400' },
+    { key: 'approval-pending', label: 'Approval Pending',        value: applySearch(filterByCard(nonArchived, 'approval-pending')).length, color: 'text-violet-700',  bg: 'bg-violet-50',  border: 'border-violet-200',  ring: 'ring-violet-400' },
+    { key: 'active',           label: 'Active Polls',            value: applySearch(filterByCard(nonArchived, 'active')).length,           color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', ring: 'ring-emerald-400' },
+    { key: 'closed',           label: 'Polls Closed',            value: applySearch(filterByCard(nonArchived, 'closed')).length,           color: 'text-slate-700',   bg: 'bg-slate-50',   border: 'border-slate-200',   ring: 'ring-slate-400' },
+    { key: 'result-sir',       label: 'Result Not Sent (Sir/Poll Requester)',   value: applySearch(filterByCard(nonArchived, 'result-sir')).length,       color: 'text-orange-700',  bg: 'bg-orange-50',  border: 'border-orange-200',  ring: 'ring-orange-400' },
+    { key: 'total',            label: 'Total Polls',             value: applySearch(nonArchived).length,                                   color: 'text-purple-700',  bg: 'bg-purple-50',  border: 'border-purple-200',  ring: 'ring-purple-400' },
   ]
 
   const tableActions = {

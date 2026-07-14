@@ -24,13 +24,18 @@ const QUARTER_DEFS = [
 
 interface Quarter { key: string; label: string; isCurrent: boolean }
 
+// Anchored to the app's launch quarter (2026-Q2). Bounded at 40 iterations
+// (10 years) as a hard safety net — the loop used to run unconditionally
+// forward until it matched the current quarter, which never terminates if
+// the system clock is ever before the anchor (misconfigured clock, a
+// staging/replay environment, etc.).
 function buildQuarters(): Quarter[] {
   const now = new Date()
   const curQ = Math.floor(now.getMonth() / 3) + 1
   const curY = now.getFullYear()
   const list: Quarter[] = []
   let y = 2026, q = 2
-  while (true) {
+  for (let i = 0; i < 40; i++) {
     const def = QUARTER_DEFS[q - 1]
     list.push({ key: `${y}-Q${q}`, label: `${def.label} ${y}`, isCurrent: y === curY && q === curQ })
     if (y === curY && q === curQ) break
@@ -51,7 +56,7 @@ function keyToLabel(key: string): string {
   return def ? `${def.label} ${yearStr}` : key
 }
 
-export function Header({ userName }: { userName?: string; userRole?: string; title?: string }) {
+export function Header({ title = 'Polls Dashboard' }: { userName?: string; userRole?: string; title?: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const [query, setQuery] = useState('')
@@ -109,7 +114,7 @@ export function Header({ userName }: { userName?: string; userRole?: string; tit
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-100 bg-white dark:border-slate-800 dark:bg-[#161b27] px-6">
       {/* Left: title + subtitle */}
       <div>
-        <h1 className="text-base font-bold text-slate-800 dark:text-white leading-tight">Polls Dashboard</h1>
+        <h1 className="text-base font-bold text-slate-800 dark:text-white leading-tight">{title}</h1>
         <p className="text-xs text-slate-400 leading-tight">{pageLabel}{showQuarterPicker ? ` · ${quarterLabel}` : ''}</p>
       </div>
 

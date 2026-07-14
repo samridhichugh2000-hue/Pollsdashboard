@@ -29,6 +29,7 @@ export interface Poll {
   id: string
   topic: string
   department: string
+  recipient_email?: string | null
   requested_by: string
   source: PollSource
   email_thread_id?: string | null
@@ -52,6 +53,8 @@ export interface Poll {
   closed_at?: string | null
   results_uploaded_at?: string | null
   remarks?: string | null
+  single_response?: number | null // 1 or 0 (SQLite boolean)
+  archived_from_status?: PollStatus | null
   created_at: string
   updated_at: string
 }

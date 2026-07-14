@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
 import { getDb } from '@/lib/db/client'
+import { runMigrations } from '@/lib/db/schema'
 import { v4 as uuidv4 } from 'uuid'
 
 export async function GET() {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  await runMigrations()
   const result = await getDb().execute('SELECT * FROM authorized_senders ORDER BY created_at ASC')
   return NextResponse.json(result.rows)
 }
 
 export async function POST(req: NextRequest) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  await runMigrations()
   const { name, email } = await req.json() as { name: string; email: string }
 
   if (!name?.trim() || !email?.trim()) {

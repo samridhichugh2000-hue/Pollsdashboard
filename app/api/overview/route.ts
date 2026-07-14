@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db/client'
+import { CLOSED_POLL_STATUSES } from '@/lib/db/queries'
 
 export async function GET(req: NextRequest) {
   const db = getDb()
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
   // Poll breakdown
   const PENDING_STATUSES = ['DETECTED', 'DRAFT', 'FORM_CREATED', 'AWAITING_APPROVAL', 'APPROVED', 'RMS_TASK_CREATED', 'REJECTED', 'RMS_TASK_FAILED', 'RMS_PUBLISH_FAILED', 'SEND_FAILED']
   const ACTIVE_STATUSES = ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED']
-  const CLOSED_STATUSES = ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED']
+  const CLOSED_STATUSES: string[] = CLOSED_POLL_STATUSES
 
   const notSentForApproval = polls.filter(p => ['DETECTED', 'DRAFT', 'FORM_CREATED'].includes(p.status)).length
   const approvalPending = polls.filter(p => p.status === 'AWAITING_APPROVAL').length

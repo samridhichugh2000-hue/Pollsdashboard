@@ -1,14 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getDueRegularPolls, updateRegularPoll, createPoll, updatePoll, updatePollStatus, createAuditLog, getRegularPollAttachments, replacePollAttachments } from '@/lib/db/queries'
+import { getDueRegularPolls, updateRegularPoll, claimRegularPollRun, createPoll, updatePoll, updatePollStatus, createAuditLog, getRegularPollAttachments, replacePollAttachments } from '@/lib/db/queries'
+import { runMigrations } from '@/lib/db/schema'
 import { sendEmailGetId } from '@/lib/graph'
-import { buildPollEmailHtml, formatDate } from '@/lib/utils'
-
-function advanceNextRunDate(current: string, frequency: string): string {
-  const date = new Date(current)
-  const months = frequency === 'quarterly' ? 3 : frequency === 'bi-annual' ? 6 : frequency === 'annual' ? 12 : 1
-  date.setMonth(date.getMonth() + months)
-  return date.toISOString().split('T')[0]
-}
+import { buildPollEmailHtml, formatDate, advanceNextRunDate } from '@/lib/utils'
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
@@ -16,6 +10,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  await runMigrations()
   const dueTemplates = await getDueRegularPolls()
   let released = 0
   let failed = 0
@@ -30,6 +25,15 @@ export async function GET(req: Request) {
         console.warn(`Regular poll ${template.id} has no recipients — skipping`)
         continue
       }
+
+      // Atomically claim this template before creating/sending anything — if
+      // two overlapping cron invocations both see the same due template, only
+      // one UPDATE actually matches (WHERE next_run_date = the value we just
+      // read), so only one of them proceeds to release. The other sees
+      // rowsAffected === 0 and skips.
+      const newNextRunDate = advanceNextRunDate(template.next_run_date, template.frequency)
+      const claimed = await claimRegularPollRun(template.id, template.next_run_date, newNextRunDate)
+      if (!claimed) continue
 
       // Create a standard poll record (pre-approved, skip approval workflow)
       const poll = await createPoll({
@@ -85,10 +89,10 @@ export async function GET(req: Request) {
         attachments: attachments.map(a => a.name),
       })
 
-      // Advance template's next run date so it doesn't re-trigger tomorrow
+      // next_run_date was already advanced atomically by claimRegularPollRun()
+      // above, before this template was released — only last_run_date remains.
       await updateRegularPoll(template.id, {
         last_run_date: new Date().toISOString().split('T')[0],
-        next_run_date: advanceNextRunDate(template.next_run_date, template.frequency),
       })
 
       released++

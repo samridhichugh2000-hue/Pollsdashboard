@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getUnreadPollEmails, markEmailAsRead } from '@/lib/graph'
 import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
+import { runMigrations } from '@/lib/db/schema'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
 import { formatDate } from '@/lib/utils'
@@ -18,6 +19,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  await runMigrations()
   const priyaEmail = process.env.PRIYA_EMAIL!
   let processed = 0
   let skipped = 0

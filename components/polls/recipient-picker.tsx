@@ -18,6 +18,20 @@ function dedup(arr: string[]): string[] {
   return [...new Set(arr.map(e => e.toLowerCase().trim()).filter(Boolean))]
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function reconcileValue(value: string[], groups: HuntGroup[]): { matchedIds: string[]; unmatched: string[] } {
+  const groupByEmail = new Map(groups.map(g => [g.email.toLowerCase(), g.id]))
+  const matchedIds: string[] = []
+  const unmatched: string[] = []
+  for (const email of value) {
+    const id = groupByEmail.get(email.toLowerCase())
+    if (id) matchedIds.push(id)
+    else if (email.trim()) unmatched.push(email)
+  }
+  return { matchedIds, unmatched }
+}
+
 export function RecipientPicker({ value, onChange }: RecipientPickerProps) {
   const [huntGroups, setHuntGroups] = useState<HuntGroup[]>([])
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
@@ -33,6 +47,11 @@ export function RecipientPicker({ value, onChange }: RecipientPickerProps) {
   const groupDropdownRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  // Tracks the last value WE emitted via onChange, so the reconciliation
+  // effect below can tell "the value prop changed because the parent handed
+  // us a genuinely new list" apart from "the value prop changed because it's
+  // just echoing back what we ourselves just emitted."
+  const lastEmittedRef = useRef<string | null>(null)
 
   // Load hunt groups + senders once
   useEffect(() => {
@@ -54,20 +73,25 @@ export function RecipientPicker({ value, onChange }: RecipientPickerProps) {
         seen.add(key); return true
       }))
 
-      // Reconcile existing value into groups + individual
-      const groupByEmail = new Map(groups.map(g => [g.email.toLowerCase(), g.id]))
-      const matchedIds: string[] = []
-      const unmatched: string[] = []
-      for (const email of value) {
-        const id = groupByEmail.get(email.toLowerCase())
-        if (id) matchedIds.push(id)
-        else if (email.trim()) unmatched.push(email)
-      }
+      const { matchedIds, unmatched } = reconcileValue(value, groups)
       setSelectedGroupIds(matchedIds)
       setIndividualEmails(unmatched)
       setInitialized(true)
     }).catch(() => setInitialized(true))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-reconcile if the parent hands us a genuinely different `value` after
+  // mount (e.g. loading a different record into the same, still-mounted
+  // form instance) — previously this only ever ran once on mount, so callers
+  // had to force a remount via `key` to avoid showing stale selections.
+  useEffect(() => {
+    if (!initialized) return
+    const sig = dedup(value).join(',')
+    if (sig === lastEmittedRef.current) return
+    const { matchedIds, unmatched } = reconcileValue(value, huntGroups)
+    setSelectedGroupIds(matchedIds)
+    setIndividualEmails(unmatched)
+  }, [value, huntGroups, initialized])
 
   // Emit combined value when selections change
   useEffect(() => {
@@ -75,7 +99,9 @@ export function RecipientPicker({ value, onChange }: RecipientPickerProps) {
     const groupEmails = huntGroups
       .filter(g => selectedGroupIds.includes(g.id))
       .map(g => g.email)
-    onChangeRef.current(dedup([...groupEmails, ...individualEmails]))
+    const combined = dedup([...groupEmails, ...individualEmails])
+    lastEmittedRef.current = combined.join(',')
+    onChangeRef.current(combined)
   }, [selectedGroupIds, individualEmails, huntGroups, initialized])
 
   // Click-outside to close dropdowns
@@ -110,7 +136,7 @@ export function RecipientPicker({ value, onChange }: RecipientPickerProps) {
 
   const addEmail = (email: string) => {
     const trimmed = email.trim().toLowerCase()
-    if (!trimmed || !trimmed.includes('@')) return
+    if (!trimmed || !EMAIL_RE.test(trimmed)) return
     // If it matches a hunt group, select the group instead
     const matchedGroup = huntGroups.find(g => g.email.toLowerCase() === trimmed)
     if (matchedGroup) {

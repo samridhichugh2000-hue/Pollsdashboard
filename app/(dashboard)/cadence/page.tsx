@@ -141,30 +141,30 @@ function AttachmentPicker({
   )
 }
 
+// next_run_date/last_run_date are bare "YYYY-MM-DD" strings. `new Date(str)`
+// parses a date-only string as UTC midnight, but the old code then mutated
+// it with setHours() in the browser's LOCAL timezone — for any viewer west
+// of UTC that silently shifts the date back a day. Parsing the components
+// directly into a local Date sidesteps the UTC round-trip entirely.
+function parseDateOnly(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+  return parseDateOnly(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function isDueToday(dateStr: string) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const d = new Date(dateStr); d.setHours(0, 0, 0, 0)
+  const d = parseDateOnly(dateStr)
   return d <= today
 }
 
 function isDueTomorrow(dateStr: string) {
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0, 0, 0, 0)
-  const d = new Date(dateStr); d.setHours(0, 0, 0, 0)
+  const d = parseDateOnly(dateStr)
   return d.getTime() === tomorrow.getTime()
-}
-
-function computeNextRunDate(frequency: RegularPollFrequency, scheduledDay: number): string {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const thisMonth = new Date(today.getFullYear(), today.getMonth(), scheduledDay)
-  if (thisMonth >= today) return thisMonth.toISOString().split('T')[0]
-  const next = new Date(thisMonth)
-  const monthsToAdd = frequency === 'quarterly' ? 3 : frequency === 'bi-annual' ? 6 : frequency === 'annual' ? 12 : 1
-  next.setMonth(next.getMonth() + monthsToAdd)
-  return next.toISOString().split('T')[0]
 }
 
 interface FormState {
@@ -229,7 +229,7 @@ function StatCard({ label, value, colour, active, onClick }: {
       className={`flex flex-col gap-1 rounded-2xl px-5 py-4 shadow-sm border text-left transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${active ? 'bg-slate-900 border-slate-700' : 'bg-white dark:bg-[#1e2535] border-gray-100 dark:border-slate-700'}`}
     >
       <span className={`text-2xl font-bold ${active ? 'text-white' : colour}`}>{value}</span>
-      <span className={`text-xs font-medium ${active ? 'text-slate-300' : 'text-gray-500'}`}>{label}</span>
+      <span className={`text-xs font-medium ${active ? 'text-slate-300' : 'text-gray-500 dark:text-slate-400'}`}>{label}</span>
     </button>
   )
 }
@@ -301,7 +301,9 @@ function CadencePageInner() {
         scheduled_day: Number(form.scheduled_day),
         questions: JSON.stringify(form.questions.filter(q => q.text.trim())),
         recipients: JSON.stringify(form.recipients),
-        next_run_date: computeNextRunDate(form.frequency, Number(form.scheduled_day)),
+        // next_run_date is always derived server-side from frequency +
+        // scheduled_day (both for create and edit) — the server no longer
+        // reads/trusts a client-computed value.
       }
       if (editingId) {
         await fetch(`/api/regular-polls/${editingId}`, {
@@ -404,7 +406,7 @@ function CadencePageInner() {
   const total = polls.length
   const upcomingCount = polls.filter(p => {
     if (!p.is_active) return false
-    const d = new Date(p.next_run_date); d.setHours(0, 0, 0, 0)
+    const d = parseDateOnly(p.next_run_date)
     return d.getTime() > todayMs && d.getTime() <= weekMs
   }).length
   const overdueCount = polls.filter(p => p.is_active && isDueToday(p.next_run_date)).length
@@ -443,8 +445,8 @@ function CadencePageInner() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">Poll Cadence</h1>
-          <p className="text-sm text-slate-500">{polls.length} template{polls.length !== 1 ? 's' : ''} &middot; auto-releases daily at 9 AM</p>
+          <h1 className="text-xl font-bold text-slate-800 dark:text-white">Poll Cadence</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{polls.length} template{polls.length !== 1 ? 's' : ''} &middot; auto-releases daily at 9 AM</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm" onClick={fetchPolls}>
@@ -457,10 +459,10 @@ function CadencePageInner() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total Cadence Polls" value={total} colour="text-purple-600" active={activeFilter === 'all'} onClick={() => handleCardClick('all')} />
-        <StatCard label="Upcoming (this week)" value={upcomingCount} colour="text-teal-600" active={activeFilter === 'upcoming'} onClick={() => handleCardClick('upcoming')} />
-        <StatCard label="Overdue" value={overdueCount} colour="text-red-600" active={activeFilter === 'overdue'} onClick={() => handleCardClick('overdue')} />
-        <StatCard label="Released" value={releasedCount} colour="text-emerald-600" active={activeFilter === 'released'} onClick={() => handleCardClick('released')} />
+        <StatCard label="Total Cadence Polls" value={total} colour="text-purple-600 dark:text-purple-400" active={activeFilter === 'all'} onClick={() => handleCardClick('all')} />
+        <StatCard label="Upcoming (this week)" value={upcomingCount} colour="text-teal-600 dark:text-teal-400" active={activeFilter === 'upcoming'} onClick={() => handleCardClick('upcoming')} />
+        <StatCard label="Overdue" value={overdueCount} colour="text-red-600 dark:text-red-400" active={activeFilter === 'overdue'} onClick={() => handleCardClick('overdue')} />
+        <StatCard label="Released" value={releasedCount} colour="text-emerald-600 dark:text-emerald-400" active={activeFilter === 'released'} onClick={() => handleCardClick('released')} />
       </div>
 
       {polls.length > 0 && (
@@ -484,31 +486,31 @@ function CadencePageInner() {
       )}
 
       {upcomingPolls.length > 0 && (
-        <div className="rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
+        <div className="rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/50 px-5 py-4">
           <div className="flex items-center gap-2 mb-1">
-            <CalendarClock className="h-4 w-4 text-amber-600" />
-            <span className="font-semibold text-amber-800">
+            <CalendarClock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <span className="font-semibold text-amber-800 dark:text-amber-300">
               {upcomingPolls.length} poll{upcomingPolls.length > 1 ? 's' : ''} will auto-release {upcomingPolls.some(p => isDueTomorrow(p.next_run_date)) ? 'tomorrow' : 'today'} at 9 AM
             </span>
           </div>
-          <p className="text-xs text-amber-600 mb-3">Pause a poll now if you want to skip this cycle, or update its attachment before it goes out.</p>
+          <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">Pause a poll now if you want to skip this cycle, or update its attachment before it goes out.</p>
           <div className="flex flex-wrap gap-2">
             {upcomingPolls.map(p => (
-              <div key={p.id} className="inline-flex items-center gap-2 rounded-lg bg-amber-100 border border-amber-200 px-3 py-1.5">
-                <CalendarClock className="h-3 w-3 text-amber-600" />
-                <span className="text-sm font-medium text-amber-800">{p.name}</span>
-                <span className="text-xs text-amber-600">{isDueTomorrow(p.next_run_date) ? 'tomorrow' : 'today'}</span>
+              <div key={p.id} className="inline-flex items-center gap-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-900/50 px-3 py-1.5">
+                <CalendarClock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                <span className="text-sm font-medium text-amber-800 dark:text-amber-300">{p.name}</span>
+                <span className="text-xs text-amber-600 dark:text-amber-400">{isDueTomorrow(p.next_run_date) ? 'tomorrow' : 'today'}</span>
                 {(p.attachmentCount ?? 0) > 0 && (
-                  <span className="inline-flex items-center gap-0.5 text-xs text-amber-700">
+                  <span className="inline-flex items-center gap-0.5 text-xs text-amber-700 dark:text-amber-400">
                     <Paperclip className="h-3 w-3" />{p.attachmentCount}
                   </span>
                 )}
                 <button onClick={() => void openAttachDialog(p)}
-                  className="ml-1 inline-flex items-center gap-1 rounded-md bg-amber-200 hover:bg-amber-300 px-2 py-0.5 text-xs font-medium text-amber-800 transition-colors">
+                  className="ml-1 inline-flex items-center gap-1 rounded-md bg-amber-200 dark:bg-amber-900/40 hover:bg-amber-300 dark:hover:bg-amber-900/60 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300 transition-colors">
                   <Paperclip className="h-3 w-3" /> Update Attachment
                 </button>
                 <button onClick={() => void toggleActive(p)}
-                  className="rounded-md bg-amber-200 hover:bg-amber-300 px-2 py-0.5 text-xs font-medium text-amber-800 transition-colors">
+                  className="rounded-md bg-amber-200 dark:bg-amber-900/40 hover:bg-amber-300 dark:hover:bg-amber-900/60 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300 transition-colors">
                   Pause
                 </button>
               </div>
@@ -521,7 +523,7 @@ function CadencePageInner() {
         {activeFilter !== 'all' && (
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
             <span className="text-xs font-semibold text-slate-600">
-              Showing: <span className="capitalize text-slate-800">{activeFilter === 'upcoming' ? 'Upcoming this week' : activeFilter}</span> &middot; {filteredPolls.length} poll{filteredPolls.length !== 1 ? 's' : ''}
+              Showing: <span className="capitalize text-slate-800 dark:text-slate-200">{activeFilter === 'upcoming' ? 'Upcoming this week' : activeFilter}</span> &middot; {filteredPolls.length} poll{filteredPolls.length !== 1 ? 's' : ''}
             </span>
             <button onClick={() => setActiveFilter('all')} className="text-xs text-slate-400 hover:text-slate-700 underline">Clear filter</button>
           </div>

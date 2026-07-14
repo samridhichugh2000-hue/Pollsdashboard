@@ -61,8 +61,17 @@ export async function GET(request: Request) {
     if (bucket) bucket.count = Number(row[1])
   }
 
-  // Month-wise responses — parse submitted_at from response_data JSON entries
-  const respResult = await db.execute(`SELECT response_data FROM poll_responses WHERE response_data IS NOT NULL`)
+  // Month-wise responses — parse submitted_at from response_data JSON entries.
+  // Joined against polls with the same ARCHIVED/DETECTED exclusion as the
+  // polls query above — previously this had no filter at all, so responses
+  // belonging to archived/detected polls leaked into the chart.
+  const respResult = await db.execute(`
+    SELECT pr.response_data
+    FROM poll_responses pr
+    JOIN polls p ON p.id = pr.poll_id
+    WHERE pr.response_data IS NOT NULL
+      AND p.status NOT IN ('ARCHIVED', 'DETECTED')
+  `)
 
   const responseCounts: Record<string, number> = {}
   for (const row of respResult.rows) {

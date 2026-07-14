@@ -37,6 +37,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const poll = await getPollById(tokenRow.poll_id)
   if (!poll) return NextResponse.json({ error: 'Poll not found.' }, { status: 404 })
 
+  // The poll may have moved on since this link was emailed (edited and
+  // re-sent for approval, or already approved/released through another
+  // path) — createApprovalToken() now invalidates prior unused tokens on
+  // every re-send, but this guard also covers the case where the poll's
+  // status changed by some other route entirely.
+  if (poll.status !== 'AWAITING_APPROVAL') {
+    return NextResponse.json({ error: `This poll is no longer awaiting approval (current status: ${poll.status}). This link is out of date.` }, { status: 409 })
+  }
+
   const body = await req.json() as {
     action: 'approve' | 'save_and_approve' | 'reject' | 'feedback'
     subject?: string
@@ -44,6 +53,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     questions?: string
     reason?: string
     remarks?: string
+  }
+
+  const ALLOWED_ACTIONS = new Set(['approve', 'save_and_approve', 'reject', 'feedback'])
+  if (!ALLOWED_ACTIONS.has(body.action)) {
+    return NextResponse.json({ error: `Unknown action: ${body.action}` }, { status: 400 })
   }
 
   if (body.action === 'reject') {

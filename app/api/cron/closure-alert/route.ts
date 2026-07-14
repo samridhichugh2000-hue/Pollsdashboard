@@ -1,14 +1,7 @@
 import { NextResponse } from 'next/server'
-import { getPollsByStatus, updatePollStatus, createAuditLog } from '@/lib/db/queries'
+import { getPollsByStatus, updatePollStatus, claimPollColumn, createAuditLog } from '@/lib/db/queries'
 import { replyToMessageWithHtml } from '@/lib/graph'
-import { buildPollEmailHtml, formatDate } from '@/lib/utils'
-import { isWeekend } from 'date-fns'
-
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
-
-function toISTDateStr(date: Date): string {
-  return new Date(date.getTime() + IST_OFFSET_MS).toISOString().split('T')[0]
-}
+import { buildPollEmailHtml, formatDate, toISTDateStr, isISTWeekend } from '@/lib/utils'
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
@@ -17,7 +10,7 @@ export async function GET(req: Request) {
   }
 
   const today = new Date()
-  if (isWeekend(today)) {
+  if (isISTWeekend(today)) {
     return NextResponse.json({ message: 'Weekend — no closure alerts today', sent: 0 })
   }
 
@@ -37,6 +30,12 @@ export async function GET(req: Request) {
       continue
     }
 
+    // Atomically claim this poll before sending — if two overlapping cron
+    // invocations reach this poll at the same time, only one UPDATE actually
+    // affects a row (WHERE closure_alert_sent_at IS NULL), so only one sends.
+    const claimed = await claimPollColumn(poll.id, 'closure_alert_sent_at', new Date().toISOString())
+    if (!claimed) continue
+
     try {
       const htmlBody = buildPollEmailHtml({
         emailBody: `<p>This is your <strong>final reminder</strong> — the poll <strong>${poll.topic}</strong> closes today. Please take a moment to share your response in the next few hours.</p>`,
@@ -52,9 +51,6 @@ export async function GET(req: Request) {
         bcc: releaseEmails,
       })
 
-      await updatePollStatus(poll.id, 'REMINDER_SENT', {
-        closure_alert_sent_at: new Date().toISOString(),
-      })
       await createAuditLog(poll.id, 'CLOSURE_ALERT_SENT', 'cron', { emails: releaseEmails })
       sent++
     } catch (err) {
