@@ -126,6 +126,34 @@ function isHtmlContent(s: string): boolean {
   return /<[a-z][\s\S]*>/i.test(s.trim())
 }
 
+// The rich-text editor's contentEditable div produces bare <p>/<div>/<ul>/<li>
+// tags with no inline styling. Inside our own app those get tight spacing
+// from Tailwind classes on the wrapping container — but that CSS doesn't
+// travel with the HTML once it's embedded in an actual outbound email, so
+// Outlook/Gmail fall back to their own (much larger) default paragraph
+// margins, making a tightly-formatted draft look double- or triple-spaced
+// once it lands in someone's inbox. Force the same tight, inline spacing on
+// every block element so what the sender sees is what the recipient gets.
+// Merge a margin declaration into a tag's existing style attribute (if any)
+// instead of appending a second `style="..."` attribute, which would be
+// invalid HTML and unreliably parsed by email clients.
+function withMargin(attrs: string, marginStyle: string): string {
+  const styleMatch = attrs.match(/style\s*=\s*"([^"]*)"/i)
+  if (styleMatch) {
+    const merged = `${styleMatch[1].replace(/;\s*$/, '')};${marginStyle}`
+    return attrs.replace(/style\s*=\s*"[^"]*"/i, `style="${merged}"`)
+  }
+  return `${attrs} style="${marginStyle}"`
+}
+
+function normalizeEmailBodyHtml(html: string): string {
+  if (!html) return html
+  return html
+    .replace(/<(p|div)((?:\s+[^>]*)?)>/gi, (_m, tag: string, attrs: string) => `<${tag}${withMargin(attrs, 'margin:0 0 10px 0;')}>`)
+    .replace(/<(ul|ol)((?:\s+[^>]*)?)>/gi, (_m, tag: string, attrs: string) => `<${tag}${withMargin(attrs, 'margin:0 0 10px 0;padding-left:20px;')}>`)
+    .replace(/<li((?:\s+[^>]*)?)>/gi, (_m, attrs: string) => `<li${withMargin(attrs, 'margin:0 0 4px 0;')}>`)
+}
+
 // Plain-text fields (names, topics, question/answer text) get interpolated
 // directly into outbound HTML emails below. Escape them so a respondent or
 // requester can't inject markup/scripts into an email sent to someone else.
@@ -219,7 +247,7 @@ export function buildApprovalEmailHtml(params: {
 
   <h3 style="font-size:14px; color:#374151; margin-bottom:8px; text-transform:uppercase; letter-spacing:.05em;">Draft Email Body</h3>
   <div style="background:#f8fafc; padding:14px; border-left:4px solid #3b82f6; border-radius:4px; font-size:14px; line-height:1.6; margin-bottom:16px;">
-    ${isHtmlContent(params.emailBody) ? params.emailBody : params.emailBody.replace(/\n/g, '<br>')}
+    ${isHtmlContent(params.emailBody) ? normalizeEmailBodyHtml(params.emailBody) : params.emailBody.replace(/\n/g, '<br>')}
   </div>
 
   <h3 style="font-size:14px; color:#374151; margin-bottom:8px; text-transform:uppercase; letter-spacing:.05em;">Poll Questions</h3>
@@ -268,7 +296,7 @@ export function buildPollEmailHtml(params: {
 }): string {
   return `
 <div style="font-family: Arial, sans-serif; max-width: 600px;">
-  <div>${isHtmlContent(params.emailBody) ? params.emailBody : params.emailBody.replace(/\n/g, '<br>')}</div>
+  <div>${isHtmlContent(params.emailBody) ? normalizeEmailBodyHtml(params.emailBody) : params.emailBody.replace(/\n/g, '<br>')}</div>
   <p><strong>Please fill out the poll by ${params.deadline}:</strong></p>
   <p><a href="${params.msFormLink}" style="background:#1e40af;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;">Take the Poll</a></p>
 </div>
