@@ -154,6 +154,40 @@ function normalizeEmailBodyHtml(html: string): string {
     .replace(/<li((?:\s+[^>]*)?)>/gi, (_m, attrs: string) => `<li${withMargin(attrs, 'margin:0 0 4px 0;')}>`)
 }
 
+const URL_RE = /(https?:\/\/[^\s<]+)/gi
+
+// Trim sentence-ending punctuation caught by the greedy URL match (e.g. the
+// period after "...visit https://example.com." shouldn't be part of the link).
+function splitTrailingPunctuation(url: string): { url: string; trailing: string } {
+  const match = url.match(/^(.*[^.,;:!?'")\]])([.,;:!?'")\]]*)$/)
+  return match ? { url: match[1], trailing: match[2] } : { url, trailing: '' }
+}
+
+// Auto-linkify bare URLs (typed or pasted as plain text) so they render as
+// clickable links in the recipient's inbox instead of dead text. Skips
+// anything already inside a real <a> tag so existing links are never
+// double-wrapped or corrupted.
+function linkifyUrls(html: string): string {
+  if (!html) return html
+  const segments = html.split(/(<a\b[^>]*>[\s\S]*?<\/a>)/gi)
+  return segments
+    .map(segment => {
+      if (/^<a\b/i.test(segment)) return segment
+      return segment.replace(URL_RE, (match) => {
+        const { url, trailing } = splitTrailingPunctuation(match)
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">${url}</a>${trailing}`
+      })
+    })
+    .join('')
+}
+
+// The single choke point every outbound email body passes through: turn bare
+// URLs into real links, then force tight inline spacing so it survives being
+// rendered by whatever mail client the recipient uses.
+function prepareEmailBodyHtml(html: string): string {
+  return normalizeEmailBodyHtml(linkifyUrls(html))
+}
+
 // Plain-text fields (names, topics, question/answer text) get interpolated
 // directly into outbound HTML emails below. Escape them so a respondent or
 // requester can't inject markup/scripts into an email sent to someone else.
@@ -247,7 +281,7 @@ export function buildApprovalEmailHtml(params: {
 
   <h3 style="font-size:14px; color:#374151; margin-bottom:8px; text-transform:uppercase; letter-spacing:.05em;">Draft Email Body</h3>
   <div style="background:#f8fafc; padding:14px; border-left:4px solid #3b82f6; border-radius:4px; font-size:14px; line-height:1.6; margin-bottom:16px;">
-    ${isHtmlContent(params.emailBody) ? normalizeEmailBodyHtml(params.emailBody) : params.emailBody.replace(/\n/g, '<br>')}
+    ${isHtmlContent(params.emailBody) ? prepareEmailBodyHtml(params.emailBody) : linkifyUrls(params.emailBody.replace(/\n/g, '<br>'))}
   </div>
 
   <h3 style="font-size:14px; color:#374151; margin-bottom:8px; text-transform:uppercase; letter-spacing:.05em;">Poll Questions</h3>
@@ -296,7 +330,7 @@ export function buildPollEmailHtml(params: {
 }): string {
   return `
 <div style="font-family: Arial, sans-serif; max-width: 600px;">
-  <div>${isHtmlContent(params.emailBody) ? normalizeEmailBodyHtml(params.emailBody) : params.emailBody.replace(/\n/g, '<br>')}</div>
+  <div>${isHtmlContent(params.emailBody) ? prepareEmailBodyHtml(params.emailBody) : linkifyUrls(params.emailBody.replace(/\n/g, '<br>'))}</div>
   <p><strong>Please fill out the poll by ${params.deadline}:</strong></p>
   <p><a href="${params.msFormLink}" style="background:#1e40af;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;">Take the Poll</a></p>
 </div>
@@ -327,7 +361,7 @@ export function buildAutoResponseHtml(params: {
         <td style="padding:10px 14px;font-size:13px;color:#6b7280;white-space:nowrap;vertical-align:top;width:24px;">${i + 1}.</td>
         <td style="padding:10px 14px;font-size:13px;">
           <div style="color:#374151;font-weight:600;margin-bottom:4px;">${escapeHtml(a.question)}</div>
-          <div style="color:#111827;">${a.answer?.trim() ? escapeHtml(a.answer) : '<em style="color:#9ca3af;">No answer provided</em>'}</div>
+          <div style="color:#111827;">${a.answer?.trim() ? linkifyUrls(escapeHtml(a.answer)) : '<em style="color:#9ca3af;">No answer provided</em>'}</div>
         </td>
       </tr>`)
     .join('')
@@ -408,7 +442,7 @@ export function buildReplyToRespondentHtml(params: {
         <td style="padding:10px 14px;font-size:13px;color:#6b7280;white-space:nowrap;vertical-align:top;width:24px;">${i + 1}.</td>
         <td style="padding:10px 14px;font-size:13px;">
           <div style="color:#374151;font-weight:600;margin-bottom:4px;">${escapeHtml(a.question)}</div>
-          <div style="color:#111827;">${a.answer?.trim() ? escapeHtml(a.answer) : '<em style="color:#9ca3af;">No answer provided</em>'}</div>
+          <div style="color:#111827;">${a.answer?.trim() ? linkifyUrls(escapeHtml(a.answer)) : '<em style="color:#9ca3af;">No answer provided</em>'}</div>
         </td>
       </tr>`)
     .join('')
@@ -423,7 +457,7 @@ export function buildReplyToRespondentHtml(params: {
     <p style="margin:0 0 6px;font-size:14px;">Hi <strong>${escapeHtml(params.name)}</strong>,</p>
     <p style="margin:0 0 18px;font-size:14px;line-height:1.6;">Thank you for submitting your response with us.</p>
     <div style="background:#fff;border-left:4px solid #1e40af;border-radius:4px;padding:14px 18px;margin-bottom:24px;font-size:14px;line-height:1.7;color:#1a1a1a;">
-      ${escapeHtml(params.replyMessage).replace(/\n/g, '<br>')}
+      ${linkifyUrls(escapeHtml(params.replyMessage).replace(/\n/g, '<br>'))}
     </div>
     <p style="margin:0 0 8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;">Your Response</p>
     <table style="width:100%;border-collapse:collapse;border-radius:6px;border:1px solid #e5e7eb;overflow:hidden;margin-bottom:20px;">
