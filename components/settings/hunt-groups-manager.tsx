@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { getErrorMessage } from '@/lib/utils'
 
 export interface HuntGroup {
   id: string
@@ -37,10 +38,7 @@ export function HuntGroupsManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), email: email.trim() }),
       })
-      if (!res.ok) {
-        const d = await res.json() as { error: string }
-        throw new Error(d.error)
-      }
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to add hunt group'))
       toast.success('Hunt group added')
       setName('')
       setEmail('')
@@ -55,11 +53,12 @@ export function HuntGroupsManager() {
   const handleDelete = async (id: string, groupName: string) => {
     setDeletingId(id)
     try {
-      await fetch(`/api/hunt-groups/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/hunt-groups/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to remove'))
       toast.success(`Removed ${groupName}`)
       void fetchGroups()
-    } catch {
-      toast.error('Failed to remove')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to remove')
     } finally {
       setDeletingId(null)
     }

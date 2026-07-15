@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ExternalLink, Trash2, ArchiveRestore } from 'lucide-react'
 import { StatusBadge } from './status-badge'
 import { Button } from '@/components/ui/button'
-import { formatDateTime, formatRelative, isApprovalOverdue } from '@/lib/utils'
+import { formatDateTime, formatRelative, isApprovalOverdue, getErrorMessage } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Poll } from '@/types'
 
@@ -54,10 +54,10 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
         setConfirmBulkDelete(false)
         onDeleted?.()
       } else {
-        toast.error('Failed to delete polls')
+        toast.error(await getErrorMessage(res, 'Failed to delete polls'))
       }
-    } catch {
-      toast.error('Failed to delete polls')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete polls')
     } finally {
       setDeleting(false)
     }
@@ -76,10 +76,10 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
         setSelected(new Set())
         onUnarchived?.()
       } else {
-        toast.error('Failed to unarchive polls')
+        toast.error(await getErrorMessage(res, 'Failed to unarchive polls'))
       }
-    } catch {
-      toast.error('Failed to unarchive polls')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to unarchive polls')
     } finally {
       setUnarchiving(false)
     }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { CheckCircle2, ClipboardList, Loader2, Star } from 'lucide-react'
+import { getErrorMessage } from '@/lib/utils'
 
 interface PollData {
   id: string
@@ -113,8 +114,8 @@ export default function RespondPage() {
 
     fetch(`/api/respond/${id}`)
       .then(async (r) => {
-        const data = await r.json() as PollData & { error?: string }
-        if (!r.ok) { setLoadError(data.error ?? 'Failed to load poll.'); return }
+        if (!r.ok) { setLoadError(await getErrorMessage(r, 'Failed to load poll.')); return }
+        const data = await r.json() as PollData
         setPoll(data)
         const normalized = data.questions
           .map(normalizeQuestion)
@@ -155,8 +156,7 @@ export default function RespondPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers, email: trimmedEmail }),
       })
-      const data = await res.json() as { error?: string }
-      if (!res.ok) throw new Error(data.error ?? 'Submission failed.')
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Submission failed.'))
 
       localStorage.setItem(`poll_responded_v2_${id}`, '1')
       setSubmitted(true)

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { MessageSquare, RefreshCw, CheckCircle2, XCircle, Clock, X, Send, ChevronDown, Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { formatRelative } from '@/lib/utils'
+import { formatRelative, getErrorMessage } from '@/lib/utils'
 import { useQuarter, inQuarter } from '@/lib/use-quarter'
 import { toast } from 'sonner'
 import type { Poll, PollResponse } from '@/types'
@@ -77,8 +77,8 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
         }),
       })
       if (res.ok) { onUpdated(entryIndex, patch); toast.success('Updated') }
-      else toast.error('Failed to update')
-    } catch { toast.error('Failed to update') }
+      else toast.error(await getErrorMessage(res, 'Failed to update'))
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed to update') }
     finally { setSaving(false) }
   }
 
@@ -97,8 +97,7 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
         setShowReply(false)
         toast.success('Reply sent')
       } else {
-        const err = await res.json() as { error?: string }
-        toast.error(err.error ?? 'Failed to send reply')
+        toast.error(await getErrorMessage(res, 'Failed to send reply'))
       }
     } catch { toast.error('Failed to send reply') }
     finally { setSaving(false) }

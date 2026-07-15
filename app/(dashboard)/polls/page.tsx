@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { PollsTable } from '@/components/polls/polls-table'
 import { PollForm } from '@/components/polls/poll-form'
 import { useQuarter, inQuarter } from '@/lib/use-quarter'
+import { getErrorMessage } from '@/lib/utils'
 import type { Poll } from '@/types'
 
 type CardKey = 'not-sent' | 'approval-pending' | 'active' | 'closed' | 'result-sir' | 'total' | 'pending'
@@ -77,32 +78,33 @@ function PollsContent() {
   useEffect(() => { void fetchPolls() }, [fetchPolls])
 
   const handleMarkClosed = async (pollId: string) => {
-    await fetch(`/api/polls/${pollId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'MARK_CLOSED' }) })
-    toast.success('Poll marked as closed')
+    const res = await fetch(`/api/polls/${pollId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'MARK_CLOSED' }) })
+    if (res.ok) toast.success('Poll marked as closed')
+    else toast.error(await getErrorMessage(res, 'Failed to mark poll as closed'))
     void fetchPolls()
   }
   const handleCloseExternal = async (pollId: string) => {
     const res = await fetch(`/api/polls/${pollId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'CLOSE_EXTERNAL_REQUEST' }) })
     if (res.ok) toast.success('Poll closed and requester notified')
-    else { const d = await res.json() as { error?: string }; toast.error(d.error ?? 'Failed to close poll') }
+    else toast.error(await getErrorMessage(res, 'Failed to close poll'))
     void fetchPolls()
   }
   const handleArchive = async (pollId: string) => {
     const res = await fetch(`/api/polls/${pollId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'ARCHIVE' }) })
     if (res.ok) toast.success('Poll archived')
-    else { const d = await res.json() as { error?: string }; toast.error(d.error ?? 'Failed to archive poll') }
+    else toast.error(await getErrorMessage(res, 'Failed to archive poll'))
     void fetchPolls()
   }
   const handleReject = async (pollId: string) => {
     const res = await fetch(`/api/polls/${pollId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'REJECT' }) })
     if (res.ok) toast.success('Poll request rejected')
-    else { const d = await res.json() as { error?: string }; toast.error(d.error ?? 'Failed to reject poll') }
+    else toast.error(await getErrorMessage(res, 'Failed to reject poll'))
     void fetchPolls()
   }
   const handleRejectExternal = async (pollId: string, reason: string) => {
     const res = await fetch(`/api/polls/${pollId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'REJECT_EXTERNAL_REQUEST', reason }) })
     if (res.ok) toast.success('Poll request rejected and requester notified')
-    else { const d = await res.json() as { error?: string }; toast.error(d.error ?? 'Failed to reject poll') }
+    else toast.error(await getErrorMessage(res, 'Failed to reject poll'))
     void fetchPolls()
   }
 

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Mail } from 'lucide-react'
+import { getErrorMessage } from '@/lib/utils'
 
 interface Sender {
   id: string
@@ -40,10 +41,7 @@ export function SendersManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), email: email.trim() }),
       })
-      if (!res.ok) {
-        const data = await res.json() as { error: string }
-        throw new Error(data.error)
-      }
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to add sender'))
       toast.success('Sender added')
       setName('')
       setEmail('')
@@ -58,11 +56,12 @@ export function SendersManager() {
   const handleDelete = async (id: string, senderEmail: string) => {
     setDeletingId(id)
     try {
-      await fetch(`/api/senders/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/senders/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to remove sender'))
       toast.success(`Removed ${senderEmail}`)
       void fetchSenders()
-    } catch {
-      toast.error('Failed to remove sender')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to remove sender')
     } finally {
       setDeletingId(null)
     }

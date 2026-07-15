@@ -5,6 +5,7 @@ import { CheckCircle2, ClipboardCheck, Loader2, Pencil, XCircle, MessageSquare }
 import type { Poll } from '@/types'
 import { QuestionBuilder, parseQuestions } from '@/components/polls/question-builder'
 import type { Question } from '@/components/polls/question-builder'
+import { getErrorMessage } from '@/lib/utils'
 
 type PageStatus = 'loading' | 'error' | 'ready' | 'submitting' | 'done'
 type DoneAction = 'approve' | 'reject' | 'feedback' | null
@@ -38,8 +39,8 @@ export default function ApprovePage({
   useEffect(() => {
     fetch(`/api/approve/${token}`)
       .then(async (r) => {
-        const data = await r.json() as Poll & { error?: string }
-        if (!r.ok) { setErrorMsg(data.error ?? 'Invalid link.'); setStatus('error'); return }
+        if (!r.ok) { setErrorMsg(await getErrorMessage(r, 'Invalid link.')); setStatus('error'); return }
+        const data = await r.json() as Poll
         setPoll(data)
         setEditSubject(data.subject ?? `Poll: ${data.topic}`)
         setEditEmailBody(data.draft_email_body ?? '')
@@ -70,8 +71,7 @@ export default function ApprovePage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const data = await res.json() as { error?: string }
-      if (!res.ok) throw new Error(data.error ?? 'Action failed.')
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Action failed.'))
       setDoneAction(action === 'save_and_approve' ? 'approve' : action)
       setStatus('done')
     } catch (err) {

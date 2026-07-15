@@ -6,6 +6,23 @@ import { generateDraftWithGemini } from '@/lib/gemini'
 import { formatDate, escapeHtml } from '@/lib/utils'
 import { sendEmail } from '@/lib/graph'
 
+// Matches the client-side limit in app/request/page.tsx — that limit is
+// enforced there for UX, but a modified client or a direct API call could
+// skip it, so it must also be enforced here.
+const MAX_ATTACHMENT_FILE_BYTES = 3 * 1024 * 1024
+const MAX_ATTACHMENT_TOTAL_BYTES = 3 * 1024 * 1024
+
+function validateAttachmentSizes(attachments: { name: string; contentBytes: string }[]): string | null {
+  let total = 0
+  for (const a of attachments) {
+    const size = Math.floor((a.contentBytes.length * 3) / 4)
+    if (size > MAX_ATTACHMENT_FILE_BYTES) return `Attachment "${a.name}" exceeds the 3 MB per-file limit.`
+    total += size
+  }
+  if (total > MAX_ATTACHMENT_TOTAL_BYTES) return 'Attachments exceed the 3 MB total limit.'
+  return null
+}
+
 export async function POST(req: NextRequest) {
   try {
     await runMigrations()
@@ -29,6 +46,11 @@ export async function POST(req: NextRequest) {
 
     if (!requester_name?.trim() || !requester_email?.trim() || !topic?.trim() || !department?.trim()) {
       return NextResponse.json({ error: 'Name, email, topic and department are required.' }, { status: 400 })
+    }
+
+    if (body.attachments?.length) {
+      const sizeError = validateAttachmentSizes(body.attachments)
+      if (sizeError) return NextResponse.json({ error: sizeError }, { status: 400 })
     }
 
     // Build remarks: combine context + frequency info

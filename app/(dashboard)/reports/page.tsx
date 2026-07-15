@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { BarChart3, X, Loader2, RefreshCw, Clock, User, Mail, ChevronDown, ChevronUp, Save, ExternalLink, Send, Upload, Zap, TrendingUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { StatusBadge } from '@/components/polls/status-badge'
-import { formatDateTime, formatRelative } from '@/lib/utils'
+import { formatDateTime, formatRelative, getErrorMessage } from '@/lib/utils'
 import type { Poll, PollResponse } from '@/types'
 
 const RELEASED_STATUSES = ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED', 'CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED']
@@ -152,7 +152,7 @@ function ManageDialog({ poll, onClose }: { poll: Poll; onClose: () => void }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'UPDATE_ENTRY_ACTIONABLE', entryIndex: index, actionable, classification, remarks, ...(status !== undefined ? { status } : {}) }),
     })
-    if (!res.ok) throw new Error('Failed to save')
+    if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to save'))
   }
 
   const handleActionable = async (index: number, value: boolean | null) => {
@@ -162,7 +162,7 @@ function ManageDialog({ poll, onClose }: { poll: Poll; onClose: () => void }) {
       const remarks = entryRemarks[index] ?? entries[index]?.remarks ?? ''
       await patchEntry(index, value, cls, remarks)
       setEntries(prev => prev.map((e, i) => i === index ? { ...e, actionable: value } : e))
-    } catch { toast.error('Failed to save — please try again') }
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed to save — please try again') }
     finally { setSavingIndex(null) }
   }
 
@@ -173,7 +173,7 @@ function ManageDialog({ poll, onClose }: { poll: Poll; onClose: () => void }) {
       const remarks = entryRemarks[index] ?? entries[index]?.remarks ?? ''
       await patchEntry(index, entries[index]?.actionable ?? null, value, remarks)
       setEntries(prev => prev.map((e, i) => i === index ? { ...e, classification: value } : e))
-    } catch { toast.error('Failed to save — please try again') }
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed to save — please try again') }
     finally { setSavingIndex(null) }
   }
 
@@ -185,7 +185,7 @@ function ManageDialog({ poll, onClose }: { poll: Poll; onClose: () => void }) {
       await patchEntry(index, entries[index]?.actionable ?? null, cls, remarks)
       setEntries(prev => prev.map((e, i) => i === index ? { ...e, remarks } : e))
       toast.success('Remarks saved')
-    } catch { toast.error('Failed to save remarks') }
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed to save remarks') }
     finally { setSavingRemarksIndex(null) }
   }
 
@@ -199,8 +199,8 @@ function ManageDialog({ poll, onClose }: { poll: Poll; onClose: () => void }) {
       const remarks = entryRemarks[index] ?? entries[index]?.remarks ?? ''
       await patchEntry(index, entries[index]?.actionable ?? null, cls, remarks, next)
       setEntries(p => p.map((e, i) => i === index ? { ...e, status: next } : e))
-    } catch {
-      toast.error('Failed to save — please try again')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save — please try again')
       setEntryStatuses(p => ({ ...p, [index]: prev }))
     } finally { setSavingIndex(null) }
   }
@@ -215,10 +215,7 @@ function ManageDialog({ poll, onClose }: { poll: Poll; onClose: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'REPLY_TO_RESPONDENT', entryIndex: index, replyMessage }),
       })
-      if (!res.ok) {
-        const d = await res.json() as { error: string }
-        throw new Error(d.error)
-      }
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to send reply'))
       const repliedAt = new Date().toISOString()
       setEntries(prev => prev.map((e, i) => i === index ? { ...e, reply_message: replyMessage, reply_sent_at: repliedAt } : e))
       toast.success('Reply sent')
@@ -492,8 +489,8 @@ export default function ReportsPage() {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'UPLOAD_TO_KOENIG' }),
       })
-      const data = await res.json() as { error?: string; success?: boolean; entriesCount?: number }
-      if (!res.ok) throw new Error(data.error)
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Upload to Koenig News failed'))
+      const data = await res.json() as { entriesCount?: number }
       toast.success(`Results uploaded to Koenig News (${data.entriesCount} responses)`)
       void fetchPolls()
     } catch (err) {
@@ -508,7 +505,7 @@ export default function ReportsPage() {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'PUSH_TO_RMS' }),
       })
-      if (!res.ok) throw new Error((await res.json() as { error: string }).error)
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Push to Koenig News failed'))
       toast.success('Pushed to Koenig News successfully')
       void fetchPolls()
     } catch (err) {

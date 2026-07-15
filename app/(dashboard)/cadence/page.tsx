@@ -306,21 +306,23 @@ function CadencePageInner() {
         // reads/trusts a client-computed value.
       }
       if (editingId) {
-        await fetch(`/api/regular-polls/${editingId}`, {
+        const res = await fetch(`/api/regular-polls/${editingId}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'UPDATE', ...payload, newAttachments, removeAttachmentNames: formRemovedAttachmentNames }),
         })
+        if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to update cadence poll'))
         toast.success('Cadence poll updated')
       } else {
-        await fetch('/api/regular-polls', {
+        const res = await fetch('/api/regular-polls', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...payload, attachments: newAttachments }),
         })
+        if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to create cadence poll'))
         toast.success('Cadence poll created')
       }
       setFormOpen(false)
       void fetchPolls()
-    } catch { toast.error('Save failed') }
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Save failed') }
     finally { setSaving(false) }
   }
 
@@ -341,11 +343,11 @@ function CadencePageInner() {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'UPDATE_ATTACHMENTS', newAttachments, removeAttachmentNames: attachRemoved }),
       })
-      if (!res.ok) { toast.error('Failed to update attachment'); return }
+      if (!res.ok) { toast.error(await getErrorMessage(res, 'Failed to update attachment')); return }
       toast.success('Attachment updated — it will be used for this release')
       setAttachPoll(null)
       void fetchPolls()
-    } catch { toast.error('Failed to update attachment') }
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed to update attachment') }
     finally { setAttachSaving(false) }
   }
 

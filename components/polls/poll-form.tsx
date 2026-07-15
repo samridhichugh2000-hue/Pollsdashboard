@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { RecipientPicker } from '@/components/polls/recipient-picker'
+import { getErrorMessage } from '@/lib/utils'
 
 interface Sender { id: string; name: string; email: string }
 
@@ -77,7 +78,7 @@ export function PollForm({ onSuccess }: PollFormProps) {
           single_response: true,
         }),
       })
-      if (!res.ok) { const d = await res.json() as { error?: string }; throw new Error(d.error ?? 'Failed') }
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to create poll'))
       onSuccess?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
