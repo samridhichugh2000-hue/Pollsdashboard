@@ -591,6 +591,12 @@ function CadencePageInner() {
                         </span>
                       </td>
                       <td className="border border-gray-200 dark:border-slate-700 px-4 py-3 text-right space-x-1">
+                        {dueToday && (
+                          <Button size="sm" variant="outline" className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20 mr-1"
+                            onClick={() => openRelease(t)}>
+                            <Play className="mr-1 h-3 w-3" /> Release Now
+                          </Button>
+                        )}
                         <Button variant="ghost" size="icon" className="h-7 w-7 inline-flex" title="Edit" onClick={() => void openEdit(t)}>
                           <Edit2 className="h-3.5 w-3.5 text-gray-500 dark:text-slate-400" />
                         </Button>
