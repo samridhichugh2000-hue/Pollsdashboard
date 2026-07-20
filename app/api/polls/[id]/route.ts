@@ -17,7 +17,7 @@ import {
 } from '@/lib/db/queries'
 import type { PollAttachment } from '@/lib/db/queries'
 import { sendEmail, sendEmailGetId, replyToMessageWithHtml } from '@/lib/graph'
-import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, formatDate } from '@/lib/utils'
+import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, buildNoActionTakenHtml, formatDate } from '@/lib/utils'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
 import { pushPollToKites, buildResponsesHtml, uploadPollResults } from '@/lib/kites-api'
@@ -41,6 +41,63 @@ function validateAttachmentSizes(attachments: PollAttachment[]): string | null {
   }
   if (total > MAX_ATTACHMENT_TOTAL_BYTES) return 'Attachments exceed the 3 MB total limit.'
   return null
+}
+
+interface ResponseEntryRecord {
+  email?: string
+  respondent?: string
+  answers?: { question: string; answer: string }[]
+  actionable?: boolean | null
+  reply_sent_at?: string
+  no_action_email_sent_at?: string
+  [key: string]: unknown
+}
+
+function nameFromEmail(email: string): string {
+  return email.split('@')[0].split('.').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
+}
+
+// Runs whenever a poll is closed — anyone whose response was never given an
+// actionable/not-actionable decision (and who hasn't already gotten a manual
+// reply) gets a closing notice so no respondent is left without any
+// acknowledgement. Persists after each successful send (not once at the end)
+// so a crash or timeout partway through never causes a duplicate send on retry.
+async function sendNoActionTakenEmails(pollId: string, topic: string): Promise<void> {
+  if (!process.env.PRIYA_EMAIL) return
+  const pollResp = await getPollResponse(pollId)
+  if (!pollResp?.response_data) return
+
+  let entries: ResponseEntryRecord[]
+  try {
+    entries = JSON.parse(pollResp.response_data) as ResponseEntryRecord[]
+  } catch {
+    return
+  }
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i]
+    if (entry.actionable != null || entry.reply_sent_at || entry.no_action_email_sent_at || !entry.email) continue
+
+    try {
+      await sendEmail({
+        from: process.env.PRIYA_EMAIL,
+        to: entry.email,
+        cc: process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com',
+        subject: `Re: Your response to "${topic}"`,
+        htmlBody: buildNoActionTakenHtml({
+          name: entry.respondent ?? nameFromEmail(entry.email),
+          topic,
+          answers: entry.answers ?? [],
+        }),
+      })
+    } catch (err) {
+      console.error(`Failed to send no-action-taken email to ${entry.email} for poll ${pollId}:`, err)
+      continue
+    }
+
+    entries[i] = { ...entry, no_action_email_sent_at: new Date().toISOString() }
+    await upsertPollResponse(pollId, JSON.stringify(entries))
+  }
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -225,6 +282,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'MARK_CLOSED': {
         await updatePollStatus(id, 'CLOSED', { closed_at: new Date().toISOString() })
         await createAuditLog(id, 'POLL_CLOSED', userEmail)
+        await sendNoActionTakenEmails(id, poll.topic)
         break
       }
 
@@ -232,6 +290,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const closedAt = new Date()
         await updatePollStatus(id, 'CLOSED', { closed_at: closedAt.toISOString() })
         await createAuditLog(id, 'POLL_CLOSED', userEmail, { notified: true })
+        await sendNoActionTakenEmails(id, poll.topic)
 
         // Extract requester name + email from "Name <email>" or bare "email"
         const nameEmailMatch = poll.requested_by?.match(/^(.+?)\s*<([^>]+)>$/)

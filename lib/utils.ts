@@ -472,6 +472,49 @@ export function buildReplyToRespondentHtml(params: {
 </div>`
 }
 
+// Sent in bulk to respondents whose entry was never classified (actionable
+// left null) by the time HR closes the poll — i.e. no decision was ever
+// recorded for their specific suggestion.
+export function buildNoActionTakenHtml(params: {
+  name: string
+  topic: string
+  answers: { question: string; answer: string }[]
+}): string {
+  const answersHtml = params.answers
+    .map((a, i) => `
+      <tr style="background:${i % 2 === 0 ? '#f9fafb' : '#fff'};">
+        <td style="padding:10px 14px;font-size:13px;color:#6b7280;white-space:nowrap;vertical-align:top;width:24px;">${i + 1}.</td>
+        <td style="padding:10px 14px;font-size:13px;">
+          <div style="color:#374151;font-weight:600;margin-bottom:4px;">${escapeHtml(a.question)}</div>
+          <div style="color:#111827;">${a.answer?.trim() ? linkifyUrls(escapeHtml(a.answer)) : '<em style="color:#9ca3af;">No answer provided</em>'}</div>
+        </td>
+      </tr>`)
+    .join('')
+
+  return `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827;">
+  <div style="background:#1e40af;padding:22px 28px;border-radius:8px 8px 0 0;">
+    <h2 style="margin:0;color:#fff;font-size:17px;font-weight:600;">Response from HR</h2>
+    <p style="margin:4px 0 0;color:rgba(255,255,255,0.65);font-size:13px;">${escapeHtml(params.topic)}</p>
+  </div>
+  <div style="background:#f9fafb;padding:22px 28px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none;">
+    <p style="margin:0 0 12px;font-size:14px;">Hi <strong>${escapeHtml(params.name)}</strong>,</p>
+    <p style="margin:0 0 12px;font-size:14px;line-height:1.6;">Thank you for taking the time to share your feedback through the poll.</p>
+    <p style="margin:0 0 12px;font-size:14px;line-height:1.6;">We have reviewed your suggestion and though no immediate action, we will consider it for future policy changes.</p>
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.6;">We appreciate your participation and encourage you to continue sharing your valuable feedback in future polls.</p>
+    <p style="margin:0 0 8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;">Your Response</p>
+    <table style="width:100%;border-collapse:collapse;border-radius:6px;border:1px solid #e5e7eb;overflow:hidden;margin-bottom:20px;">
+      ${answersHtml}
+    </table>
+    <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.7;">
+      Regards,<br>
+      <strong style="color:#374151;">Team HR</strong><br>
+      Poll Dashboard
+    </p>
+  </div>
+</div>`
+}
+
 export function truncate(str: string, maxLength: number): string {
   if (str.length <= maxLength) return str
   return str.slice(0, maxLength) + '...'
