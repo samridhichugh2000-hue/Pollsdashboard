@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "polls-dashboard",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "C:\\Users\\ragha\\OneDrive\\Desktop\\polls-dashboard",
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "Pollsmockup",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "C:\\Users\\ragha\\OneDrive\\Desktop\\Pollsmockup",
+      "port": 3001,
+      "autoPort": true
+    }
+  ]
+}

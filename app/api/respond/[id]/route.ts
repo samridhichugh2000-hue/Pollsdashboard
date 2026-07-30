@@ -104,10 +104,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const currentData = existing.rows[0].response_data as string | null
     const currentArray: Array<{ email?: string }> = currentData ? JSON.parse(currentData) : []
 
-    // Server-side dedup — the client also gates re-submission via
-    // localStorage, but that's trivially bypassed (private window, different
-    // browser, cleared storage) and was the only thing enforcing this until
-    // now. single_response defaults to on (matches createPoll()'s default).
+    // Server-side dedup — the only source of truth for "already responded".
+    // single_response defaults to on (matches createPoll()'s default).
     if (poll.single_response !== 0 && currentArray.some(e => e.email?.toLowerCase() === email)) {
       return NextResponse.json({ error: 'You have already submitted a response to this poll.' }, { status: 409 })
     }

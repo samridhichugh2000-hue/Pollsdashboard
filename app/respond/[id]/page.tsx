@@ -107,11 +107,12 @@ export default function RespondPage() {
   const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem(`poll_responded_v2_${id}`)) {
-      setSubmitted(true)
-      return
-    }
-
+    // Whether this respondent has already submitted is checked server-side
+    // (by email, at the actual submit) — that's the only source of truth.
+    // A client-side localStorage flag here used to gate the form before this
+    // even loaded, which went stale the moment an admin deleted a response
+    // (or the respondent used a different browser), showing "already
+    // submitted" for someone whose submission no longer existed.
     fetch(`/api/respond/${id}`)
       .then(async (r) => {
         if (!r.ok) { setLoadError(await getErrorMessage(r, 'Failed to load poll.')); return }
@@ -158,7 +159,6 @@ export default function RespondPage() {
       })
       if (!res.ok) throw new Error(await getErrorMessage(res, 'Submission failed.'))
 
-      localStorage.setItem(`poll_responded_v2_${id}`, '1')
       setSubmitted(true)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Something went wrong.')
