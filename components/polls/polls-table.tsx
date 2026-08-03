@@ -18,9 +18,10 @@ interface PollsTableProps {
   onRejectExternal?: (pollId: string, reason: string) => void
   onDeleted?: () => void
   onUnarchived?: () => void
+  linkBase?: string
 }
 
-export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, onReject, onRejectExternal, onDeleted, onUnarchived }: PollsTableProps) {
+export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, onReject, onRejectExternal, onDeleted, onUnarchived, linkBase = '/polls' }: PollsTableProps) {
   const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const [confirmArchive, setConfirmArchive] = useState<string | null>(null)
   const [confirmReject, setConfirmReject] = useState<string | null>(null)
@@ -208,7 +209,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                 </td>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-2">
-                    <Link href={`/polls/${poll.id}`}
+                    <Link href={`${linkBase}/${poll.id}`}
                       className="text-xs font-medium text-cyan-600 hover:text-cyan-800 hover:underline">
                       View
                     </Link>

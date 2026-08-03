@@ -132,7 +132,7 @@ export default function ApprovePage({
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
             <ClipboardCheck className="h-7 w-7 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">Poll Approval Request</h1>
+          <h1 className="text-2xl font-bold text-white">{poll?.request_type === 'KGT' ? 'KGT Approval Request' : 'Poll Approval Request'}</h1>
           <p className="mt-1 text-sm text-white/60">{poll.department}</p>
         </div>
 

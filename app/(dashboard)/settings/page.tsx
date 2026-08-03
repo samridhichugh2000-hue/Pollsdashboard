@@ -4,6 +4,7 @@ import { getAllUsers } from '@/lib/db/queries'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { SendersManager } from '@/components/settings/senders-manager'
+import { KGTSendersManager } from '@/components/settings/kgt-senders-manager'
 import { HuntGroupsManager } from '@/components/settings/hunt-groups-manager'
 import { RequestLink } from '@/components/settings/request-link'
 import { formatDate } from '@/lib/utils'
@@ -21,6 +22,7 @@ export default async function SettingsPage() {
 
       <RequestLink />
       <SendersManager />
+      <KGTSendersManager />
       <HuntGroupsManager />
 
       {/* Cron Jobs */}

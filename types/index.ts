@@ -19,6 +19,8 @@ export type PollStatus =
 
 export type PollSource = 'email' | 'dashboard' | 'external'
 
+export type RequestType = 'POLL' | 'KGT'
+
 export type ApprovalAction = 'approved' | 'edited' | 'clarification' | 'rejected'
 
 export type UserRole = 'super_admin' | 'admin'
@@ -55,6 +57,7 @@ export interface Poll {
   remarks?: string | null
   single_response?: number | null // 1 or 0 (SQLite boolean)
   archived_from_status?: PollStatus | null
+  request_type: RequestType
   created_at: string
   updated_at: string
 }
@@ -107,6 +110,7 @@ export interface CreatePollInput {
   deadline?: string
   remarks?: string
   single_response?: boolean
+  request_type?: RequestType
 }
 
 export interface KPIData {
@@ -130,6 +134,13 @@ export interface Notification {
 export interface AuthorizedSender {
   email: string
   name: string
+}
+
+export interface KGTAuthorizedSender {
+  id: string
+  name: string
+  email: string
+  created_at: string
 }
 
 export type RegularPollFrequency = 'monthly' | 'quarterly' | 'bi-annual' | 'annual'

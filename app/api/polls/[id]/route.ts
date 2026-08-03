@@ -157,6 +157,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           editUrl,
           feedbackUrl,
           rejectUrl,
+          isKGT: poll.request_type === 'KGT',
         })
 
         const recipients = Array.isArray(body.recipients) && (body.recipients as string[]).length > 0
@@ -181,10 +182,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
 
         const pollSubject = poll.subject ?? (poll.department && poll.department !== 'All Departments' ? `Poll of ${poll.department} – ${poll.topic}` : `Poll – ${poll.topic}`)
+        // KGT requests already carry their own "KGT Opportunity – <topic>" subject —
+        // the "Poll Approval Required:" prefix only applies to regular polls.
+        const approvalSubject = poll.request_type === 'KGT' ? pollSubject : `Poll Approval Required: ${pollSubject}`
         await sendEmail({
           from: process.env.PRIYA_EMAIL!,
           to: recipients,
-          subject: `Poll Approval Required: ${pollSubject}`,
+          subject: approvalSubject,
           htmlBody: approvalHtml,
           ...(approvalAttachments.length > 0 && { attachments: approvalAttachments }),
         })

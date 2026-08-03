@@ -94,7 +94,7 @@ export function RichTextEditor({
           '[&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_td]:align-top',
           '[&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted [&_th]:font-semibold',
           // Basic text formatting
-          '[&_p]:my-1 [&_br]:block',
+          '[&_p]:my-1',
           disabled && 'opacity-50 cursor-not-allowed',
           className
         )}

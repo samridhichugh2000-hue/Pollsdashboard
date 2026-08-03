@@ -115,6 +115,20 @@ export async function getUnreadPollEmails(userEmail: string): Promise<GraphMessa
   })
 }
 
+// KGT (knowledge/ownership transfer) requests come from a small named list of
+// people — any unread mail from an authorized requester is a candidate, since
+// they don't always spell out "KGT" in the subject. Kept unfiltered by
+// keyword; the dashboard's DRAFT review step is the actual confirmation gate.
+export async function getUnreadKGTEmails(userEmail: string, authorizedEmails: Set<string>): Promise<GraphMessage[]> {
+  const messages = await getInboxMessages(userEmail, `isRead eq false`)
+  return messages.filter((m) => {
+    const sender = m.from.emailAddress.address.toLowerCase()
+    if (!authorizedEmails.has(sender)) return false
+    if (isSystemNotificationEmail(m.subject)) return false
+    return true
+  })
+}
+
 // ─── Email Sending ─────────────────────────────────────────────────────────────
 
 export interface EmailAttachment {

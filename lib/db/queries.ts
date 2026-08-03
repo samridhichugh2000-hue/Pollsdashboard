@@ -11,7 +11,12 @@ export const CLOSED_POLL_STATUSES: PollStatus[] = ['CLOSED', 'RESULTS_UPLOADED',
 // ─── Polls ───────────────────────────────────────────────────────────────────
 
 export async function getAllPolls(): Promise<Poll[]> {
-  const result = await getDb().execute('SELECT * FROM polls ORDER BY created_at DESC')
+  const result = await getDb().execute(`SELECT * FROM polls WHERE request_type != 'KGT' ORDER BY created_at DESC`)
+  return result.rows as unknown as Poll[]
+}
+
+export async function getAllKGTRequests(): Promise<Poll[]> {
+  const result = await getDb().execute(`SELECT * FROM polls WHERE request_type = 'KGT' ORDER BY created_at DESC`)
   return result.rows as unknown as Poll[]
 }
 
@@ -61,8 +66,8 @@ export async function createPoll(input: CreatePollInput): Promise<Poll> {
   const now = new Date().toISOString()
 
   await getDb().execute({
-    sql: `INSERT INTO polls (id, topic, department, recipient_email, requested_by, source, email_thread_id, questions, deadline, remarks, single_response, status, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DETECTED', ?, ?)`,
+    sql: `INSERT INTO polls (id, topic, department, recipient_email, requested_by, source, email_thread_id, questions, deadline, remarks, single_response, request_type, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DETECTED', ?, ?)`,
     args: [
       id,
       input.topic,
@@ -75,6 +80,7 @@ export async function createPoll(input: CreatePollInput): Promise<Poll> {
       deadline,
       input.remarks ?? null,
       input.single_response !== false ? 1 : 0,
+      input.request_type ?? 'POLL',
       now,
       now,
     ],

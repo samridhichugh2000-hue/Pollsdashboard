@@ -225,6 +225,27 @@ export async function runMigrations() {
     `)
   } catch { /* already exists */ }
 
+  // Distinguishes KGT ownership-transfer requests from normal HR polls —
+  // both live in the same `polls` table and share its whole lifecycle
+  // (draft/approve/release/close), just filtered differently in the UI.
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN request_type TEXT NOT NULL DEFAULT 'POLL'`)
+  } catch { /* already exists */ }
+
+  // KGT requester allow-list — same shape/purpose as authorized_senders but
+  // scoped to the fixed set of people whose mailbox requests should be
+  // detected as KGT opportunities rather than regular polls.
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS kgt_authorized_senders (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+
   // Hunt groups (named recipient shortcuts used by RecipientPicker) — same
   // gap as authorized_senders: queried/written by app/api/hunt-groups/* but
   // never created anywhere in the checked-in schema.

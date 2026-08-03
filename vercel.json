@@ -5,6 +5,10 @@
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/kgt-inbox-reader",
+      "schedule": "15 3 * * *"
+    },
+    {
       "path": "/api/cron/reminder-scheduler",
       "schedule": "30 2 * * *"
     },

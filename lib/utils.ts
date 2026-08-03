@@ -254,6 +254,7 @@ export function buildApprovalEmailHtml(params: {
   editUrl: string
   feedbackUrl: string
   rejectUrl: string
+  isKGT?: boolean
 }): string {
   const questionsHtml = params.questions
     .map((q, i) => `<li style="margin-bottom:6px;">${i + 1}. ${escapeHtml(q)}</li>`)
@@ -261,7 +262,7 @@ export function buildApprovalEmailHtml(params: {
 
   return `
 <div style="font-family: Arial, sans-serif; max-width: 620px; color: #1a1a1a;">
-  <h2 style="color: #1e40af; margin-bottom: 4px;">Poll Approval Request</h2>
+  <h2 style="color: #1e40af; margin-bottom: 4px;">${params.isKGT ? 'KGT Approval Request' : 'Poll Approval Request'}</h2>
   <p style="margin:0 0 16px; color:#6b7280; font-size:14px;">${escapeHtml(params.topic)}</p>
 
   <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:14px;">

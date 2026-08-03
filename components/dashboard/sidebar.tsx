@@ -17,12 +17,14 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   LogOut,
+  Handshake,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const mainNav = [
   { href: '/dashboard',     label: 'Overview',       icon: LayoutDashboard },
   { href: '/polls',         label: 'Poll Requests',  icon: ClipboardList },
+  { href: '/kgt',           label: 'KGT',            icon: Handshake },
   { href: '/feedback',      label: 'Poll Responses', icon: MessageSquare },
   { href: '/participation', label: 'Participation',  icon: Users },
   { href: '/cadence',       label: 'Poll Cadence',   icon: CalendarClock },

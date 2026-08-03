@@ -6,8 +6,8 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "cwd": "C:\\Users\\ragha\\OneDrive\\Desktop\\polls-dashboard",
-      "port": 3000,
-      "autoPort": true
+      "port": 3002,
+      "autoPort": false
     },
     {
       "name": "Pollsmockup",
