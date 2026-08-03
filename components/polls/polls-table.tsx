@@ -165,8 +165,8 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                   <input type="checkbox" checked={selected.has(poll.id)} onChange={() => toggleOne(poll.id)}
                     className="h-4 w-4 rounded border-gray-300 text-cyan-600 cursor-pointer" />
                 </td>
-                <td className="max-w-[200px] px-5 py-3.5">
-                  <p className="truncate font-medium text-gray-900 dark:text-slate-100">{poll.topic}</p>
+                <td className="max-w-[280px] px-5 py-3.5">
+                  <p className="break-words font-medium text-gray-900 dark:text-slate-100" title={poll.topic}>{poll.topic}</p>
                   {overdue && <span className="text-xs font-medium text-rose-500">Overdue</span>}
                 </td>
                 <td className="px-5 py-3.5 text-gray-500 dark:text-slate-400">{poll.department}</td>
