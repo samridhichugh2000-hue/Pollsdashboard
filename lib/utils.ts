@@ -395,6 +395,67 @@ export function buildAutoResponseHtml(params: {
 </div>`
 }
 
+// Calendar-month boundary (previous month relative to `now`), end exclusive.
+// Server-side equivalent of the client-only keyToRange() in lib/use-quarter.ts.
+export function getLastCalendarMonthRange(now: Date): { startIso: string; endIsoExclusive: string; label: string } {
+  const start = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const end = new Date(now.getFullYear(), now.getMonth(), 1)
+  const label = start.toLocaleString('en-US', { month: 'long', year: 'numeric' })
+  return { startIso: start.toISOString(), endIsoExclusive: end.toISOString(), label }
+}
+
+// Explicit "YYYY-MM" variant — used to re-run the report for a specific past
+// month (e.g. manual testing against a month that actually has response data).
+export function getCalendarMonthRange(yearMonth: string): { startIso: string; endIsoExclusive: string; label: string } {
+  const [year, month] = yearMonth.split('-').map(Number)
+  const start = new Date(year, month - 1, 1)
+  const end = new Date(year, month, 1)
+  const label = start.toLocaleString('en-US', { month: 'long', year: 'numeric' })
+  return { startIso: start.toISOString(), endIsoExclusive: end.toISOString(), label }
+}
+
+export function buildTopVotersReportHtml(params: {
+  monthLabel: string
+  topVoters: { full_name: string; email: string; department_name: string | null; voteCount: number }[]
+}): string {
+  const votersHtml = params.topVoters.length > 0
+    ? params.topVoters.map((v, i) => `
+      <tr style="background:${i % 2 === 0 ? '#f9fafb' : '#fff'};">
+        <td style="padding:10px 14px;font-size:13px;color:#6b7280;">${i + 1}</td>
+        <td style="padding:10px 14px;font-size:13px;">
+          <div style="color:#111827;font-weight:600;">${escapeHtml(v.full_name)}</div>
+          <div style="color:#9ca3af;font-size:12px;">${escapeHtml(v.email)}</div>
+        </td>
+        <td style="padding:10px 14px;font-size:13px;color:#6b7280;">${escapeHtml(v.department_name ?? '—')}</td>
+        <td style="padding:10px 14px;font-size:13px;color:#0e7490;font-weight:700;text-align:right;">${v.voteCount}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="4" style="padding:20px;text-align:center;color:#9ca3af;font-size:13px;">No poll responses recorded for this period.</td></tr>`
+
+  return `
+<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;color:#111827;">
+  <div style="background:#0e7490;padding:22px 28px;border-radius:8px 8px 0 0;">
+    <h2 style="margin:0;color:#fff;font-size:17px;font-weight:600;">Top ${params.topVoters.length || 5} Employees by Poll Participation - ${escapeHtml(params.monthLabel)}</h2>
+  </div>
+  <div style="background:#f9fafb;padding:22px 28px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none;">
+    <table style="width:100%;border-collapse:collapse;border-radius:6px;border:1px solid #e5e7eb;overflow:hidden;margin:0 0 20px;">
+      <thead>
+        <tr style="background:#f1f5f9;">
+          <th style="padding:10px 14px;font-size:11px;text-transform:uppercase;color:#6b7280;text-align:left;">#</th>
+          <th style="padding:10px 14px;font-size:11px;text-transform:uppercase;color:#6b7280;text-align:left;">Employee</th>
+          <th style="padding:10px 14px;font-size:11px;text-transform:uppercase;color:#6b7280;text-align:left;">Department</th>
+          <th style="padding:10px 14px;font-size:11px;text-transform:uppercase;color:#6b7280;text-align:right;">Polls Participated</th>
+        </tr>
+      </thead>
+      <tbody>${votersHtml}</tbody>
+    </table>
+    <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.7;">
+      Regards,<br>
+      <strong style="color:#374151;">Poll Dashboard</strong>
+    </p>
+  </div>
+</div>`
+}
+
 export function buildDeadlineExtensionAudienceHtml(params: {
   topic: string
   newDeadline: string

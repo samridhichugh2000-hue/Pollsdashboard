@@ -30,6 +30,22 @@ function deptColor(dept: string | null) {
   return DEPT_COLORS[dept]
 }
 
+// Last 12 calendar months, newest first — used by the "Top Voters" month picker.
+function buildMonthOptions(n = 12): { value: string; label: string; from: string; to: string }[] {
+  const now = new Date()
+  const opts = []
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' })
+    const from = `${value}-01`
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+    const to = `${value}-${String(lastDay).padStart(2, '0')}`
+    opts.push({ value, label, from, to })
+  }
+  return opts
+}
+
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -89,7 +105,22 @@ export default function ParticipationPage() {
   const [dateTo, setDateTo] = useState('')
   const [sortField, setSortField] = useState<'name' | 'count' | 'dept'>('count')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [topVotersMonth, setTopVotersMonth] = useState('')
   const syncedOnce = useRef(false)
+  const monthOptions = buildMonthOptions()
+
+  // "Top Voters" — pick a month and the table filters to it and sorts by
+  // Polls Participated descending, so the top voters for that month are on top.
+  const applyTopVotersMonth = (value: string) => {
+    setTopVotersMonth(value)
+    if (!value) return
+    const month = monthOptions.find(m => m.value === value)
+    if (!month) return
+    setDateFrom(month.from)
+    setDateTo(month.to)
+    setSortField('count')
+    setSortDir('desc')
+  }
 
   const triggerBackgroundSync = useCallback(async () => {
     if (bgSyncing) return
@@ -264,12 +295,21 @@ export default function ParticipationPage() {
           <option value="yes">Participated</option>
           <option value="no">Never participated</option>
         </select>
+        <select
+          value={topVotersMonth}
+          onChange={e => applyTopVotersMonth(e.target.value)}
+          className="h-[34px] border border-gray-200 dark:border-slate-700 rounded px-2.5 text-[13px] bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-purple-400"
+          title="Filters to the selected month and sorts by Polls Participated, descending"
+        >
+          <option value="">Top Voters — pick a month</option>
+          {monthOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
         <div className="flex items-center gap-1.5 h-[34px] border border-gray-200 dark:border-slate-700 rounded px-2.5 bg-white dark:bg-slate-800">
           <CalendarRange className="h-3.5 w-3.5 text-gray-400 dark:text-slate-500 flex-shrink-0" />
           <input
             type="date"
             value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
+            onChange={e => { setDateFrom(e.target.value); setTopVotersMonth('') }}
             max={dateTo || undefined}
             className="bg-transparent text-[12px] text-gray-700 dark:text-slate-300 outline-none [color-scheme:light] dark:[color-scheme:dark]"
           />
@@ -277,13 +317,13 @@ export default function ParticipationPage() {
           <input
             type="date"
             value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
+            onChange={e => { setDateTo(e.target.value); setTopVotersMonth('') }}
             min={dateFrom || undefined}
             className="bg-transparent text-[12px] text-gray-700 dark:text-slate-300 outline-none [color-scheme:light] dark:[color-scheme:dark]"
           />
         </div>
         {(search || filterDept !== 'all' || filterParticipated !== 'all' || activeCard !== null || dateFrom || dateTo) && (
-          <button onClick={() => { setSearch(''); setFilterDept('all'); setFilterParticipated('all'); setActiveCard(null); setDateFrom(''); setDateTo('') }}
+          <button onClick={() => { setSearch(''); setFilterDept('all'); setFilterParticipated('all'); setActiveCard(null); setDateFrom(''); setDateTo(''); setTopVotersMonth('') }}
             className="flex items-center gap-1 h-[34px] px-2.5 rounded border border-gray-200 dark:border-slate-700 text-[12px] text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 bg-white dark:bg-slate-800 transition-colors">
             <X className="h-3 w-3" /> Clear
           </button>

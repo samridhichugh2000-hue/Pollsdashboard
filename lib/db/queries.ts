@@ -489,6 +489,62 @@ export async function updateRegularPoll(id: string, fields: Partial<Omit<Regular
   await getDb().execute({ sql: `UPDATE regular_polls SET ${setClauses.join(', ')} WHERE id = ?`, args })
 }
 
+// ─── Top Voters (poll participation leaderboard) ──────────────────────────────
+// Same aggregation as app/api/participation/route.ts (poll_responses joined
+// against the employees cache by email), but scoped to a date range and
+// limited to the top N — used to fold a "most active voters this month"
+// section into the Kites votes report email.
+
+export interface TopVoterRow {
+  full_name: string
+  email: string
+  department_name: string | null
+  designation_name: string | null
+  voteCount: number
+}
+
+export async function getTopVotersInRange(startIso: string, endIsoExclusive: string, limit = 5): Promise<TopVoterRow[]> {
+  const db = getDb()
+
+  const respResult = await db.execute('SELECT response_data FROM poll_responses')
+  const empResult = await db.execute('SELECT first_name, last_name, email_address, department_name, designation_name FROM employees')
+
+  const empByEmail = new Map<string, { first_name: string | null; last_name: string | null; department_name: string | null; designation_name: string | null }>()
+  for (const row of empResult.rows) {
+    const email = (row.email_address as string | null)?.toLowerCase().trim()
+    if (email) empByEmail.set(email, row as unknown as { first_name: string | null; last_name: string | null; department_name: string | null; designation_name: string | null })
+  }
+
+  const countByEmail = new Map<string, number>()
+  for (const row of respResult.rows) {
+    const responseData = row.response_data as string | null
+    if (!responseData) continue
+    let entries: Array<{ email?: string; submitted_at?: string }> = []
+    try { entries = JSON.parse(responseData) } catch { continue }
+    for (const entry of entries) {
+      const email = (entry.email ?? '').toLowerCase().trim()
+      if (!email || !entry.submitted_at) continue
+      if (entry.submitted_at < startIso || entry.submitted_at >= endIsoExclusive) continue
+      countByEmail.set(email, (countByEmail.get(email) ?? 0) + 1)
+    }
+  }
+
+  return [...countByEmail.entries()]
+    .map(([email, voteCount]) => {
+      const emp = empByEmail.get(email)
+      const full_name = emp ? `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || email : email
+      return {
+        full_name,
+        email,
+        department_name: emp?.department_name ?? null,
+        designation_name: emp?.designation_name ?? null,
+        voteCount,
+      }
+    })
+    .sort((a, b) => b.voteCount - a.voteCount)
+    .slice(0, limit)
+}
+
 // ─── Email dedup ──────────────────────────────────────────────────────────────
 
 export async function pollEmailAlreadyProcessed(emailThreadId: string): Promise<boolean> {
