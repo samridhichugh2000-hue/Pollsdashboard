@@ -129,7 +129,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         from: process.env.PRIYA_EMAIL,
         to: email,
         subject: `Your response has been recorded – ${poll.topic}`,
-        htmlBody: buildAutoResponseHtml({ topic: poll.topic, answers: body.answers }),
+        htmlBody: buildAutoResponseHtml({ topic: poll.topic, answers: body.answers, isKGT: poll.request_type === 'KGT' }),
       })
     }
   } catch (emailErr) {

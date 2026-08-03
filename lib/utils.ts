@@ -355,6 +355,7 @@ export function buildResultsEmailHtml(topic: string, hasResponses = true): strin
 export function buildAutoResponseHtml(params: {
   topic: string
   answers: { question: string; answer: string }[]
+  isKGT?: boolean
 }): string {
   const answersHtml = params.answers
     .map((a, i) => `
@@ -375,7 +376,9 @@ export function buildAutoResponseHtml(params: {
   </div>
   <div style="background:#f9fafb;padding:22px 28px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none;">
     <p style="margin:0 0 18px;font-size:14px;line-height:1.6;">
-      Your response has been recorded. HR team will review and will work on it if found feasible.
+      ${params.isKGT
+        ? 'Thank you for showing your interest. Your interest for KGT has been recorded. Next steps will be shared with you soon.'
+        : 'Your response has been recorded. HR team will review and will work on it if found feasible.'}
     </p>
 
     <p style="margin:0 0 8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;">Your Response</p>
