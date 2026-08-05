@@ -60,12 +60,23 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   const blob = new Blob([bytes.buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
 
-  const filename = `poll-responses-${poll.topic.slice(0, 30).replace(/\s+/g, '-').toLowerCase()}.xlsx`
+  // Content-Disposition header values must be Latin-1/ASCII — topics with
+  // en-dashes, curly quotes, etc. (e.g. "Poll of Managers– Opportunity...")
+  // throw a runtime error if used as-is. Strip non-ASCII for the plain
+  // `filename` fallback, and carry the real name via RFC 5987 `filename*`.
+  const asciiSlug = poll.topic
+    .slice(0, 30)
+    .replace(/[^\x20-\x7E]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .toLowerCase() || 'poll'
+  const filename = `poll-responses-${asciiSlug}.xlsx`
+  const utf8Filename = `poll-responses-${poll.topic.slice(0, 30).replace(/\s+/g, '-').toLowerCase()}.xlsx`
 
   return new Response(blob, {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(utf8Filename)}`,
     },
   })
 }
