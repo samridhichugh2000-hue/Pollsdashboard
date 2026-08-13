@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ClipboardList, Clock, MessageSquare, TrendingUp, BarChart3, Zap,
-  CalendarClock, ChevronDown, ChevronUp, Loader2, ArrowRight
+  CalendarClock, ChevronDown, ChevronUp, Loader2, ArrowRight, Handshake
 } from 'lucide-react'
 
 import Link from 'next/link'
@@ -31,6 +31,7 @@ interface OverviewData {
     suggestionsPendingReview: number
     processImprovements: number
     rmsImprovements: number
+    totalKGTs: number
   }
   pollBreakdown: {
     notSentForApproval: number
@@ -77,7 +78,7 @@ interface FeedbackItem {
 }
 
 const defaultData: OverviewData = {
-  kpi: { totalPolls: 0, totalPending: 0, totalSuggestions: 0, suggestionsPendingReview: 0, processImprovements: 0, rmsImprovements: 0 },
+  kpi: { totalPolls: 0, totalPending: 0, totalSuggestions: 0, suggestionsPendingReview: 0, processImprovements: 0, rmsImprovements: 0, totalKGTs: 0 },
   pollBreakdown: { notSentForApproval: 0, approvalPending: 0, activePolls: 0, pollsClosed: 0, resultNotSentSir: 0, resultNotSentVoter: 0 },
   cadenceBreakdown: { total: 0, monthly: 0, quarterly: 0, biAnnual: 0, annual: 0, scheduledReleased: 0, overdue: 0 },
   suggestionBreakdown: { total: 0, actionable: 0, pendingForAction: 0, processImproved: 0, nonActionable: 0 },
@@ -237,6 +238,14 @@ export default function DashboardPage() {
       color: 'text-teal-600',
       iconBg: 'bg-teal-50',
       onClick: undefined,
+    },
+    {
+      label: 'Total KGTs',
+      value: data.kpi.totalKGTs,
+      icon: Handshake,
+      color: 'text-fuchsia-600',
+      iconBg: 'bg-fuchsia-50',
+      onClick: () => router.push('/kgt'),
     },
   ]
 

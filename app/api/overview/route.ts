@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   }
 
   const [pollsRes, regularPollsRes, feedbackRes, kpiRes, responsesRes] = await Promise.all([
-    db.execute({ sql: 'SELECT id, topic, status, source, requested_by, department, created_at, rms_task_id, results_uploaded_at, closed_at FROM polls WHERE status != ? ORDER BY created_at DESC', args: ['ARCHIVED'] }),
+    db.execute({ sql: 'SELECT id, topic, status, source, requested_by, department, created_at, rms_task_id, results_uploaded_at, closed_at, request_type FROM polls WHERE status != ? ORDER BY created_at DESC', args: ['ARCHIVED'] }),
     db.execute('SELECT id, frequency, is_active, next_run_date, last_run_date FROM regular_polls').catch(() => ({ rows: [] })),
     db.execute('SELECT id, type, status, category, rms_task_id, task_pending, followup_done, summary, submitted_by, department, poll_title FROM feedback_items ORDER BY created_at DESC').catch(() => ({ rows: [] })),
     db.execute("SELECT process_improvements, rms_improvements, policy_announced FROM kpi_data WHERE id = 'singleton'").catch(() => ({ rows: [] })),
@@ -40,10 +40,12 @@ export async function GET(req: NextRequest) {
     rms_task_id: string | null
     results_uploaded_at: string | null
     closed_at: string | null
+    request_type: string | null
   }>
 
   // Filter polls to the selected quarter (by creation date); responses follow their poll.
   const polls = allPolls.filter(p => inRange(p.created_at))
+  const totalKGTs = polls.filter(p => p.request_type === 'KGT').length
 
   const regularPolls = regularPollsRes.rows as unknown as Array<{
     id: string
@@ -182,6 +184,7 @@ export async function GET(req: NextRequest) {
       suggestionsPendingReview: pendingForAction,
       processImprovements: processImproved,
       rmsImprovements: Number(kpiRow?.rms_improvements ?? 0),
+      totalKGTs,
     },
     pollBreakdown: {
       notSentForApproval,

@@ -1,13 +1,81 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ExternalLink, Trash2, ArchiveRestore } from 'lucide-react'
+import { ExternalLink, Trash2, ArchiveRestore, Award, X, Loader2 } from 'lucide-react'
 import { StatusBadge } from './status-badge'
 import { Button } from '@/components/ui/button'
 import { formatDateTime, formatRelative, isApprovalOverdue, getErrorMessage } from '@/lib/utils'
 import { toast } from 'sonner'
-import type { Poll } from '@/types'
+import type { Poll, PollResponse } from '@/types'
+
+interface FinalisedEntry {
+  respondent?: string
+  email?: string
+  submitted_at: string
+  answers: { question: string; answer: string }[]
+}
+
+function FinalisedKiteModal({ poll, onClose }: { poll: Poll; onClose: () => void }) {
+  const [loading, setLoading] = useState(true)
+  const [candidates, setCandidates] = useState<FinalisedEntry[]>([])
+
+  useEffect(() => {
+    fetch(`/api/polls/${poll.id}`)
+      .then(r => r.ok ? r.json() : {})
+      .then((data: { response?: PollResponse | null }) => {
+        if (!data.response?.response_data) return
+        try {
+          const entries = JSON.parse(data.response.response_data) as (FinalisedEntry & { actionable?: boolean | null })[]
+          setCandidates(entries.filter(e => e.actionable === true))
+        } catch { /* leave empty */ }
+      })
+      .catch(() => toast.error('Failed to load finalised candidates'))
+      .finally(() => setLoading(false))
+  }, [poll.id])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 dark:border-slate-700 px-6 py-5">
+          <div>
+            <h2 className="flex items-center gap-2 font-bold text-gray-900 dark:text-slate-100 text-lg leading-tight">
+              <Award className="h-5 w-5 text-emerald-500" /> Finalised Kite
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">{poll.topic}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-6 py-5 space-y-3">
+          {loading ? (
+            <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>
+          ) : candidates.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-slate-500 py-6 text-center">No candidate has been marked Finalised for this KGT yet.</p>
+          ) : (
+            candidates.map((c, i) => (
+              <div key={i} className="rounded-xl border border-emerald-100 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-900/20 p-4">
+                <p className="font-semibold text-gray-900 dark:text-slate-100">{c.respondent ?? c.email ?? 'Anonymous'}</p>
+                {c.email && <p className="text-xs text-gray-400 dark:text-slate-500 mb-2">{c.email}</p>}
+                {c.answers.map((a, qi) => (
+                  <div key={qi} className="mt-2">
+                    <p className="text-[11px] font-semibold text-gray-400 dark:text-slate-500">Q{qi + 1}. {a.question}</p>
+                    <p className="text-sm text-gray-700 dark:text-slate-200 whitespace-pre-wrap">{a.answer || '—'}</p>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function isPastDeadline(poll: Poll): boolean {
+  return !!poll.deadline && new Date(poll.deadline).getTime() < Date.now()
+}
 
 interface PollsTableProps {
   polls: Poll[]
@@ -27,6 +95,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
   const [confirmReject, setConfirmReject] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [finalisedKitePoll, setFinalisedKitePoll] = useState<Poll | null>(null)
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [unarchiving, setUnarchiving] = useState(false)
@@ -200,12 +269,20 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                   )}
                 </td>
                 <td className="px-5 py-3.5">
-                  {poll.ms_form_link ? (
-                    <a href={poll.ms_form_link} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-cyan-600 hover:underline">
-                      Open <ExternalLink className="h-3 w-3" />
-                    </a>
-                  ) : <span className="text-gray-300 dark:text-slate-600">—</span>}
+                  <div className="flex flex-col gap-1">
+                    {poll.ms_form_link ? (
+                      <a href={poll.ms_form_link} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-cyan-600 hover:underline">
+                        Open <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : <span className="text-gray-300 dark:text-slate-600">—</span>}
+                    {poll.request_type === 'KGT' && isPastDeadline(poll) && (
+                      <button onClick={() => setFinalisedKitePoll(poll)}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-800 hover:underline">
+                        <Award className="h-3 w-3" /> Finalised Kite
+                      </button>
+                    )}
+                  </div>
                 </td>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-2">
@@ -304,6 +381,9 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
         </tbody>
       </table>
     </div>
+    {finalisedKitePoll && (
+      <FinalisedKiteModal poll={finalisedKitePoll} onClose={() => setFinalisedKitePoll(null)} />
+    )}
     </div>
   )
 }

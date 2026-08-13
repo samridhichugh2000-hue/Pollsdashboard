@@ -254,8 +254,8 @@ function ManageDialog({ poll, onClose }: { poll: Poll; onClose: () => void }) {
             <div className="grid grid-cols-4 gap-2">
               {[
                 { label: 'Total',          value: stats.total,         cls: 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-200' },
-                { label: 'Actionable',     value: stats.actionable,    cls: 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' },
-                { label: 'Not Actionable', value: stats.notActionable, cls: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' },
+                { label: poll.request_type === 'KGT' ? 'Finalised' : 'Actionable',     value: stats.actionable,    cls: 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' },
+                { label: poll.request_type === 'KGT' ? 'Not Finalised' : 'Not Actionable', value: stats.notActionable, cls: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' },
                 { label: 'Pending Review', value: stats.pending,       cls: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' },
               ].map(s => (
                 <div key={s.label} className={`rounded-xl px-3 py-2 text-center ${s.cls}`}>
@@ -315,8 +315,8 @@ function ManageDialog({ poll, onClose }: { poll: Poll; onClose: () => void }) {
                           </span>
                         </div>
                         <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                          {entry.actionable === true && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">Actionable</span>}
-                          {entry.actionable === false && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">Not Actionable</span>}
+                          {entry.actionable === true && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">{poll.request_type === 'KGT' ? 'Finalised' : 'Actionable'}</span>}
+                          {entry.actionable === false && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{poll.request_type === 'KGT' ? 'Not Finalised' : 'Not Actionable'}</span>}
                           {cls === 'rms' && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">RMS</span>}
                           {cls === 'non_rms' && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400">Non-RMS</span>}
                           {cls === 'partial' && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400">Partial</span>}
@@ -331,11 +331,11 @@ function ManageDialog({ poll, onClose }: { poll: Poll; onClose: () => void }) {
                         <div className="flex flex-wrap gap-1.5 flex-shrink-0 justify-end">
                           <button onClick={() => void handleActionable(i, entry.actionable === true ? null : true)} disabled={savingIndex !== null}
                             className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold border transition-colors ${entry.actionable === true ? 'bg-emerald-500 text-white border-emerald-500' : 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100'}`}>
-                            Actionable
+                            {poll.request_type === 'KGT' ? 'Finalised' : 'Actionable'}
                           </button>
                           <button onClick={() => void handleActionable(i, entry.actionable === false ? null : false)} disabled={savingIndex !== null}
                             className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold border transition-colors ${entry.actionable === false ? 'bg-slate-500 text-white border-slate-500' : 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100'}`}>
-                            Not Actionable
+                            {poll.request_type === 'KGT' ? 'Not Finalised' : 'Not Actionable'}
                           </button>
                           <button onClick={() => void handleStatus(i, 'wip')} disabled={savingIndex !== null}
                             className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold border transition-colors ${currentStatus(i) === 'wip' ? 'bg-amber-500 text-white border-amber-500' : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100'}`}>

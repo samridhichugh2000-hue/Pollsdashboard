@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Plus, RefreshCw, X } from 'lucide-react'
+import { Plus, RefreshCw, X, Award, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,56 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { PollsTable } from '@/components/polls/polls-table'
 import { KGTForm } from '@/components/polls/kgt-form'
 import { getErrorMessage } from '@/lib/utils'
-import type { Poll } from '@/types'
+import type { Poll, PollResponse } from '@/types'
+
+interface FinalisedCandidate {
+  pollId: string
+  pollTopic: string
+  respondent?: string
+  email?: string
+  answers: { question: string; answer: string }[]
+}
+
+function AllFinalisedModal({ candidates, loading, onClose }: { candidates: FinalisedCandidate[]; loading: boolean; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 dark:border-slate-700 px-6 py-5">
+          <div>
+            <h2 className="flex items-center gap-2 font-bold text-gray-900 dark:text-slate-100 text-lg leading-tight">
+              <Award className="h-5 w-5 text-emerald-500" /> Finalised Kites
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">Across all KGT opportunities</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-6 py-5 space-y-3">
+          {loading ? (
+            <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>
+          ) : candidates.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-slate-500 py-6 text-center">No candidates have been marked Finalised yet.</p>
+          ) : (
+            candidates.map((c, i) => (
+              <div key={i} className="rounded-xl border border-emerald-100 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-900/20 p-4">
+                <p className="font-semibold text-gray-900 dark:text-slate-100">{c.respondent ?? c.email ?? 'Anonymous'}</p>
+                {c.email && <p className="text-xs text-gray-400 dark:text-slate-500">{c.email}</p>}
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1">{c.pollTopic}</p>
+                {c.answers.map((a, qi) => (
+                  <div key={qi} className="mt-2">
+                    <p className="text-[11px] font-semibold text-gray-400 dark:text-slate-500">Q{qi + 1}. {a.question}</p>
+                    <p className="text-sm text-gray-700 dark:text-slate-200 whitespace-pre-wrap">{a.answer || '—'}</p>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 type CardKey = 'not-sent' | 'approval-pending' | 'active' | 'closed' | 'total'
 const VALID_CARD_KEYS: CardKey[] = ['not-sent', 'approval-pending', 'active', 'closed', 'total']
@@ -30,6 +79,9 @@ function KGTContent() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [activeCard, setActiveCard] = useState<CardKey | null>(null)
+  const [finalisedCandidates, setFinalisedCandidates] = useState<FinalisedCandidate[]>([])
+  const [finalisedLoading, setFinalisedLoading] = useState(false)
+  const [showFinalisedModal, setShowFinalisedModal] = useState(false)
 
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -61,6 +113,35 @@ function KGTContent() {
   }, [fetchRequests])
 
   useEffect(() => { void fetchRequests() }, [fetchRequests])
+
+  // Pulls every KGT's responses in parallel and keeps only entries marked
+  // Finalised — feeds both the "Finalised Kite" KPI card count and its popup.
+  useEffect(() => {
+    if (requests.length === 0) { setFinalisedCandidates([]); return }
+    let ignore = false
+    setFinalisedLoading(true)
+    Promise.all(
+      requests.filter(p => p.status !== 'ARCHIVED').map(p =>
+        fetch(`/api/polls/${p.id}`)
+          .then(r => r.ok ? r.json() : {})
+          .then((data: { response?: PollResponse | null }) => {
+            if (!data.response?.response_data) return [] as FinalisedCandidate[]
+            try {
+              const entries = JSON.parse(data.response.response_data) as Array<{
+                respondent?: string; email?: string; actionable?: boolean | null
+                answers: { question: string; answer: string }[]
+              }>
+              return entries
+                .filter(e => e.actionable === true)
+                .map(e => ({ pollId: p.id, pollTopic: p.topic, respondent: e.respondent, email: e.email, answers: e.answers }))
+            } catch { return [] as FinalisedCandidate[] }
+          })
+          .catch(() => [] as FinalisedCandidate[])
+      )
+    ).then(results => { if (!ignore) setFinalisedCandidates(results.flat()) })
+      .finally(() => { if (!ignore) setFinalisedLoading(false) })
+    return () => { ignore = true }
+  }, [requests])
 
   const handleMarkClosed = async (id: string) => {
     const res = await fetch(`/api/polls/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'MARK_CLOSED' }) })
@@ -158,7 +239,7 @@ function KGTContent() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {statCards.map(({ key, label, value, color, bg, border, ring }) => (
           <button
             key={key}
@@ -169,6 +250,15 @@ function KGTContent() {
             <p className={`text-xs font-medium mt-1 ${color} opacity-80`}>{label}</p>
           </button>
         ))}
+        <button
+          onClick={() => setShowFinalisedModal(true)}
+          className="rounded-2xl bg-emerald-50 dark:bg-[#1e2535] border border-emerald-200 dark:border-slate-700 px-4 py-4 text-center cursor-pointer transition-all hover:shadow-md hover:scale-[1.02]"
+        >
+          <p className="text-3xl font-bold text-emerald-700 flex items-center justify-center gap-1.5">
+            {finalisedLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : finalisedCandidates.length}
+          </p>
+          <p className="text-xs font-medium mt-1 text-emerald-700 opacity-80">Finalised Kite</p>
+        </button>
       </div>
 
       {/* Table */}
@@ -211,6 +301,14 @@ function KGTContent() {
           </Tabs>
         )}
       </div>
+
+      {showFinalisedModal && (
+        <AllFinalisedModal
+          candidates={finalisedCandidates}
+          loading={finalisedLoading}
+          onClose={() => setShowFinalisedModal(false)}
+        />
+      )}
     </div>
   )
 }

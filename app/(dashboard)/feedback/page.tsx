@@ -42,12 +42,62 @@ function parseEntries(response: PollResponse | null): Entry[] {
   try { return JSON.parse(response.response_data) as Entry[] } catch { return [] }
 }
 
+interface PopupEntry extends Entry {
+  pollId: string
+  pollTopic: string
+  pollCreatedAt: string
+}
+
+const POPUP_TITLES: Record<'nonActionable' | 'rms' | 'nonRms', string> = {
+  nonActionable: 'Non-Actionable Suggestions',
+  rms: 'RMS Improvement Suggestions',
+  nonRms: 'Non-RMS Improvement Suggestions',
+}
+
+function CrossPollEntriesModal({ title, entries, onClose }: { title: string; entries: PopupEntry[]; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 dark:border-slate-700 px-6 py-5">
+          <div>
+            <h2 className="font-bold text-gray-900 dark:text-slate-100 text-lg leading-tight">{title}</h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">{entries.length} response{entries.length === 1 ? '' : 's'}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-6 py-5 space-y-3">
+          {entries.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-slate-500 py-6 text-center">No matching responses.</p>
+          ) : (
+            entries.map((e, i) => (
+              <div key={i} className="rounded-xl border border-gray-100 dark:border-slate-700 p-4">
+                <p className="font-semibold text-gray-900 dark:text-slate-100">{e.respondent ?? e.email ?? 'Anonymous'}</p>
+                {e.email && <p className="text-xs text-gray-400 dark:text-slate-500">{e.email}</p>}
+                <p className="text-xs text-purple-600 dark:text-purple-400 font-medium mt-1">{e.pollTopic}</p>
+                {e.answers.map((a, qi) => (
+                  <div key={qi} className="mt-2">
+                    <p className="text-[11px] font-semibold text-gray-400 dark:text-slate-500">Q{qi + 1}. {a.question}</p>
+                    <p className="text-sm text-gray-700 dark:text-slate-200 whitespace-pre-wrap">{a.answer || '—'}</p>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const SENT_STATUSES = ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED', 'CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED']
 
-function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
+function EntryRow({ pollId, entryIndex, entry, isKGT, onUpdated }: {
   pollId: string
   entryIndex: number
   entry: Entry
+  isKGT?: boolean
   onUpdated: (idx: number, patch: Partial<Entry>) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -120,9 +170,9 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
           {entry.status === 'completed'
             ? <span className="text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">Completed</span>
             : entry.actionable === true
-            ? <span className="text-[10px] font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 rounded-full">Actionable</span>
+            ? <span className="text-[10px] font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 rounded-full">{isKGT ? 'Finalised' : 'Actionable'}</span>
             : entry.actionable === false
-            ? <span className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded-full">Non-Act.</span>
+            ? <span className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded-full">{isKGT ? 'Not Finalised' : 'Non-Act.'}</span>
             : <span className="text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full">Pending</span>
           }
           {entry.reply_sent_at && <span className="text-[10px] font-semibold bg-teal-100 dark:bg-teal-900/40 text-teal-600 dark:text-teal-400 px-1.5 py-0.5 rounded-full">Replied</span>}
@@ -157,13 +207,13 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
             {entry.actionable !== true && (
               <button disabled={saving} onClick={() => void update({ actionable: true })}
                 className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 disabled:opacity-50 transition-colors">
-                Mark Actionable
+                {isKGT ? 'Mark Finalised' : 'Mark Actionable'}
               </button>
             )}
             {entry.actionable !== false && (
               <button disabled={saving} onClick={() => void update({ actionable: false })}
                 className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-colors">
-                Non-Actionable
+                {isKGT ? 'Not Finalised' : 'Non-Actionable'}
               </button>
             )}
             {entry.actionable != null && (
@@ -214,6 +264,8 @@ function FeedbackPageInner() {
   const [panelOpen, setPanelOpen] = useState(true)
   const [activeCard, setActiveCard] = useState<CardKey | null>((searchParams.get('card') as CardKey) ?? null)
   const [search, setSearch] = useState('')
+  const [crossPollEntries, setCrossPollEntries] = useState<{ nonActionable: PopupEntry[]; rms: PopupEntry[]; nonRms: PopupEntry[] }>({ nonActionable: [], rms: [], nonRms: [] })
+  const [openPopup, setOpenPopup] = useState<'nonActionable' | 'rms' | 'nonRms' | null>(null)
 
   const fetchPolls = useCallback(async () => {
     setLoadingPolls(true)
@@ -229,6 +281,7 @@ function FeedbackPageInner() {
             .then(r => r.ok ? r.json() : {})
             .then((d: { response?: PollResponse | null }) => {
               const es = parseEntries(d.response ?? null)
+              const tag = (e: Entry): PopupEntry => ({ ...e, pollId: p.id, pollTopic: p.topic, pollCreatedAt: p.created_at })
               return {
                 id: p.id,
                 total: es.length,
@@ -238,15 +291,23 @@ function FeedbackPageInner() {
                 nonActionable: es.filter(e => e.actionable === false).length,
                 rms: es.filter(e => e.classification === 'rms').length,
                 nonRms: es.filter(e => e.classification === 'non_rms').length,
+                nonActionableEntries: es.filter(e => e.actionable === false).map(tag),
+                rmsEntries: es.filter(e => e.classification === 'rms').map(tag),
+                nonRmsEntries: es.filter(e => e.classification === 'non_rms').map(tag),
               }
             })
-            .catch(() => ({ id: p.id, total: 0, pending: 0, actionable: 0, completed: 0, nonActionable: 0, rms: 0, nonRms: 0 }))
+            .catch(() => ({ id: p.id, total: 0, pending: 0, actionable: 0, completed: 0, nonActionable: 0, rms: 0, nonRms: 0, nonActionableEntries: [] as PopupEntry[], rmsEntries: [] as PopupEntry[], nonRmsEntries: [] as PopupEntry[] }))
         )
       )
       setPolls(prev => prev.map(p => {
         const c = counts.find(x => x.id === p.id)
         return c ? { ...p, totalCount: c.total, pendingCount: c.pending, actionableCount: c.actionable, completedCount: c.completed, nonActionableCount: c.nonActionable, rmsCount: c.rms, nonRmsCount: c.nonRms } : p
       }))
+      setCrossPollEntries({
+        nonActionable: counts.flatMap(c => c.nonActionableEntries),
+        rms: counts.flatMap(c => c.rmsEntries),
+        nonRms: counts.flatMap(c => c.nonRmsEntries),
+      })
     } catch { /**/ }
     finally { setLoadingPolls(false) }
   }, [])
@@ -339,27 +400,40 @@ function FeedbackPageInner() {
 
   const totalPolls = visiblePolls.length
   const sum = (key: keyof PollWithEntries) => visiblePolls.reduce((acc, p) => acc + ((p[key] as number | null) ?? 0), 0)
-  const globalCards = [
+  const visibleIds = new Set(visiblePolls.map(p => p.id))
+  const popupEntriesFor = (key: 'nonActionable' | 'rms' | 'nonRms') => crossPollEntries[key].filter(e => visibleIds.has(e.pollId))
+  const globalCards: { label: string; sub: string | null; value: number; color: string; bg: string; border: string; popupKey?: 'nonActionable' | 'rms' | 'nonRms' }[] = [
     { label: 'Total Suggestions', sub: `out of ${totalPolls} polls`, value: sum('totalCount'), color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-800' },
     { label: 'Pending for Action', sub: null, value: sum('pendingCount'), color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800' },
     { label: 'Suggestions Actioned', sub: null, value: sum('completedCount'), color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-800' },
-    { label: 'Non-Actionable', sub: null, value: sum('nonActionableCount'), color: 'text-slate-600 dark:text-slate-300', bg: 'bg-slate-50 dark:bg-slate-800/40', border: 'border-slate-200 dark:border-slate-700' },
-    { label: 'RMS Improvement', sub: null, value: sum('rmsCount'), color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-800' },
-    { label: 'Non-RMS Improvement', sub: null, value: sum('nonRmsCount'), color: 'text-teal-700 dark:text-teal-300', bg: 'bg-teal-50 dark:bg-teal-950/40', border: 'border-teal-200 dark:border-teal-800' },
+    { label: 'Non-Actionable', sub: null, value: sum('nonActionableCount'), color: 'text-slate-600 dark:text-slate-300', bg: 'bg-slate-50 dark:bg-slate-800/40', border: 'border-slate-200 dark:border-slate-700', popupKey: 'nonActionable' },
+    { label: 'RMS Improvement', sub: null, value: sum('rmsCount'), color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-800', popupKey: 'rms' },
+    { label: 'Non-RMS Improvement', sub: null, value: sum('nonRmsCount'), color: 'text-teal-700 dark:text-teal-300', bg: 'bg-teal-50 dark:bg-teal-950/40', border: 'border-teal-200 dark:border-teal-800', popupKey: 'nonRms' },
   ]
 
   return (
     <div className="flex flex-col h-full gap-4 overflow-hidden">
       {/* Global stat cards */}
       <div className="grid grid-cols-6 gap-3 flex-shrink-0">
-        {globalCards.map(({ label, sub, value, color, bg, border }) => (
-          <div key={label} className={`rounded-xl ${bg} border ${border} px-3 py-3 text-center`}>
+        {globalCards.map(({ label, sub, value, color, bg, border, popupKey }) => (
+          <div key={label}
+            onClick={popupKey ? () => setOpenPopup(popupKey) : undefined}
+            className={`rounded-xl ${bg} border ${border} px-3 py-3 text-center ${popupKey ? 'cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-current transition-shadow' : ''}`}
+          >
             <p className={`text-2xl font-bold ${color}`}>{value}</p>
             <p className={`text-[11px] font-medium mt-0.5 ${color} opacity-90 leading-tight`}>{label}</p>
             {sub && <p className={`text-[10px] mt-0.5 ${color} opacity-50 leading-tight`}>{sub}</p>}
           </div>
         ))}
       </div>
+
+      {openPopup && (
+        <CrossPollEntriesModal
+          title={POPUP_TITLES[openPopup]}
+          entries={popupEntriesFor(openPopup)}
+          onClose={() => setOpenPopup(null)}
+        />
+      )}
 
       <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
       {/* Left: Poll list */}
@@ -499,6 +573,7 @@ function FeedbackPageInner() {
                     pollId={activePoll.id}
                     entryIndex={idx}
                     entry={entry}
+                    isKGT={activePoll.request_type === 'KGT'}
                     onUpdated={(i, patch) => patchEntry(activePoll.id, i, patch)}
                   />
                 ) : null)
