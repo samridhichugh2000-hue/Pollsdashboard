@@ -142,6 +142,16 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
             ))}
           </div>
 
+          {/* Our reply, if one was sent — kept visible so it's obvious which responses were actually actioned with a reply, not just marked */}
+          {entry.reply_message && (
+            <div className="rounded-xl border border-teal-100 dark:border-teal-800/60 bg-teal-50/60 dark:bg-teal-900/20 px-3 py-2.5">
+              <p className="text-[10px] font-semibold text-teal-500 dark:text-teal-400 mb-1 flex items-center gap-1">
+                <Send className="h-3 w-3" /> Our Reply{entry.reply_sent_at ? ` · ${formatRelative(entry.reply_sent_at)}` : ''}
+              </p>
+              <p className="text-xs text-teal-800 dark:text-teal-200 whitespace-pre-wrap">{entry.reply_message}</p>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex flex-wrap items-center gap-1.5">
             {entry.actionable !== true && (
