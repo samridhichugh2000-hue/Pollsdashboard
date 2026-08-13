@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
   }).length
 
   // Suggestion breakdown — parse all response_data entries (same source as feedback page)
-  interface ResponseEntry { actionable?: boolean | null; status?: string | null; reply_sent_at?: string | null }
+  interface ResponseEntry { actionable?: boolean | null; status?: string | null; reply_sent_at?: string | null; classification?: string | null }
   const allEntries: ResponseEntry[] = []
   for (const row of responseRows) {
     try { (JSON.parse(row.response_data ?? '[]') as ResponseEntry[]).forEach(e => allEntries.push(e)) } catch { /* skip */ }
@@ -127,7 +127,13 @@ export async function GET(req: NextRequest) {
   const totalResponses = totalSuggestionsReceived
   const actionable = allEntries.filter(e => e.actionable === true).length
   const pendingForAction = allEntries.filter(e => e.actionable == null && e.status !== 'completed').length
-  const processImproved = allEntries.filter(e => e.status === 'process-improved').length
+  // "Process Improvement" = responses classified Non-RMS (per user: Non-RMS
+  // Improvement and Process Improvement are the same thing); "RMS
+  // Improvement" = responses classified RMS. Both now read the real
+  // classification field instead of the disconnected status flag / manual
+  // kpi_data counter, so these stay in sync with the Poll Responses page.
+  const processImproved = allEntries.filter(e => e.classification === 'non_rms').length
+  const rmsClassified = allEntries.filter(e => e.classification === 'rms').length
   const nonActionable = allEntries.filter(e => e.actionable === false).length
   const resultNotSentVoter = allEntries.filter(e => !e.reply_sent_at).length
 
@@ -183,7 +189,7 @@ export async function GET(req: NextRequest) {
       totalSuggestions: totalResponses,
       suggestionsPendingReview: pendingForAction,
       processImprovements: processImproved,
-      rmsImprovements: Number(kpiRow?.rms_improvements ?? 0),
+      rmsImprovements: rmsClassified,
       totalKGTs,
     },
     pollBreakdown: {
