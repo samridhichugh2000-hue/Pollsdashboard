@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
   const totalSuggestions = allEntries.length
   const totalResponses = totalSuggestionsReceived
   const actionable = allEntries.filter(e => e.actionable === true).length
-  const pendingForAction = allEntries.filter(e => e.actionable == null).length
+  const pendingForAction = allEntries.filter(e => e.actionable == null && e.status !== 'completed').length
   const processImproved = allEntries.filter(e => e.status === 'process-improved').length
   const nonActionable = allEntries.filter(e => e.actionable === false).length
   const resultNotSentVoter = allEntries.filter(e => !e.reply_sent_at).length
@@ -135,7 +135,7 @@ export async function GET(req: NextRequest) {
   for (const row of responseRows) {
     let entries: ResponseEntry[] = []
     try { entries = JSON.parse(row.response_data ?? '[]') as ResponseEntry[] } catch { continue }
-    const pendingCount = entries.filter(e => e.actionable == null).length
+    const pendingCount = entries.filter(e => e.actionable == null && e.status !== 'completed').length
     if (pendingCount === 0) continue
     const poll_id = row.poll_id
     const poll_title = pollMap2.get(poll_id) ?? null

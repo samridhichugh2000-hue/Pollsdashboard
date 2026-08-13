@@ -117,7 +117,9 @@ function EntryRow({ pollId, entryIndex, entry, onUpdated }: {
         <div className="flex items-center gap-2 flex-shrink-0">
           <span className="text-[10px] text-slate-400">{formatRelative(entry.submitted_at)}</span>
           <span className="text-[10px] text-slate-400">{entry.answers.length}q</span>
-          {entry.actionable === true
+          {entry.status === 'completed'
+            ? <span className="text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">Completed</span>
+            : entry.actionable === true
             ? <span className="text-[10px] font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 rounded-full">Actionable</span>
             : entry.actionable === false
             ? <span className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded-full">Non-Act.</span>
@@ -220,7 +222,7 @@ function FeedbackPageInner() {
               return {
                 id: p.id,
                 total: es.length,
-                pending: es.filter(e => e.actionable == null).length,
+                pending: es.filter(e => e.actionable == null && e.status !== 'completed').length,
                 actionable: es.filter(e => e.actionable === true).length,
                 completed: es.filter(e => e.status === 'completed').length,
                 nonActionable: es.filter(e => e.actionable === false).length,
@@ -246,7 +248,7 @@ function FeedbackPageInner() {
     try {
       const data = await fetch(`/api/polls/${pollId}`).then(r => r.ok ? r.json() : {}) as { response: PollResponse | null }
       const entries = parseEntries(data.response)
-      setPolls(prev => prev.map(p => p.id === pollId ? { ...p, entries, loading: false, totalCount: entries.length, pendingCount: entries.filter(e => e.actionable == null).length, actionableCount: entries.filter(e => e.actionable === true).length, completedCount: entries.filter(e => e.status === 'completed').length, nonActionableCount: entries.filter(e => e.actionable === false).length, rmsCount: entries.filter(e => e.classification === 'rms').length, nonRmsCount: entries.filter(e => e.classification === 'non_rms').length } : p))
+      setPolls(prev => prev.map(p => p.id === pollId ? { ...p, entries, loading: false, totalCount: entries.length, pendingCount: entries.filter(e => e.actionable == null && e.status !== 'completed').length, actionableCount: entries.filter(e => e.actionable === true).length, completedCount: entries.filter(e => e.status === 'completed').length, nonActionableCount: entries.filter(e => e.actionable === false).length, rmsCount: entries.filter(e => e.classification === 'rms').length, nonRmsCount: entries.filter(e => e.classification === 'non_rms').length } : p))
     } catch {
       setPolls(prev => prev.map(p => p.id === pollId ? { ...p, entries: [], loading: false } : p))
     }
@@ -275,7 +277,7 @@ function FeedbackPageInner() {
         ...p,
         entries: updated,
         totalCount: updated.length,
-        pendingCount: updated.filter(e => e.actionable == null).length,
+        pendingCount: updated.filter(e => e.actionable == null && e.status !== 'completed').length,
         actionableCount: updated.filter(e => e.actionable === true).length,
         completedCount: updated.filter(e => e.status === 'completed').length,
         nonActionableCount: updated.filter(e => e.actionable === false).length,
@@ -297,7 +299,7 @@ function FeedbackPageInner() {
   const counts: Record<CardKey, number> = {
     total:              entries.length,
     actionable:         entries.filter(e => e.actionable === true).length,
-    pending:            entries.filter(e => e.actionable == null).length,
+    pending:            entries.filter(e => e.actionable == null && e.status !== 'completed').length,
     'process-improved': entries.filter(e => e.status === 'process-improved').length,
     'non-actionable':   entries.filter(e => e.actionable === false).length,
     closed:             entries.filter(e => e.status === 'completed').length,
@@ -316,7 +318,7 @@ function FeedbackPageInner() {
     const matchesCard = !activeCard
       || (activeCard === 'total')
       || (activeCard === 'actionable' && e.actionable === true)
-      || (activeCard === 'pending' && e.actionable == null)
+      || (activeCard === 'pending' && e.actionable == null && e.status !== 'completed')
       || (activeCard === 'process-improved' && e.status === 'process-improved')
       || (activeCard === 'non-actionable' && e.actionable === false)
       || (activeCard === 'closed' && e.status === 'completed')

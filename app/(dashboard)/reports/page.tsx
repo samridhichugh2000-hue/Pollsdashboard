@@ -228,7 +228,7 @@ function ManageDialog({ poll, onClose }: { poll: Poll; onClose: () => void }) {
     total: entries.length,
     actionable: entries.filter(e => e.actionable === true).length,
     notActionable: entries.filter(e => e.actionable === false).length,
-    pending: entries.filter(e => e.actionable == null).length,
+    pending: entries.filter(e => e.actionable == null && e.status !== 'completed').length,
     rms: entries.filter(e => e.classification === 'rms').length,
     nonRms: entries.filter(e => e.classification === 'non_rms').length,
     partial: entries.filter(e => e.classification === 'partial').length,

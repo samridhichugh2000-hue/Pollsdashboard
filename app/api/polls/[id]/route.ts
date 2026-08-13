@@ -14,6 +14,7 @@ import {
   replacePollAttachments,
   getPollAttachments,
   getPollAttachmentsMeta,
+  closeOutUntouchedEntries,
 } from '@/lib/db/queries'
 import type { PollAttachment } from '@/lib/db/queries'
 import { sendEmail, sendEmailGetId, replyToMessageWithHtml } from '@/lib/graph'
@@ -287,6 +288,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await updatePollStatus(id, 'CLOSED', { closed_at: new Date().toISOString() })
         await createAuditLog(id, 'POLL_CLOSED', userEmail)
         await sendNoActionTakenEmails(id, poll.topic)
+        await closeOutUntouchedEntries(id)
         break
       }
 
@@ -295,6 +297,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await updatePollStatus(id, 'CLOSED', { closed_at: closedAt.toISOString() })
         await createAuditLog(id, 'POLL_CLOSED', userEmail, { notified: true })
         await sendNoActionTakenEmails(id, poll.topic)
+        await closeOutUntouchedEntries(id)
 
         // Extract requester name + email from "Name <email>" or bare "email"
         const nameEmailMatch = poll.requested_by?.match(/^(.+?)\s*<([^>]+)>$/)

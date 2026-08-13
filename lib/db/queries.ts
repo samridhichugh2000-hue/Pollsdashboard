@@ -293,6 +293,36 @@ export async function getPollResponse(pollId: string): Promise<PollResponse | nu
   return (result.rows[0] as unknown as PollResponse) ?? null
 }
 
+// Runs when a poll closes (manual or auto) — any response entry nobody ever
+// triaged (actionable still null AND no status set) is marked 'completed' so
+// it drops out of "Pending for Action" once the poll stops collecting input.
+// Entries with an explicit status already (wip/process-improved) or an
+// explicit actionable decision are left untouched — this only resolves
+// entries nobody looked at, it never overwrites a real human decision.
+export async function closeOutUntouchedEntries(pollId: string): Promise<number> {
+  const pollResponse = await getPollResponse(pollId)
+  if (!pollResponse?.response_data) return 0
+
+  let entries: Array<{ actionable?: boolean | null; status?: string | null; [key: string]: unknown }>
+  try {
+    entries = JSON.parse(pollResponse.response_data)
+  } catch {
+    return 0
+  }
+
+  let changed = 0
+  const updated = entries.map((e) => {
+    if (e.actionable == null && !e.status) {
+      changed++
+      return { ...e, status: 'completed' }
+    }
+    return e
+  })
+
+  if (changed > 0) await upsertPollResponse(pollId, JSON.stringify(updated))
+  return changed
+}
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 export async function getUserByEmail(email: string): Promise<User | null> {

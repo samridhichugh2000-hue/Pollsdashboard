@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse } from '@/lib/db/queries'
+import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse, closeOutUntouchedEntries } from '@/lib/db/queries'
 import { sendEmail, getFormResponses } from '@/lib/graph'
 import { buildResultsEmailHtml, toISTDateStr, istMinutesOfDay } from '@/lib/utils'
 import * as XLSX from 'xlsx'
@@ -90,6 +90,7 @@ export async function GET(req: Request) {
         closed_at: new Date().toISOString(),
       })
       await createAuditLog(poll.id, 'AUTO_CLOSED', 'cron')
+      await closeOutUntouchedEntries(poll.id)
 
       // Send results to EA
       const htmlBody = buildResultsEmailHtml(poll.topic, attachments.length > 0)
