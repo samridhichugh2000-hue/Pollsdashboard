@@ -269,27 +269,25 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                   )}
                 </td>
                 <td className="px-5 py-3.5">
-                  <div className="flex flex-col gap-1">
-                    {poll.ms_form_link ? (
-                      <a href={poll.ms_form_link} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-cyan-600 hover:underline">
-                        Open <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : <span className="text-gray-300 dark:text-slate-600">—</span>}
+                  {poll.ms_form_link ? (
+                    <a href={poll.ms_form_link} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-cyan-600 hover:underline">
+                      Open <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : <span className="text-gray-300 dark:text-slate-600">—</span>}
+                </td>
+                <td className="px-5 py-3.5">
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    <Link href={`${linkBase}/${poll.id}`}
+                      className="text-xs font-medium text-cyan-600 hover:text-cyan-800 hover:underline">
+                      View
+                    </Link>
                     {poll.request_type === 'KGT' && isPastDeadline(poll) && (
                       <button onClick={() => setFinalisedKitePoll(poll)}
                         className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-800 hover:underline">
                         <Award className="h-3 w-3" /> Finalised Kite
                       </button>
                     )}
-                  </div>
-                </td>
-                <td className="px-5 py-3.5">
-                  <div className="flex items-center gap-2">
-                    <Link href={`${linkBase}/${poll.id}`}
-                      className="text-xs font-medium text-cyan-600 hover:text-cyan-800 hover:underline">
-                      View
-                    </Link>
                     {(onReject || onRejectExternal) && poll.source === 'external' && !['REJECTED', 'ARCHIVED', 'CLOSED', 'RESULTS_UPLOADED'].includes(poll.status) && (
                       confirmReject === poll.id ? (
                         <div className="flex flex-col gap-1.5" style={{ minWidth: 200 }}>
