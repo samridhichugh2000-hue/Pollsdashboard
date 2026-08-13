@@ -159,11 +159,18 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     ? options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
     : [{ emailAddress: { address: extractEmail(options.to) } }]
 
-  // Approval requests, results and reminders are sent from Priya's address — no from override.
+  // Graph only grants this app direct mailbox access via Priya's account —
+  // calling /users/{mailbox}/sendMail for polls@ (or any other address)
+  // 404s with ErrorInvalidUser. So the API call always goes through Priya's
+  // mailbox; a different visible sender (e.g. polls@) is achieved the same
+  // way sendEmailGetId/replyToMessageWithHtml already do it — via Exchange
+  // Send-As, by setting the message's own `from` field.
+  const actingMailbox = process.env.PRIYA_EMAIL!
   const message: Record<string, unknown> = {
     subject: options.subject,
     body: { contentType: 'HTML', content: options.htmlBody },
     toRecipients,
+    ...(options.from && options.from !== actingMailbox && { from: { emailAddress: { address: options.from } } }),
   }
 
   if (options.cc) {
@@ -185,7 +192,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     }))
   }
 
-  await graphRequest(`/users/${options.from}/sendMail`, {
+  await graphRequest(`/users/${actingMailbox}/sendMail`, {
     method: 'POST',
     body: JSON.stringify({ message, saveToSentItems: true }),
   })

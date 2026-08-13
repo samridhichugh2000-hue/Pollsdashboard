@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     }
 
     await sendEmail({
-      from: process.env.PRIYA_EMAIL!,
+      from: process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com',
       to: recipients,
       subject: `Top 5 Employees by Poll Participation - ${monthName}`,
       htmlBody: buildTopVotersReportHtml({ monthLabel: monthName, topVoters }),

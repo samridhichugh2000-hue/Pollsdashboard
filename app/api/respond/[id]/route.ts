@@ -126,7 +126,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     if (process.env.PRIYA_EMAIL) {
       await sendEmail({
-        from: process.env.PRIYA_EMAIL,
+        from: process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com',
         to: email,
         subject: `Your response has been recorded – ${poll.topic}`,
         htmlBody: buildAutoResponseHtml({ topic: poll.topic, answers: body.answers, isKGT: poll.request_type === 'KGT' }),

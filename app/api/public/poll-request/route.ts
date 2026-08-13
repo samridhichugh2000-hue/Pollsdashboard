@@ -191,13 +191,10 @@ export async function POST(req: NextRequest) {
   </div>
 </div>
 `
-        const ccList = [
-          process.env.PRIYA_EMAIL,
-          process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com',
-        ].filter(Boolean) as string[]
+        const ccList = [process.env.PRIYA_EMAIL].filter(Boolean) as string[]
 
         await sendEmail({
-          from: process.env.PRIYA_EMAIL,
+          from: process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com',
           to: requester_email,
           cc: ccList,
           subject: `Poll Request Received: ${topic}`,
