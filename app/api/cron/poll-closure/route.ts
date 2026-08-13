@@ -5,7 +5,7 @@ import { buildResultsEmailHtml, toISTDateStr, istMinutesOfDay } from '@/lib/util
 import * as XLSX from 'xlsx'
 
 const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000
-const CLOSE_GATE_IST_MINUTES = 23 * 60 + 50 // 11:50 PM IST
+const CLOSE_GATE_IST_MINUTES = 23 * 60 + 58 // 11:58 PM IST
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
@@ -15,9 +15,13 @@ export async function GET(req: Request) {
 
   const now = new Date()
 
-  // Hard gate: never close polls before 11:50 PM IST regardless of when the cron fires.
-  if (istMinutesOfDay(now) < CLOSE_GATE_IST_MINUTES) {
-    return NextResponse.json({ closed: 0, message: 'Too early — polls only close after 11:50 PM IST' })
+  // ?force=1 bypasses the time gate — for on-demand admin runs (e.g. clearing
+  // a backlog after the scheduled cron missed a run) without waiting for 11:58 PM IST.
+  const forced = new URL(req.url).searchParams.get('force') === '1'
+
+  // Hard gate: never close polls before 11:58 PM IST regardless of when the cron fires.
+  if (!forced && istMinutesOfDay(now) < CLOSE_GATE_IST_MINUTES) {
+    return NextResponse.json({ closed: 0, message: 'Too early — polls only close after 11:58 PM IST' })
   }
 
   const activePolls = await getPollsByStatus(['SENT', 'REMINDER_SENT'] as Parameters<typeof getPollsByStatus>[0])
