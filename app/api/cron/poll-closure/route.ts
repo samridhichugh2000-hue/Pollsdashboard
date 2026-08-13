@@ -14,13 +14,15 @@ export async function GET(req: Request) {
   }
 
   const now = new Date()
+  const gateSatisfied = istMinutesOfDay(now) >= CLOSE_GATE_IST_MINUTES
 
-  // ?force=1 bypasses the time gate — for on-demand admin runs (e.g. clearing
-  // a backlog after the scheduled cron missed a run) without waiting for 11:58 PM IST.
+  // ?force=1 lets an admin clear a genuine backlog (polls overdue from a PAST
+  // day) without waiting for the nightly window — it must NEVER cut off a
+  // poll whose deadline is today before 11:58 PM actually arrives, so it only
+  // bypasses the early-return below, not the per-poll "is today's gate open" check.
   const forced = new URL(req.url).searchParams.get('force') === '1'
 
-  // Hard gate: never close polls before 11:58 PM IST regardless of when the cron fires.
-  if (!forced && istMinutesOfDay(now) < CLOSE_GATE_IST_MINUTES) {
+  if (!forced && !gateSatisfied) {
     return NextResponse.json({ closed: 0, message: 'Too early — polls only close after 11:58 PM IST' })
   }
 
@@ -30,7 +32,12 @@ export async function GET(req: Request) {
 
   for (const poll of activePolls) {
     if (poll.deadline) {
-      if (toISTDateStr(new Date(poll.deadline)) > todayISTDate) continue
+      const deadlineISTDate = toISTDateStr(new Date(poll.deadline))
+      if (deadlineISTDate > todayISTDate) continue // deadline hasn't arrived yet
+      // Deadline is today — only close once 11:58 PM IST has actually passed,
+      // even on a forced/manual run. A poll from a strictly earlier day is a
+      // genuine backlog and can close immediately.
+      if (deadlineISTDate === todayISTDate && !gateSatisfied) continue
     } else {
       if (!poll.sent_at || Date.now() - new Date(poll.sent_at).getTime() < FORTY_EIGHT_HOURS) continue
     }
