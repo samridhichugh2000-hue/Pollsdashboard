@@ -118,10 +118,27 @@ export async function GET(req: NextRequest) {
   }).length
 
   // Suggestion breakdown — parse all response_data entries (same source as feedback page)
-  interface ResponseEntry { actionable?: boolean | null; status?: string | null; reply_sent_at?: string | null; classification?: string | null }
+  interface ResponseEntry {
+    actionable?: boolean | null
+    status?: string | null
+    reply_sent_at?: string | null
+    classification?: string | null
+    respondent?: string
+    email?: string
+    answers?: { question: string; answer: string }[]
+  }
+  const pollTopicById = new Map(polls.map(p => [p.id, p.topic]))
   const allEntries: ResponseEntry[] = []
+  const taggedEntries: (ResponseEntry & { pollTopic: string })[] = []
   for (const row of responseRows) {
-    try { (JSON.parse(row.response_data ?? '[]') as ResponseEntry[]).forEach(e => allEntries.push(e)) } catch { /* skip */ }
+    try {
+      const entries = JSON.parse(row.response_data ?? '[]') as ResponseEntry[]
+      const topic = pollTopicById.get(row.poll_id) ?? 'Unknown poll'
+      for (const e of entries) {
+        allEntries.push(e)
+        taggedEntries.push({ ...e, pollTopic: topic })
+      }
+    } catch { /* skip */ }
   }
   const totalSuggestions = allEntries.length
   const totalResponses = totalSuggestionsReceived
@@ -136,6 +153,9 @@ export async function GET(req: NextRequest) {
   const rmsClassified = allEntries.filter(e => e.classification === 'rms').length
   const nonActionable = allEntries.filter(e => e.actionable === false).length
   const resultNotSentVoter = allEntries.filter(e => !e.reply_sent_at).length
+
+  const rmsEntries = taggedEntries.filter(e => e.classification === 'rms')
+  const nonRmsEntries = taggedEntries.filter(e => e.classification === 'non_rms')
 
   // Polls with pending feedback — responses where actionable is null (not yet reviewed), grouped by poll
   const pollMap2 = new Map(polls.map(p => [p.id, p.topic]))
@@ -223,5 +243,7 @@ export async function GET(req: NextRequest) {
       annexurePending,
     },
     pendingPolls,
+    rmsEntries: rmsEntries.map(e => ({ pollTopic: e.pollTopic, respondent: e.respondent, email: e.email, answers: e.answers ?? [] })),
+    nonRmsEntries: nonRmsEntries.map(e => ({ pollTopic: e.pollTopic, respondent: e.respondent, email: e.email, answers: e.answers ?? [] })),
   })
 }

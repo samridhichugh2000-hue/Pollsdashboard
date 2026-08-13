@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ClipboardList, Clock, MessageSquare, TrendingUp, BarChart3, Zap,
-  CalendarClock, ChevronDown, ChevronUp, Loader2, ArrowRight, Handshake
+  CalendarClock, ChevronDown, ChevronUp, Loader2, ArrowRight, Handshake, X
 } from 'lucide-react'
 
 import Link from 'next/link'
@@ -64,6 +64,15 @@ interface OverviewData {
     annexurePending: FeedbackItem[]
   }
   pendingPolls: PendingPoll[]
+  rmsEntries: ClassifiedEntry[]
+  nonRmsEntries: ClassifiedEntry[]
+}
+
+interface ClassifiedEntry {
+  pollTopic: string
+  respondent?: string
+  email?: string
+  answers: { question: string; answer: string }[]
 }
 
 interface FeedbackItem {
@@ -85,6 +94,45 @@ const defaultData: OverviewData = {
   pollsWithFeedbackPending: [],
   feedbackPending: { rmsTaskRaised: [], actionYetToStart: [], annexurePending: [] },
   pendingPolls: [],
+  rmsEntries: [],
+  nonRmsEntries: [],
+}
+
+function ClassifiedEntriesModal({ title, entries, onClose }: { title: string; entries: ClassifiedEntry[]; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 dark:border-slate-700 px-6 py-5">
+          <div>
+            <h2 className="font-bold text-gray-900 dark:text-slate-100 text-lg leading-tight">{title}</h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">{entries.length} response{entries.length === 1 ? '' : 's'}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-6 py-5 space-y-3">
+          {entries.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-slate-500 py-6 text-center">No matching responses.</p>
+          ) : (
+            entries.map((e, i) => (
+              <div key={i} className="rounded-xl border border-gray-100 dark:border-slate-700 p-4">
+                <p className="font-semibold text-gray-900 dark:text-slate-100">{e.respondent ?? e.email ?? 'Anonymous'}</p>
+                {e.email && <p className="text-xs text-gray-400 dark:text-slate-500">{e.email}</p>}
+                <p className="text-xs text-purple-600 dark:text-purple-400 font-medium mt-1">{e.pollTopic}</p>
+                {e.answers.map((a, qi) => (
+                  <div key={qi} className="mt-2">
+                    <p className="text-[11px] font-semibold text-gray-400 dark:text-slate-500">Q{qi + 1}. {a.question}</p>
+                    <p className="text-sm text-gray-700 dark:text-slate-200 whitespace-pre-wrap">{a.answer || '—'}</p>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function BreakdownRow({ label, value, color = 'bg-slate-400', href }: { label: string; value: number; color?: string; href?: string }) {
@@ -166,6 +214,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<OverviewData>(defaultData)
   const [loading, setLoading] = useState(true)
   const [showAllPending, setShowAllPending] = useState(false)
+  const [openClassifiedPopup, setOpenClassifiedPopup] = useState<'process' | 'rms' | null>(null)
 
   const fetchData = useCallback((ignoreRef: { current: boolean }) => {
     const params = new URLSearchParams()
@@ -187,7 +236,7 @@ export default function DashboardPage() {
     return () => { ignoreRef.current = true; clearInterval(interval) }
   }, [fetchData])
 
-  const kpiCards = [
+  const kpiCards: { label: string; value: number; icon: typeof ClipboardList; color: string; iconBg: string; onClick: (() => void) | undefined }[] = [
     {
       label: 'Total Polls',
       value: data.kpi.totalPolls,
@@ -229,7 +278,7 @@ export default function DashboardPage() {
       icon: TrendingUp,
       color: 'text-emerald-600',
       iconBg: 'bg-emerald-50',
-      onClick: undefined,
+      onClick: () => setOpenClassifiedPopup('process'),
     },
     {
       label: 'RMS Improvement',
@@ -237,7 +286,7 @@ export default function DashboardPage() {
       icon: Zap,
       color: 'text-teal-600',
       iconBg: 'bg-teal-50',
-      onClick: undefined,
+      onClick: () => setOpenClassifiedPopup('rms'),
     },
     {
       label: 'Total KGTs',
@@ -437,6 +486,14 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+
+      {openClassifiedPopup && (
+        <ClassifiedEntriesModal
+          title={openClassifiedPopup === 'process' ? 'Process Improvement (Non-RMS)' : 'RMS Improvement'}
+          entries={openClassifiedPopup === 'process' ? data.nonRmsEntries : data.rmsEntries}
+          onClose={() => setOpenClassifiedPopup(null)}
+        />
+      )}
     </div>
   )
 }
