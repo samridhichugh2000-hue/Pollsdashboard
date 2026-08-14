@@ -101,6 +101,12 @@ export async function GET(req: Request) {
         htmlBody,
         ...(attachments.length > 0 && { attachments }),
       })
+
+      // Results just went out unconditionally above — reflect that in status
+      // so this poll doesn't sit under "Result Not Sent" forever. Only runs
+      // once the send has actually succeeded (this line is unreachable if it throws).
+      await updatePollStatus(poll.id, 'RESULTS_SHARED', { results_uploaded_at: new Date().toISOString() })
+      await createAuditLog(poll.id, 'RESULTS_SHARED', 'cron')
       closed++
     } catch (err) {
       console.error(`Failed to close poll ${poll.id}:`, err)
