@@ -26,7 +26,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ closed: 0, message: 'Too early — polls only close after 11:58 PM IST' })
   }
 
-  const activePolls = await getPollsByStatus(['SENT', 'REMINDER_SENT'] as Parameters<typeof getPollsByStatus>[0])
+  // RMS_PUBLISHED must be included — a poll pushed to RMS is still "active"
+  // and collecting responses, and was previously permanently immune to
+  // auto-close once it reached that status (one sat 2 months past deadline).
+  const activePolls = await getPollsByStatus(['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'] as Parameters<typeof getPollsByStatus>[0])
   const todayISTDate = toISTDateStr(now)
   let closed = 0
 
