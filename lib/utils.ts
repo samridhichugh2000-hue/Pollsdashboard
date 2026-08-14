@@ -88,18 +88,28 @@ export function addMonthsClamped(date: Date, months: number): Date {
   return clampToMonth(target.getFullYear(), target.getMonth(), day)
 }
 
+// A scheduled_day landing on a Saturday/Sunday rolls forward to the next
+// working day — the release date itself, not just the follow-up reminder.
+function rollToWorkingDay(date: Date): Date {
+  let d = date
+  while (isISTWeekend(d)) {
+    d = addDays(d, 1)
+  }
+  return d
+}
+
 export function computeNextRunDate(frequency: string, scheduledDay: number, from: Date = new Date()): string {
   const today = new Date(from)
   today.setHours(0, 0, 0, 0)
   const thisMonthTarget = clampToMonth(today.getFullYear(), today.getMonth(), scheduledDay)
-  if (thisMonthTarget >= today) return thisMonthTarget.toISOString().split('T')[0]
+  if (thisMonthTarget >= today) return rollToWorkingDay(thisMonthTarget).toISOString().split('T')[0]
   const months = frequency === 'quarterly' ? 3 : frequency === 'bi-annual' ? 6 : frequency === 'annual' ? 12 : 1
-  return addMonthsClamped(thisMonthTarget, months).toISOString().split('T')[0]
+  return rollToWorkingDay(addMonthsClamped(thisMonthTarget, months)).toISOString().split('T')[0]
 }
 
 export function advanceNextRunDate(current: string, frequency: string): string {
   const months = frequency === 'quarterly' ? 3 : frequency === 'bi-annual' ? 6 : frequency === 'annual' ? 12 : 1
-  return addMonthsClamped(new Date(current), months).toISOString().split('T')[0]
+  return rollToWorkingDay(addMonthsClamped(new Date(current), months)).toISOString().split('T')[0]
 }
 
 export function getNextWorkingDay(from: Date = new Date()): Date {
