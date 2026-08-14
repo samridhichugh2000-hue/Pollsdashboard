@@ -90,6 +90,9 @@ const EXCLUDE_SUBJECT_PHRASES = [
   'automatic reply:',         // out-of-office / auto-reply emails
   'accepted:',                // calendar acceptance emails
   'reminder: for rms task',   // RMS system reminders
+  'acknowledgment of new agent improvement request', // agent-improvement ticketing system notifications
+  'new agent task',                                  // agent-task assignment notifications
+  'agent improvements that you must be aware of',    // agent-improvement digest emails
 ]
 
 // Body phrases that indicate a dashboard-released poll email or a reply to one
