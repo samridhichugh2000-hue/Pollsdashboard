@@ -23,9 +23,8 @@ import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
 import { pushPollToKites, buildResponsesHtml, uploadPollResults } from '@/lib/kites-api'
 import * as XLSX from 'xlsx'
-import { writeFileSync, mkdirSync, unlinkSync } from 'fs'
+import { writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
-import { tmpdir } from 'os'
 import type { Poll } from '@/types'
 
 // Matches the client-side limit in components/polls/poll-detail.tsx — that
@@ -712,8 +711,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const koenigWb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(koenigWb, koenigWs, 'Responses')
 
-        // Save to a temp file and pass the path to the API (writable on both local Windows and Vercel)
-        const repoDir = process.env.POLLS_REPO_PATH ?? tmpdir()
+        // Save to repository and pass the file path to the API
+        const repoDir = process.env.POLLS_REPO_PATH ?? 'C:\\KoenigPollsRepository'
         mkdirSync(repoDir, { recursive: true })
         const safeSlug = poll.topic.slice(0, 40).replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()
         const repoFileName = `poll-${safeSlug}-${poll.rms_news_id}.xlsx`
@@ -722,7 +721,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         writeFileSync(repoFilePath, koenigBuffer)
 
         const outcome = await uploadPollResults(poll.rms_news_id, repoFilePath, koenigEntries)
-        try { unlinkSync(repoFilePath) } catch { /* best-effort cleanup */ }
         if (!outcome.success) {
           await createAuditLog(id, 'RESULTS_UPLOAD_FAILED', userEmail, { error: outcome.error, step: outcome.step })
           return NextResponse.json({ error: `Koenig News upload failed at ${outcome.step}: ${outcome.error}` }, { status: 502 })
