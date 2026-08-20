@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ExternalLink, Trash2, ArchiveRestore, Award, X, Loader2 } from 'lucide-react'
 import { StatusBadge } from './status-badge'
 import { Button } from '@/components/ui/button'
-import { formatDateTime, formatRelative, isApprovalOverdue, getErrorMessage } from '@/lib/utils'
+import { formatDateTime, formatRelative, isApprovalOverdue, getErrorMessage, deriveAudienceLabel, buildHuntGroupEmailMap } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Poll, PollResponse } from '@/types'
 
@@ -99,6 +99,14 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [unarchiving, setUnarchiving] = useState(false)
+  const [huntGroupsByEmail, setHuntGroupsByEmail] = useState<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    fetch('/api/hunt-groups')
+      .then(r => r.ok ? r.json() : [])
+      .then((groups: { name: string; email: string }[]) => setHuntGroupsByEmail(buildHuntGroupEmailMap(groups)))
+      .catch(() => { /* falls back to raw email/department display */ })
+  }, [])
 
   const allSelected = polls.length > 0 && selected.size === polls.length
   const someSelected = selected.size > 0
@@ -214,7 +222,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                 className="h-4 w-4 rounded border-gray-300 text-cyan-600 cursor-pointer" />
             </th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Topic</th>
-            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Department</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Audience</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Requested By</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Source</th>
             <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Status</th>
@@ -238,7 +246,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                   <p className="break-words font-medium text-gray-900 dark:text-slate-100" title={poll.topic}>{poll.topic}</p>
                   {overdue && <span className="text-xs font-medium text-rose-500">Overdue</span>}
                 </td>
-                <td className="px-5 py-3.5 text-gray-500 dark:text-slate-400">{poll.department}</td>
+                <td className="px-5 py-3.5 text-gray-500 dark:text-slate-400">{deriveAudienceLabel(poll, huntGroupsByEmail)}</td>
                 <td className="px-5 py-3.5 text-gray-500 dark:text-slate-400 max-w-[140px] truncate">{poll.requested_by}</td>
                 <td className="px-5 py-3.5">
                   <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${

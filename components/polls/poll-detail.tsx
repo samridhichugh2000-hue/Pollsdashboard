@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { StatusBadge } from './status-badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { formatDate, formatDateTime, formatRelative, isApprovalOverdue, normalizeBodyForEditor, sanitizeWordHtml, getErrorMessage } from '@/lib/utils'
+import { formatDate, formatDateTime, formatRelative, isApprovalOverdue, normalizeBodyForEditor, sanitizeWordHtml, getErrorMessage, deriveAudienceLabel, buildHuntGroupEmailMap } from '@/lib/utils'
 import { sanitizeHtml } from '@/lib/sanitize-html'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import type { Poll, PollApproval, AuditLog, PollResponse } from '@/types'
@@ -48,6 +48,14 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const [response, setResponse] = useState(initialResponse)
   const [loading, setLoading] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
+  const [huntGroupsByEmail, setHuntGroupsByEmail] = useState<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    fetch('/api/hunt-groups')
+      .then(r => r.ok ? r.json() : [])
+      .then((groups: { name: string; email: string }[]) => setHuntGroupsByEmail(buildHuntGroupEmailMap(groups)))
+      .catch(() => { /* falls back to raw email/department display */ })
+  }, [])
 
 
   // Draft edit state
@@ -467,8 +475,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             <CardContent>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                 <div>
-                  <dt className="text-gray-500 dark:text-slate-400">Department</dt>
-                  <dd className="font-medium text-gray-900 dark:text-slate-100">{poll.department}</dd>
+                  <dt className="text-gray-500 dark:text-slate-400">Audience</dt>
+                  <dd className="font-medium text-gray-900 dark:text-slate-100">{deriveAudienceLabel(poll, huntGroupsByEmail)}</dd>
                 </div>
                 <div>
                   <dt className="text-gray-500 dark:text-slate-400">Requested By</dt>

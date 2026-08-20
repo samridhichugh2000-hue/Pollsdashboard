@@ -47,6 +47,41 @@ export function formatRelative(date: string | Date | null | undefined): string {
   return formatDistanceToNow(parseDate(date), { addSuffix: true })
 }
 
+// `department` on a poll is a free-text categorization chosen at creation
+// time (often just left as "All Departments") — it does not reflect who the
+// poll actually went to. The real audience lives in `release_emails` (set
+// once the poll is released) or `recipient_email` (set at creation, before
+// release). This resolves those email addresses to friendly hunt-group names
+// (e.g. "trainers@koenig-solutions.com" -> "Trainers") for display, falling
+// back to the raw address's local-part and finally to `department` if no
+// audience emails are known yet.
+export function deriveAudienceLabel(
+  poll: { recipient_email?: string | null; release_emails?: string | null; department?: string | null },
+  huntGroupsByEmail: Map<string, string>
+): string {
+  let emails: string[] = []
+  if (poll.release_emails) {
+    try { emails = JSON.parse(poll.release_emails) as string[] } catch { /* ignore */ }
+  }
+  if (emails.length === 0 && poll.recipient_email) {
+    emails = poll.recipient_email.split(',').map(e => e.trim()).filter(Boolean)
+  }
+  if (emails.length === 0) return poll.department || '—'
+
+  const labels = emails.map(email => {
+    const lower = email.toLowerCase()
+    const groupName = huntGroupsByEmail.get(lower)
+    if (groupName) return groupName
+    const localPart = lower.split('@')[0]
+    return localPart.charAt(0).toUpperCase() + localPart.slice(1)
+  })
+  return [...new Set(labels)].join(', ')
+}
+
+export function buildHuntGroupEmailMap(huntGroups: { name: string; email: string }[]): Map<string, string> {
+  return new Map(huntGroups.map(g => [g.email.toLowerCase(), g.name]))
+}
+
 // Shared IST-aware date helpers for the cron jobs. Previously each cron file
 // (poll-closure, reminder-scheduler, closure-alert) had its own copy of some
 // of this math, and some copies used raw server-local time (UTC on Vercel)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db/client'
 import { CLOSED_POLL_STATUSES } from '@/lib/db/queries'
+import { deriveAudienceLabel, buildHuntGroupEmailMap } from '@/lib/utils'
 
 export async function GET(req: NextRequest) {
   const db = getDb()
@@ -21,13 +22,16 @@ export async function GET(req: NextRequest) {
     return true
   }
 
-  const [pollsRes, regularPollsRes, feedbackRes, kpiRes, responsesRes] = await Promise.all([
-    db.execute({ sql: 'SELECT id, topic, status, source, requested_by, department, created_at, rms_task_id, results_uploaded_at, closed_at, request_type FROM polls WHERE status != ? ORDER BY created_at DESC', args: ['ARCHIVED'] }),
+  const [pollsRes, regularPollsRes, feedbackRes, kpiRes, responsesRes, huntGroupsRes] = await Promise.all([
+    db.execute({ sql: 'SELECT id, topic, status, source, requested_by, department, recipient_email, release_emails, created_at, rms_task_id, results_uploaded_at, closed_at, request_type FROM polls WHERE status != ? ORDER BY created_at DESC', args: ['ARCHIVED'] }),
     db.execute('SELECT id, frequency, is_active, next_run_date, last_run_date FROM regular_polls').catch(() => ({ rows: [] })),
     db.execute('SELECT id, type, status, category, rms_task_id, task_pending, followup_done, summary, submitted_by, department, poll_title FROM feedback_items ORDER BY created_at DESC').catch(() => ({ rows: [] })),
     db.execute("SELECT process_improvements, rms_improvements, policy_announced FROM kpi_data WHERE id = 'singleton'").catch(() => ({ rows: [] })),
     db.execute('SELECT poll_id, response_data FROM poll_responses').catch(() => ({ rows: [] })),
+    db.execute('SELECT name, email FROM hunt_groups').catch(() => ({ rows: [] })),
   ])
+
+  const huntGroupsByEmail = buildHuntGroupEmailMap(huntGroupsRes.rows as unknown as { name: string; email: string }[])
 
   const allPolls = pollsRes.rows as unknown as Array<{
     id: string
@@ -36,6 +40,8 @@ export async function GET(req: NextRequest) {
     source: string | null
     requested_by: string | null
     department: string | null
+    recipient_email: string | null
+    release_emails: string | null
     created_at: string
     rms_task_id: string | null
     results_uploaded_at: string | null
@@ -196,7 +202,7 @@ export async function GET(req: NextRequest) {
       pollNo: `POLL-${new Date(p.created_at).getFullYear()}-${String(allSorted.findIndex(s => s.id === p.id) + 1).padStart(3, '0')}`,
       topic: p.topic,
       requestedBy: p.requested_by ?? '—',
-      department: p.department ?? '—',
+      department: deriveAudienceLabel(p, huntGroupsByEmail),
       source: p.source ?? 'dashboard',
       createdAt: p.created_at,
       status: p.status,

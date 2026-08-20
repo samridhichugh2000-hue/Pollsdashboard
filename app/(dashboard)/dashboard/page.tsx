@@ -391,7 +391,7 @@ export default function DashboardPage() {
                   <th className="text-left pb-2 pr-4 font-semibold">Poll No.</th>
                   <th className="text-left pb-2 pr-4 font-semibold">Request Title</th>
                   <th className="text-left pb-2 pr-4 font-semibold">Requester</th>
-                  <th className="text-left pb-2 pr-4 font-semibold">Dept.</th>
+                  <th className="text-left pb-2 pr-4 font-semibold">Audience</th>
                   <th className="text-left pb-2 pr-4 font-semibold">Source</th>
                   <th className="text-left pb-2 pr-4 font-semibold">Date</th>
                   <th className="text-left pb-2 font-semibold">Status</th>
