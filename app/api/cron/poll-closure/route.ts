@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse, closeOutUntouchedEntries, getPollAttachments } from '@/lib/db/queries'
+import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse, getPollAttachments } from '@/lib/db/queries'
 import { sendEmail, forwardMessageWithHtml, getFormResponses } from '@/lib/graph'
 import { buildResultsEmailHtml, toISTDateStr, istMinutesOfDay } from '@/lib/utils'
 import * as XLSX from 'xlsx'
@@ -93,7 +93,6 @@ export async function GET(req: Request) {
         closed_at: new Date().toISOString(),
       })
       await createAuditLog(poll.id, 'AUTO_CLOSED', 'cron')
-      await closeOutUntouchedEntries(poll.id)
 
       // Send results to EA — forward the last reminder sent for this poll
       // (falling back to the original release email, then to a plain new

@@ -15,6 +15,7 @@ import {
   getPollAttachments,
   getPollAttachmentsMeta,
   closeOutUntouchedEntries,
+  CLOSED_POLL_STATUSES,
 } from '@/lib/db/queries'
 import type { PollAttachment } from '@/lib/db/queries'
 import { sendEmail, sendEmailGetId, replyToMessageWithHtml, forwardMessageWithHtml } from '@/lib/graph'
@@ -288,8 +289,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'MARK_CLOSED': {
         await updatePollStatus(id, 'CLOSED', { closed_at: new Date().toISOString() })
         await createAuditLog(id, 'POLL_CLOSED', userEmail)
+        break
+      }
+
+      // Sends the "no action taken" notice to any respondent still without an
+      // actionable/not-actionable decision, then marks those entries resolved.
+      // Deliberately a separate, explicit action from closing the poll (or
+      // sharing results) — staff need a window after results go out to review
+      // and act on individual responses before anyone gets an auto-reply
+      // saying no action was taken.
+      case 'CLOSE_PENDING_RESPONSES': {
+        if (!CLOSED_POLL_STATUSES.includes(poll.status)) {
+          return NextResponse.json({ error: 'Poll must be closed before closing pending responses.' }, { status: 400 })
+        }
         await sendNoActionTakenEmails(id, poll.topic)
-        await closeOutUntouchedEntries(id)
+        const closedCount = await closeOutUntouchedEntries(id)
+        await createAuditLog(id, 'PENDING_RESPONSES_CLOSED', userEmail, { count: closedCount })
         break
       }
 
@@ -297,8 +312,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const closedAt = new Date()
         await updatePollStatus(id, 'CLOSED', { closed_at: closedAt.toISOString() })
         await createAuditLog(id, 'POLL_CLOSED', userEmail, { notified: true })
-        await sendNoActionTakenEmails(id, poll.topic)
-        await closeOutUntouchedEntries(id)
 
         // Extract requester name + email from "Name <email>" or bare "email"
         const nameEmailMatch = poll.requested_by?.match(/^(.+?)\s*<([^>]+)>$/)
