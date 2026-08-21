@@ -124,7 +124,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const body = await req.json() as Record<string, unknown>
   const { action } = body
-  const userEmail = 'priya.upadhyay@koenig-solutions.com'
+  const userEmail = 'gunjan.setia@koenig-solutions.com'
 
   try {
     switch (action) {

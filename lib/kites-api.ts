@@ -70,7 +70,7 @@ export async function pushPollToKites(
 
   const sendFrom = process.env.PRIYA_EMAIL
     ? `${process.env.PRIYA_EMAIL};`
-    : 'Priya.upadhyay@koenig-solutions.com;'
+    : 'Gunjan.setia@koenig-solutions.com;'
 
   let sendTo: string | null = null
   if (poll.release_emails) {
