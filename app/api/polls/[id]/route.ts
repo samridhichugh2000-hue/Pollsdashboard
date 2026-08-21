@@ -188,7 +188,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         // the "Poll Approval Required:" prefix only applies to regular polls.
         const approvalSubject = poll.request_type === 'KGT' ? pollSubject : `Poll Approval Required: ${pollSubject}`
         await sendEmail({
-          from: process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com',
+          from: process.env.PRIYA_EMAIL!,
           to: recipients,
           subject: approvalSubject,
           htmlBody: approvalHtml,
@@ -785,9 +785,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const respondentName = replyEntry.respondent ?? (replyEntry.email.split('@')[0].split('.').map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' '))
         const answers = (replyEntry.answers ?? []) as { question: string; answer: string }[]
         await sendEmail({
-          from: process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com',
+          from: process.env.PRIYA_EMAIL!,
           to: replyEntry.email,
-          cc: process.env.PRIYA_EMAIL,
           subject: `Re: Your response to "${poll.topic}"`,
           htmlBody: buildReplyToRespondentHtml({ name: respondentName, topic: poll.topic, replyMessage, answers }),
         })

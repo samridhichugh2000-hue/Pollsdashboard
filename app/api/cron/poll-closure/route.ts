@@ -98,7 +98,7 @@ export async function GET(req: Request) {
       // Send results to EA
       const htmlBody = buildResultsEmailHtml(poll.topic, attachments.length > 0)
       await sendEmail({
-        from: process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com',
+        from: process.env.PRIYA_EMAIL!,
         to: process.env.RESULTS_RECIPIENT_EMAIL ?? 'ea@koenig-solutions.com',
         subject: `Poll Results: ${poll.topic}`,
         htmlBody,
