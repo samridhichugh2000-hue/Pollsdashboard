@@ -54,6 +54,7 @@ export interface Poll {
   approved_at?: string | null
   closed_at?: string | null
   results_uploaded_at?: string | null
+  closed_message?: string | null
   remarks?: string | null
   single_response?: number | null // 1 or 0 (SQLite boolean)
   archived_from_status?: PollStatus | null

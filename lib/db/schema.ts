@@ -260,6 +260,13 @@ export async function runMigrations() {
     `)
   } catch { /* already exists */ }
 
+  // Optional custom message shown on the public respond page once a poll is
+  // closed, e.g. to redirect respondents to a replacement poll. Falls back to
+  // the generic "no longer accepting responses" text when unset.
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN closed_message TEXT`)
+  } catch { /* already exists */ }
+
   // Tracks inbox messages the poll/KGT detectors have already looked at, keyed
   // by Graph message ID. Previously "already processed" was inferred from the
   // mailbox's isRead flag, which the app itself sets — but Outlook (or anyone
