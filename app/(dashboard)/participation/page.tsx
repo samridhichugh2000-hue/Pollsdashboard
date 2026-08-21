@@ -68,7 +68,7 @@ function PollsModal({ participant, onClose }: { participant: Participant; onClos
         <div className="flex items-center justify-between px-[18px] py-[14px] border-b border-gray-100 dark:border-slate-700">
           <div>
             <p className="text-[15px] font-medium text-gray-900 dark:text-slate-100">{participant.full_name}</p>
-            <p className="text-[12px] text-gray-400 dark:text-slate-500 mt-0.5">{participant.email} · {participant.department_name ?? '—'}</p>
+            <p className="text-[12px] text-gray-400 dark:text-slate-500 mt-0.5">{participant.email}{participant.emp_code ? ` · ID ${participant.emp_code}` : ''} · {participant.department_name ?? '—'}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-lg leading-none">×</button>
         </div>
@@ -203,7 +203,8 @@ export default function ParticipationPage() {
         p.full_name.toLowerCase().includes(q) ||
         p.email.toLowerCase().includes(q) ||
         (p.department_name ?? '').toLowerCase().includes(q) ||
-        (p.manager_name ?? '').toLowerCase().includes(q)
+        (p.manager_name ?? '').toLowerCase().includes(q) ||
+        (p.emp_code ?? '').toLowerCase().includes(q)
       )
     })
     .sort((a, b) => {
@@ -337,16 +338,18 @@ export default function ParticipationPage() {
       <div className="bg-white dark:bg-[#1a2035] border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
         <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: '28%' }} />
-            <col style={{ width: '20%' }} />
-            <col style={{ width: '22%' }} />
+            <col style={{ width: '24%' }} />
+            <col style={{ width: '10%' }} />
             <col style={{ width: '18%' }} />
+            <col style={{ width: '20%' }} />
+            <col style={{ width: '16%' }} />
             <col style={{ width: '12%' }} />
           </colgroup>
           <thead>
             <tr className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-100 dark:border-slate-700">
               {[
                 { label: 'Employee', field: 'name' as const },
+                { label: 'Employee ID', field: null },
                 { label: 'Manager', field: null },
                 { label: 'Department', field: 'dept' as const },
                 { label: 'Designation', field: null },
@@ -363,11 +366,11 @@ export default function ParticipationPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="py-20 text-center">
+              <tr><td colSpan={6} className="py-20 text-center">
                 <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
               </td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={5} className="py-16 text-center text-[13px] text-gray-400 dark:text-slate-500">
+              <tr><td colSpan={6} className="py-16 text-center text-[13px] text-gray-400 dark:text-slate-500">
                 {participants.length === 0 ? 'Loading employee directory…' : 'No results match your search.'}
               </td></tr>
             ) : filtered.map((p, idx) => {
@@ -382,6 +385,9 @@ export default function ParticipationPage() {
                         <div className="text-[11px] text-gray-400 dark:text-slate-500 truncate">{p.email}</div>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-3.5 py-3 text-[13px] text-gray-600 dark:text-slate-400 truncate">
+                    {p.emp_code ?? <span className="text-gray-300 dark:text-slate-600">—</span>}
                   </td>
                   <td className="px-3.5 py-3 text-[13px] text-gray-600 dark:text-slate-400 truncate">
                     {p.manager_name ?? <span className="text-gray-300 dark:text-slate-600">—</span>}
