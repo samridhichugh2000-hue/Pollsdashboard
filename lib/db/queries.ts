@@ -606,3 +606,25 @@ export async function pollTopicAlreadyExists(rawTopic: string): Promise<boolean>
   })
   return result.rows.some(row => normalizeTopic(String(row.topic ?? '')) === normalized)
 }
+
+// Returns the subset of the given Graph message IDs that the detector has
+// already looked at, for the given category ('poll' | 'kgt'). Used instead of
+// the mailbox's isRead flag, which anyone with mailbox access can flip —
+// silently hiding a genuine request from every future scan with no record it
+// ever arrived.
+export async function getProcessedMessageIds(category: string, messageIds: string[]): Promise<Set<string>> {
+  if (messageIds.length === 0) return new Set()
+  const placeholders = messageIds.map(() => '?').join(', ')
+  const result = await getDb().execute({
+    sql: `SELECT message_id FROM processed_inbox_messages WHERE category = ? AND message_id IN (${placeholders})`,
+    args: [category, ...messageIds],
+  })
+  return new Set(result.rows.map(row => String(row.message_id)))
+}
+
+export async function markMessageProcessed(category: string, messageId: string): Promise<void> {
+  await getDb().execute({
+    sql: 'INSERT OR IGNORE INTO processed_inbox_messages (message_id, category) VALUES (?, ?)',
+    args: [messageId, category],
+  })
+}

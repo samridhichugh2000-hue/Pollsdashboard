@@ -106,8 +106,18 @@ export function isSystemNotificationEmail(subject: string): boolean {
   return EXCLUDE_SUBJECT_PHRASES.some(phrase => s.includes(phrase))
 }
 
-export async function getUnreadPollEmails(userEmail: string): Promise<GraphMessage[]> {
-  const messages = await getInboxMessages(userEmail, `isRead eq false`)
+// Candidates are found by recency, not by the mailbox's isRead flag — a
+// message can be marked read by anyone with mailbox access (e.g. opening it
+// in Outlook's preview pane) well before the detector ever sees it, which
+// used to hide it from every future run with no record it had arrived.
+// Callers dedup against the app's own processed_inbox_messages table instead
+// (see lib/db/queries.ts getProcessedMessageIds/markMessageProcessed), so
+// "already handled" is a fact the app records itself.
+const CANDIDATE_WINDOW_DAYS = 14
+
+export async function getRecentPollEmails(userEmail: string): Promise<GraphMessage[]> {
+  const since = new Date(Date.now() - CANDIDATE_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
+  const messages = await getInboxMessages(userEmail, `receivedDateTime ge ${since}`)
   return messages.filter((m) => {
     if (EXCLUDE_SENDERS.some(s => m.from.emailAddress.address.toLowerCase() === s.toLowerCase())) return false
     if (isSystemNotificationEmail(m.subject)) return false
@@ -119,11 +129,12 @@ export async function getUnreadPollEmails(userEmail: string): Promise<GraphMessa
 }
 
 // KGT (knowledge/ownership transfer) requests come from a small named list of
-// people — any unread mail from an authorized requester is a candidate, since
+// people — any recent mail from an authorized requester is a candidate, since
 // they don't always spell out "KGT" in the subject. Kept unfiltered by
 // keyword; the dashboard's DRAFT review step is the actual confirmation gate.
-export async function getUnreadKGTEmails(userEmail: string, authorizedEmails: Set<string>): Promise<GraphMessage[]> {
-  const messages = await getInboxMessages(userEmail, `isRead eq false`)
+export async function getRecentKGTEmails(userEmail: string, authorizedEmails: Set<string>): Promise<GraphMessage[]> {
+  const since = new Date(Date.now() - CANDIDATE_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
+  const messages = await getInboxMessages(userEmail, `receivedDateTime ge ${since}`)
   return messages.filter((m) => {
     const sender = m.from.emailAddress.address.toLowerCase()
     if (!authorizedEmails.has(sender)) return false

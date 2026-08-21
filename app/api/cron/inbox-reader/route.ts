@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getUnreadPollEmails, markEmailAsRead } from '@/lib/graph'
-import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog } from '@/lib/db/queries'
+import { getRecentPollEmails, markEmailAsRead } from '@/lib/graph'
+import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog, getProcessedMessageIds, markMessageProcessed } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { runMigrations } from '@/lib/db/schema'
 import { generatePollDraft } from '@/lib/draft-generator'
@@ -26,12 +26,15 @@ export async function GET(req: Request) {
 
   try {
     const AUTHORIZED_EMAILS = await getAuthorizedEmails()
-    const messages = await getUnreadPollEmails(priyaEmail)
+    const candidates = await getRecentPollEmails(priyaEmail)
+    const processedIds = await getProcessedMessageIds('poll', candidates.map(m => m.id))
+    const messages = candidates.filter(m => !processedIds.has(m.id))
 
     for (const msg of messages) {
       const senderEmail = msg.from.emailAddress.address.toLowerCase()
 
-      // Whitelist check
+      // Whitelist check — left unprocessed (not marked) so it's reconsidered
+      // if the sender is authorized later.
       if (!AUTHORIZED_EMAILS.has(senderEmail)) {
         skipped++
         continue
@@ -41,6 +44,7 @@ export async function GET(req: Request) {
       const alreadyProcessed = await pollEmailAlreadyProcessed(msg.conversationId)
       if (alreadyProcessed) {
         skipped++
+        await markMessageProcessed('poll', msg.id)
         await markEmailAsRead(priyaEmail, msg.id)
         continue
       }
@@ -58,6 +62,7 @@ export async function GET(req: Request) {
       // Dedup by topic — catches forwarded duplicates with a different conversationId
       if (await pollTopicAlreadyExists(topic)) {
         skipped++
+        await markMessageProcessed('poll', msg.id)
         await markEmailAsRead(priyaEmail, msg.id)
         continue
       }
@@ -92,6 +97,7 @@ export async function GET(req: Request) {
         status: 'DRAFT',
       })
 
+      await markMessageProcessed('poll', msg.id)
       await markEmailAsRead(priyaEmail, msg.id)
 
       await createAuditLog(poll.id, 'DETECTED_FROM_INBOX', 'cron', {

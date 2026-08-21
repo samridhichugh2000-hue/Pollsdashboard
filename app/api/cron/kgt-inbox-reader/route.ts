@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getUnreadKGTEmails, markEmailAsRead } from '@/lib/graph'
-import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog } from '@/lib/db/queries'
+import { getRecentKGTEmails, markEmailAsRead } from '@/lib/graph'
+import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog, getProcessedMessageIds, markMessageProcessed } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { runMigrations } from '@/lib/db/schema'
 import { generateDefaultKGTDraft } from '@/lib/kgt-draft-generator'
@@ -23,17 +23,19 @@ export async function GET(req: Request) {
 
   try {
     const AUTHORIZED_EMAILS = await getAuthorizedKGTEmails()
-    const messages = await getUnreadKGTEmails(priyaEmail, AUTHORIZED_EMAILS)
+    const candidates = await getRecentKGTEmails(priyaEmail, AUTHORIZED_EMAILS)
+    const processedIds = await getProcessedMessageIds('kgt', candidates.map(m => m.id))
+    const messages = candidates.filter(m => !processedIds.has(m.id))
 
     for (const msg of messages) {
       const senderEmail = msg.from.emailAddress.address.toLowerCase()
 
       const alreadyProcessed = await pollEmailAlreadyProcessed(msg.conversationId)
-      if (alreadyProcessed) { skipped++; await markEmailAsRead(priyaEmail, msg.id); continue }
+      if (alreadyProcessed) { skipped++; await markMessageProcessed('kgt', msg.id); await markEmailAsRead(priyaEmail, msg.id); continue }
 
       const topic = msg.subject.replace(/^(fw|fwd|re|tr):\s*/gi, '').replace(/^(fw|fwd|re|tr):\s*/gi, '').trim()
 
-      if (await pollTopicAlreadyExists(topic)) { skipped++; await markEmailAsRead(priyaEmail, msg.id); continue }
+      if (await pollTopicAlreadyExists(topic)) { skipped++; await markMessageProcessed('kgt', msg.id); await markEmailAsRead(priyaEmail, msg.id); continue }
 
       const poll = await createPoll({
         topic,
@@ -54,6 +56,7 @@ export async function GET(req: Request) {
         status: 'DRAFT',
       })
 
+      await markMessageProcessed('kgt', msg.id)
       await markEmailAsRead(priyaEmail, msg.id)
       await createAuditLog(poll.id, 'DETECTED_FROM_INBOX_KGT', 'cron', {
         sender: senderEmail, subject: msg.subject,

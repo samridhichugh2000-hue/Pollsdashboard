@@ -260,6 +260,23 @@ export async function runMigrations() {
     `)
   } catch { /* already exists */ }
 
+  // Tracks inbox messages the poll/KGT detectors have already looked at, keyed
+  // by Graph message ID. Previously "already processed" was inferred from the
+  // mailbox's isRead flag, which the app itself sets — but Outlook (or anyone
+  // with mailbox access) can also mark a message read, e.g. by opening it in
+  // a preview pane. That silently hid genuine poll requests from every future
+  // cron run with no record they'd ever arrived. Tracking by message ID here
+  // instead makes "processed" the app's own fact, independent of read-state.
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS processed_inbox_messages (
+        message_id TEXT PRIMARY KEY,
+        category TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+
   // Migrate old emp_code-keyed table to email-keyed
   try {
     const cols = await db.execute(`PRAGMA table_info(employees)`)

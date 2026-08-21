@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { getInboxMessages, getUnreadPollEmails, markEmailAsRead, isSystemNotificationEmail } from '@/lib/graph'
-import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog } from '@/lib/db/queries'
+import { getInboxMessages, getRecentPollEmails, markEmailAsRead, isSystemNotificationEmail } from '@/lib/graph'
+import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog, getProcessedMessageIds, markMessageProcessed } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { runMigrations } from '@/lib/db/schema'
 import { generatePollDraft } from '@/lib/draft-generator'
@@ -47,15 +47,18 @@ export async function POST() {
     `)
 
     // Second pass: process actual poll emails
-    const messages = await getUnreadPollEmails(priyaEmail)
+    const candidates = await getRecentPollEmails(priyaEmail)
+    const processedIds = await getProcessedMessageIds('poll', candidates.map(m => m.id))
+    const messages = candidates.filter(m => !processedIds.has(m.id))
 
     for (const msg of messages) {
       const senderEmail = msg.from.emailAddress.address.toLowerCase()
 
+      // Left unprocessed (not marked) so it's reconsidered if authorized later.
       if (!AUTHORIZED_EMAILS.has(senderEmail)) { skipped++; continue }
 
       const alreadyProcessed = await pollEmailAlreadyProcessed(msg.conversationId)
-      if (alreadyProcessed) { skipped++; await markEmailAsRead(priyaEmail, msg.id); continue }
+      if (alreadyProcessed) { skipped++; await markMessageProcessed('poll', msg.id); await markEmailAsRead(priyaEmail, msg.id); continue }
 
       const emailText = msg.body.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
       const deptMatch = emailText.match(/(?:department|team|audience)[:\s]+([A-Za-z\s&]+?)(?:\.|,|\n|$)/i)
@@ -63,7 +66,7 @@ export async function POST() {
       const topic = msg.subject.replace(/^(fw|fwd|re|tr):\s*/gi, '').replace(/^(fw|fwd|re|tr):\s*/gi, '').trim()
 
       // Dedup by topic — catches forwarded duplicates with a different conversationId
-      if (await pollTopicAlreadyExists(topic)) { skipped++; await markEmailAsRead(priyaEmail, msg.id); continue }
+      if (await pollTopicAlreadyExists(topic)) { skipped++; await markMessageProcessed('poll', msg.id); await markEmailAsRead(priyaEmail, msg.id); continue }
 
       const poll = await createPoll({
         topic, department,
@@ -87,6 +90,7 @@ export async function POST() {
         status: 'DRAFT',
       })
 
+      await markMessageProcessed('poll', msg.id)
       await markEmailAsRead(priyaEmail, msg.id)
       await createAuditLog(poll.id, 'DETECTED_FROM_INBOX', 'manual-sync', {
         sender: senderEmail, subject: msg.subject,
