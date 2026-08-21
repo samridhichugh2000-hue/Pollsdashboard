@@ -45,6 +45,7 @@ export interface Poll {
   rms_news_id?: string | null
   release_emails?: string | null // JSON array of email strings
   release_message_id?: string | null // Graph message ID of the release email
+  last_reminder_message_id?: string | null // Graph message ID of the most recently sent reminder/closure-alert email
   status: PollStatus
   sent_at?: string | null
   reminder_at?: string | null

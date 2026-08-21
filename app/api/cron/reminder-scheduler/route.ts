@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getPollsByStatus, claimReminderSent, claimPollColumn, createAuditLog } from '@/lib/db/queries'
-import { replyToMessageWithHtml } from '@/lib/graph'
+import { getPollsByStatus, claimReminderSent, claimPollColumn, createAuditLog, updatePoll } from '@/lib/db/queries'
+import { forwardMessageWithHtml } from '@/lib/graph'
 import { buildPollEmailHtml, formatDate, getNextWorkingDay, toISTDateStr, isISTWeekend } from '@/lib/utils'
 
 export async function GET(req: Request) {
@@ -65,12 +65,12 @@ export async function GET(req: Request) {
         })
 
         const priyaEmail = process.env.PRIYA_EMAIL!
-        await replyToMessageWithHtml(priyaEmail, poll.release_message_id, {
-          subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
+        const newMessageId = await forwardMessageWithHtml(priyaEmail, poll.release_message_id, {
           htmlBody,
           to: [process.env.POLLS_MAILBOX ?? priyaEmail],
           bcc: releaseEmails,
         })
+        await updatePoll(poll.id, { last_reminder_message_id: newMessageId })
 
         await createAuditLog(poll.id, 'REMINDER_SENT', 'cron', { emails: releaseEmails })
         sent++
@@ -104,12 +104,12 @@ export async function GET(req: Request) {
       })
 
       const priyaEmail2 = process.env.PRIYA_EMAIL!
-      await replyToMessageWithHtml(priyaEmail2, poll.release_message_id, {
-        subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
+      const newMessageId2 = await forwardMessageWithHtml(priyaEmail2, poll.release_message_id, {
         htmlBody,
         to: [process.env.POLLS_MAILBOX ?? priyaEmail2],
         bcc: releaseEmails,
       })
+      await updatePoll(poll.id, { last_reminder_message_id: newMessageId2 })
 
       await createAuditLog(poll.id, 'SECOND_REMINDER_SENT', 'cron', { emails: releaseEmails })
       sent++

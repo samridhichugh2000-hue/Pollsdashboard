@@ -260,6 +260,14 @@ export async function runMigrations() {
     `)
   } catch { /* already exists */ }
 
+  // Tracks the internetMessageId of the most recently sent reminder-type
+  // email (1st/2nd reminder, manual reminder, closure alert) for a poll —
+  // used so the results-sharing email at closure can forward the LAST
+  // reminder (rather than only ever the original release email) to EA.
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN last_reminder_message_id TEXT`)
+  } catch { /* already exists */ }
+
   // Optional custom message shown on the public respond page once a poll is
   // closed, e.g. to redirect respondents to a replacement poll. Falls back to
   // the generic "no longer accepting responses" text when unset.

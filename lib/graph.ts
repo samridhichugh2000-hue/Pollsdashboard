@@ -255,53 +255,47 @@ export async function sendEmailGetId(options: SendEmailOptions): Promise<string>
   return created.internetMessageId
 }
 
-// Replies on the same thread as the original release email.
-// Looks up the sent message in Sent Items by its RFC internetMessageId, then uses
-// the Graph /reply endpoint (which handles threading natively).
-//
-// Exchange saves the sent copy to the FROM address's Sent Items (polls mailbox),
-// not Priya's, so we search polls@ first, then fall back to Priya's mailbox.
+// Looks up a previously-sent message in Sent Items by its RFC internetMessageId,
+// searching the polls mailbox first (release/reminder emails display "From:
+// polls@"), then falling back to the acting mailbox. Shared by
+// replyToMessageWithHtml and forwardMessageWithHtml.
 // ConsistencyLevel: eventual is required for filtering on non-indexed properties.
+async function findSentMessage(from: string, internetMessageId: string, logLabel: string): Promise<{ mailbox: string; id: string }> {
+  const filter = `internetMessageId eq '${internetMessageId.replace(/'/g, "''")}'`
+  // $count=true is required alongside ConsistencyLevel:eventual for advanced query capabilities
+  const qs = `$filter=${encodeURIComponent(filter)}&$select=id&$top=1&$count=true`
+
+  const pollsMailbox = process.env.POLLS_MAILBOX
+  const mailboxesToSearch = [...new Set([pollsMailbox, from].filter(Boolean))] as string[]
+
+  console.log(`[${logLabel}] Searching for internetMessageId: ${internetMessageId}`)
+  for (const mailbox of mailboxesToSearch) {
+    try {
+      console.log(`[${logLabel}] Searching mailbox: ${mailbox}`)
+      const search = await graphRequest<{ value: Array<{ id: string }> }>(
+        `/users/${mailbox}/mailFolders/SentItems/messages?${qs}`,
+        { headers: { ConsistencyLevel: 'eventual' } }
+      )
+      console.log(`[${logLabel}] Found ${search.value?.length ?? 0} result(s) in ${mailbox}`)
+      if (search.value?.[0]?.id) {
+        return { mailbox, id: search.value[0].id }
+      }
+    } catch (searchErr) {
+      console.warn(`[${logLabel}] Could not search mailbox ${mailbox} (skipping):`, searchErr)
+    }
+  }
+
+  throw new Error(`Could not find message in Sent Items (internetMessageId: ${internetMessageId}). Searched: ${mailboxesToSearch.join(', ')}`)
+}
+
+// Replies on the same thread as the original release email, using the Graph
+// /reply endpoint (which handles threading natively).
 export async function replyToMessageWithHtml(
   from: string,
   internetMessageId: string, // RFC Message-ID stored from sendEmailGetId
   options: { subject: string; htmlBody: string; to: string[]; bcc?: string[]; attachments?: EmailAttachment[] }
 ): Promise<void> {
-  const filter = `internetMessageId eq '${internetMessageId.replace(/'/g, "''")}'`
-  // $count=true is required alongside ConsistencyLevel:eventual for advanced query capabilities
-  const qs = `$filter=${encodeURIComponent(filter)}&$select=id&$top=1&$count=true`
-
-  // Search polls mailbox Sent Items first (release email sent "From: polls@"),
-  // then fall back to Priya's Sent Items.
-  const pollsMailbox = process.env.POLLS_MAILBOX
-  const mailboxesToSearch = [...new Set([pollsMailbox, from].filter(Boolean))] as string[]
-
-  let sentMessageId: string | undefined
-  let foundInMailbox = from
-
-  console.log(`[replyToMessageWithHtml] Searching for internetMessageId: ${internetMessageId}`)
-  for (const mailbox of mailboxesToSearch) {
-    try {
-      console.log(`[replyToMessageWithHtml] Searching mailbox: ${mailbox}`)
-      const search = await graphRequest<{ value: Array<{ id: string }> }>(
-        `/users/${mailbox}/mailFolders/SentItems/messages?${qs}`,
-        { headers: { ConsistencyLevel: 'eventual' } }
-      )
-      console.log(`[replyToMessageWithHtml] Found ${search.value?.length ?? 0} result(s) in ${mailbox}`)
-      if (search.value?.[0]?.id) {
-        sentMessageId = search.value[0].id
-        foundInMailbox = mailbox
-        break
-      }
-    } catch (searchErr) {
-      console.warn(`[replyToMessageWithHtml] Could not search mailbox ${mailbox} (skipping):`, searchErr)
-    }
-  }
-
-  if (!sentMessageId) {
-    throw new Error(`Could not find release email in Sent Items (internetMessageId: ${internetMessageId}). Searched: ${mailboxesToSearch.join(', ')}`)
-  }
-  console.log(`[replyToMessageWithHtml] Found message ${sentMessageId} in ${foundInMailbox}, sending reply`)
+  const { mailbox: foundInMailbox, id: sentMessageId } = await findSentMessage(from, internetMessageId, 'replyToMessageWithHtml')
 
   const toRecipients = options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
   const pollsSender = process.env.POLLS_MAILBOX ?? from
@@ -326,6 +320,66 @@ export async function replyToMessageWithHtml(
     method: 'POST',
     body: JSON.stringify({ message }),
   })
+}
+
+// Forwards a previously-sent message (found by RFC internetMessageId, same
+// lookup as replyToMessageWithHtml) instead of composing a new email —
+// Graph's createForward action carries the original message's own
+// attachments onto the new draft automatically, so a poll's release
+// attachments ride along through every reminder/closure email that forwards
+// it, and ultimately to the results-sharing email at the end of the chain.
+// Returns the new message's internetMessageId so callers can thread further
+// forwards (e.g. "forward the last reminder") off this one.
+export async function forwardMessageWithHtml(
+  from: string,
+  internetMessageId: string,
+  options: { htmlBody: string; to: string[]; bcc?: string[]; attachments?: EmailAttachment[] }
+): Promise<string> {
+  const { mailbox: foundInMailbox, id: sourceMessageId } = await findSentMessage(from, internetMessageId, 'forwardMessageWithHtml')
+
+  const toRecipients = options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
+  const bccRecipients = options.bcc?.length
+    ? options.bcc.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
+    : undefined
+  const pollsSender = process.env.POLLS_MAILBOX ?? from
+
+  // createForward returns a draft (in Drafts) with the original message's
+  // attachments and quoted content already copied in — we only need to
+  // prepend our own HTML ahead of that quoted content, not rebuild it.
+  const draft = await graphRequest<{ id: string; internetMessageId: string; body: { contentType: string; content: string } }>(
+    `/users/${foundInMailbox}/messages/${sourceMessageId}/createForward`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        toRecipients,
+        ...(bccRecipients && { bccRecipients }),
+        message: { from: { emailAddress: { address: pollsSender } } },
+      }),
+    }
+  )
+
+  await graphRequest(`/users/${foundInMailbox}/messages/${draft.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ body: { contentType: 'HTML', content: options.htmlBody + (draft.body?.content ?? '') } }),
+  })
+
+  if (options.attachments?.length) {
+    for (const a of options.attachments) {
+      await graphRequest(`/users/${foundInMailbox}/messages/${draft.id}/attachments`, {
+        method: 'POST',
+        body: JSON.stringify({
+          '@odata.type': '#microsoft.graph.fileAttachment',
+          name: a.name,
+          contentType: a.contentType,
+          contentBytes: a.contentBytes,
+        }),
+      })
+    }
+  }
+
+  await graphRequest(`/users/${foundInMailbox}/messages/${draft.id}/send`, { method: 'POST' })
+
+  return draft.internetMessageId
 }
 
 export async function replyToEmail(

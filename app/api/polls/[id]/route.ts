@@ -17,7 +17,7 @@ import {
   closeOutUntouchedEntries,
 } from '@/lib/db/queries'
 import type { PollAttachment } from '@/lib/db/queries'
-import { sendEmail, sendEmailGetId, replyToMessageWithHtml } from '@/lib/graph'
+import { sendEmail, sendEmailGetId, replyToMessageWithHtml, forwardMessageWithHtml } from '@/lib/graph'
 import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, buildNoActionTakenHtml, formatDate } from '@/lib/utils'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
@@ -595,15 +595,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const emailHtml = buildResultsEmailHtml(poll.topic)
         const attachment = { name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }
 
-        if (!poll.release_message_id) {
+        const forwardSourceId = poll.last_reminder_message_id ?? poll.release_message_id
+        if (!forwardSourceId) {
           return NextResponse.json({ error: 'No release thread found for this poll. Results can only be shared on the original poll email thread.' }, { status: 400 })
         }
 
-        await replyToMessageWithHtml(process.env.PRIYA_EMAIL!, poll.release_message_id, {
-          subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
+        // Also attach whatever was attached at release time — forwarding the
+        // last reminder already carries those along automatically (forwards
+        // copy the original message's attachments), but attach them
+        // explicitly too so results always include them even if the
+        // reminder chain never happened (poll closed same-day as release).
+        const releaseAttachments = await getPollAttachments(id)
+
+        await forwardMessageWithHtml(process.env.PRIYA_EMAIL!, forwardSourceId, {
           htmlBody: emailHtml,
           to: shareRecipients,
-          attachments: [attachment],
+          attachments: [attachment, ...releaseAttachments],
         })
 
         await updatePollStatus(id, 'RESULTS_SHARED')
@@ -875,12 +882,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           msFormLink: poll.ms_form_link,
           deadline: poll.deadline ? formatDate(poll.deadline) : 'today',
         })
-        await replyToMessageWithHtml(process.env.PRIYA_EMAIL!, poll.release_message_id, {
-          subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
+        const manualReminderMessageId = await forwardMessageWithHtml(process.env.PRIYA_EMAIL!, poll.release_message_id, {
           htmlBody: manualReminderHtml,
           to: [process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!],
           bcc: manualReleaseEmails,
         })
+        await updatePoll(id, { last_reminder_message_id: manualReminderMessageId })
         await createAuditLog(id, 'MANUAL_REMINDER_SENT', userEmail, { emails: manualReleaseEmails })
         break
       }

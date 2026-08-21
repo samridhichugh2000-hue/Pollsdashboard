@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse, closeOutUntouchedEntries } from '@/lib/db/queries'
-import { sendEmail, getFormResponses } from '@/lib/graph'
+import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse, closeOutUntouchedEntries, getPollAttachments } from '@/lib/db/queries'
+import { sendEmail, forwardMessageWithHtml, getFormResponses } from '@/lib/graph'
 import { buildResultsEmailHtml, toISTDateStr, istMinutesOfDay } from '@/lib/utils'
 import * as XLSX from 'xlsx'
 
@@ -95,15 +95,32 @@ export async function GET(req: Request) {
       await createAuditLog(poll.id, 'AUTO_CLOSED', 'cron')
       await closeOutUntouchedEntries(poll.id)
 
-      // Send results to EA
+      // Send results to EA — forward the last reminder sent for this poll
+      // (falling back to the original release email, then to a plain new
+      // email for older polls with no stored thread at all) so EA sees the
+      // full poll context, not just a bare results notice. Attach whatever
+      // was attached at release time alongside the responses excel; forwarding
+      // already carries those along, but this covers polls closed same-day
+      // as release with no reminder/forward chain to inherit from.
       const htmlBody = buildResultsEmailHtml(poll.topic, attachments.length > 0)
-      await sendEmail({
-        from: process.env.PRIYA_EMAIL!,
-        to: process.env.RESULTS_RECIPIENT_EMAIL ?? 'ea@koenig-solutions.com',
-        subject: `Poll Results: ${poll.topic}`,
-        htmlBody,
-        ...(attachments.length > 0 && { attachments }),
-      })
+      const resultsRecipient = process.env.RESULTS_RECIPIENT_EMAIL ?? 'ea@koenig-solutions.com'
+      const forwardSourceId = poll.last_reminder_message_id ?? poll.release_message_id
+      if (forwardSourceId) {
+        const releaseAttachments = await getPollAttachments(poll.id)
+        await forwardMessageWithHtml(process.env.PRIYA_EMAIL!, forwardSourceId, {
+          htmlBody,
+          to: [resultsRecipient],
+          attachments: [...attachments, ...releaseAttachments],
+        })
+      } else {
+        await sendEmail({
+          from: process.env.PRIYA_EMAIL!,
+          to: resultsRecipient,
+          subject: `Poll Results: ${poll.topic}`,
+          htmlBody,
+          ...(attachments.length > 0 && { attachments }),
+        })
+      }
 
       // Results just went out unconditionally above — reflect that in status
       // so this poll doesn't sit under "Result Not Sent" forever. Only runs

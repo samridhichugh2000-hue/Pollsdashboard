@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getPollsByStatus, updatePollStatus, claimPollColumn, createAuditLog } from '@/lib/db/queries'
-import { replyToMessageWithHtml } from '@/lib/graph'
+import { getPollsByStatus, updatePollStatus, claimPollColumn, createAuditLog, updatePoll } from '@/lib/db/queries'
+import { forwardMessageWithHtml } from '@/lib/graph'
 import { buildPollEmailHtml, formatDate, toISTDateStr, isISTWeekend } from '@/lib/utils'
 
 export async function GET(req: Request) {
@@ -44,12 +44,12 @@ export async function GET(req: Request) {
       })
 
       const priyaEmail = process.env.PRIYA_EMAIL!
-      await replyToMessageWithHtml(priyaEmail, poll.release_message_id, {
-        subject: `Re: ${poll.subject ?? `Poll: ${poll.topic}`}`,
+      const newMessageId = await forwardMessageWithHtml(priyaEmail, poll.release_message_id, {
         htmlBody,
         to: [process.env.POLLS_MAILBOX ?? priyaEmail],
         bcc: releaseEmails,
       })
+      await updatePoll(poll.id, { last_reminder_message_id: newMessageId })
 
       await createAuditLog(poll.id, 'CLOSURE_ALERT_SENT', 'cron', { emails: releaseEmails })
       sent++
