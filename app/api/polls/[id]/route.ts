@@ -565,7 +565,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'SHARE_RESULTS': {
-        if (!['CLOSED', 'RESULTS_SHARED'].includes(poll.status)) {
+        if (!CLOSED_POLL_STATUSES.includes(poll.status)) {
           return NextResponse.json({ error: `Cannot share results for a poll in ${poll.status} status — it must be closed first.` }, { status: 409 })
         }
         const shareRecipients = Array.isArray(body.recipients) && (body.recipients as string[]).length > 0

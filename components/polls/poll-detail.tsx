@@ -998,23 +998,6 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   <XCircle className="mr-1.5 h-3.5 w-3.5" /> Close Responses
                 </Button>
               )}
-
-              {['CLOSED', 'RESULTS_SHARED', 'RESULTS_UPLOADED'].includes(poll.status) && (
-                <Button
-                  className="w-full"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    if (confirm('Close pending responses? Anyone whose response was never marked actionable or not-actionable will get an automatic "no action taken" email, and those entries will be marked resolved. Do this only after you\'ve finished acting on individual responses.')) {
-                      void runAction('CLOSE_PENDING_RESPONSES')
-                    }
-                  }}
-                  disabled={!!loading}
-                >
-                  {loading === 'CLOSE_PENDING_RESPONSES' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                  <XCircle className="mr-1.5 h-3.5 w-3.5" /> Close Pending Responses
-                </Button>
-              )}
             </CardContent>
           </Card>
 
@@ -1111,6 +1094,21 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   {entries.length > 0 && (
                     <Button size="sm" variant="outline" onClick={downloadResponses}>
                       <Download className="mr-1.5 h-3.5 w-3.5" /> Download Excel
+                    </Button>
+                  )}
+                  {['CLOSED', 'RESULTS_SHARED', 'RESULTS_UPLOADED'].includes(poll.status) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (confirm('Close pending responses? Anyone whose response was never marked actionable or not-actionable will get an automatic "no action taken" email, and those entries will be marked resolved. Do this only after you\'ve finished acting on individual responses.')) {
+                          void runAction('CLOSE_PENDING_RESPONSES').then(() => void refreshResponse())
+                        }
+                      }}
+                      disabled={!!loading}
+                    >
+                      {loading === 'CLOSE_PENDING_RESPONSES' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                      <XCircle className="mr-1.5 h-3.5 w-3.5" /> Close Pending Responses
                     </Button>
                   )}
                 </div>

@@ -266,6 +266,7 @@ function FeedbackPageInner() {
   const [search, setSearch] = useState('')
   const [crossPollEntries, setCrossPollEntries] = useState<{ nonActionable: PopupEntry[]; rms: PopupEntry[]; nonRms: PopupEntry[] }>({ nonActionable: [], rms: [], nonRms: [] })
   const [openPopup, setOpenPopup] = useState<'nonActionable' | 'rms' | 'nonRms' | null>(null)
+  const [closingPendingFor, setClosingPendingFor] = useState<string | null>(null)
 
   const fetchPolls = useCallback(async () => {
     setLoadingPolls(true)
@@ -324,6 +325,28 @@ function FeedbackPageInner() {
       setPolls(prev => prev.map(p => p.id === pollId ? { ...p, entries: [], loading: false } : p))
     }
   }, [])
+
+  const closePendingResponses = useCallback(async (pollId: string) => {
+    if (!confirm('Close pending responses? Anyone whose response was never marked actionable or not-actionable will get an automatic "no action taken" email, and those entries will be marked resolved. Do this only after you\'ve finished acting on individual responses.')) return
+    setClosingPendingFor(pollId)
+    try {
+      const res = await fetch(`/api/polls/${pollId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'CLOSE_PENDING_RESPONSES' }),
+      })
+      if (res.ok) {
+        toast.success('Pending responses closed')
+        await loadEntries(pollId)
+      } else {
+        toast.error(await getErrorMessage(res, 'Failed to close pending responses'))
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to close pending responses')
+    } finally {
+      setClosingPendingFor(null)
+    }
+  }, [loadEntries])
 
   // Auto-load entries when arriving via ?poll= URL param
   useEffect(() => {
@@ -520,9 +543,23 @@ function FeedbackPageInner() {
         ) : (
           <>
             {/* Poll title */}
-            <div className="flex-shrink-0">
-              <h2 className="text-sm font-bold text-slate-800 dark:text-white truncate">{activePoll.topic}</h2>
-              <p className="text-xs text-slate-400">{activePoll.department} · {activePoll.requested_by}</p>
+            <div className="flex-shrink-0 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold text-slate-800 dark:text-white truncate">{activePoll.topic}</h2>
+                <p className="text-xs text-slate-400">{activePoll.department} · {activePoll.requested_by}</p>
+              </div>
+              {['CLOSED', 'RESULTS_SHARED', 'RESULTS_UPLOADED'].includes(activePoll.status) && (
+                <button
+                  onClick={() => void closePendingResponses(activePoll.id)}
+                  disabled={closingPendingFor === activePoll.id}
+                  className="flex-shrink-0 flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e2535] px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+                >
+                  {closingPendingFor === activePoll.id
+                    ? <div className="h-3 w-3 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+                    : <XCircle className="h-3.5 w-3.5" />}
+                  Close Pending Responses
+                </button>
+              )}
             </div>
 
             {/* Stat cards */}
