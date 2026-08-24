@@ -255,10 +255,18 @@ export async function sendEmailGetId(options: SendEmailOptions): Promise<string>
   return created.internetMessageId
 }
 
-// Looks up a previously-sent message in Sent Items by its RFC internetMessageId,
-// searching the polls mailbox first (release/reminder emails display "From:
-// polls@"), then falling back to the acting mailbox. Shared by
-// replyToMessageWithHtml and forwardMessageWithHtml.
+// polls@koenig-solutions.com is a Send-As address, not a real mailbox object
+// — Graph 404s (ErrorInvalidUser) on any /users/polls@.../messages call, so
+// despite release/reminder emails displaying "From: polls@", their Sent
+// Items copy actually lands in whichever mailbox executed the send, not the
+// impersonated From address. Before the mail identity moved from Priya to
+// Gunjan (2026-08-21), that was Priya's mailbox — so any poll released
+// before the switch is only findable there, never under the current
+// PRIYA_EMAIL. Kept as a permanent fallback so old polls stay forwardable.
+const LEGACY_ACTING_MAILBOX = 'priya.upadhyay@koenig-solutions.com'
+
+// Looks up a previously-sent message in Sent Items by its RFC internetMessageId.
+// Shared by replyToMessageWithHtml and forwardMessageWithHtml.
 // ConsistencyLevel: eventual is required for filtering on non-indexed properties.
 async function findSentMessage(from: string, internetMessageId: string, logLabel: string): Promise<{ mailbox: string; id: string }> {
   const filter = `internetMessageId eq '${internetMessageId.replace(/'/g, "''")}'`
@@ -266,7 +274,7 @@ async function findSentMessage(from: string, internetMessageId: string, logLabel
   const qs = `$filter=${encodeURIComponent(filter)}&$select=id&$top=1&$count=true`
 
   const pollsMailbox = process.env.POLLS_MAILBOX
-  const mailboxesToSearch = [...new Set([pollsMailbox, from].filter(Boolean))] as string[]
+  const mailboxesToSearch = [...new Set([pollsMailbox, from, LEGACY_ACTING_MAILBOX].filter(Boolean))] as string[]
 
   console.log(`[${logLabel}] Searching for internetMessageId: ${internetMessageId}`)
   for (const mailbox of mailboxesToSearch) {
