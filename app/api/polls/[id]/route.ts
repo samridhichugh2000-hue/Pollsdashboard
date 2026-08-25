@@ -18,8 +18,9 @@ import {
   CLOSED_POLL_STATUSES,
 } from '@/lib/db/queries'
 import type { PollAttachment } from '@/lib/db/queries'
-import { sendEmail, sendEmailGetId, replyToMessageWithHtml, forwardMessageWithHtml } from '@/lib/graph'
-import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, buildNoActionTakenHtml, formatDate } from '@/lib/utils'
+import { sendEmail, replyToMessageWithHtml, forwardMessageWithHtml } from '@/lib/graph'
+import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, buildNoActionTakenHtml, formatDate, toISTDateStr } from '@/lib/utils'
+import { releasePollNow } from '@/lib/poll-release'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
 import { pushPollToKites, buildResponsesHtml, uploadPollResults } from '@/lib/kites-api'
@@ -212,10 +213,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'RELEASE_POLL': {
-        if (poll.status !== 'APPROVED') {
+        // SCHEDULED is allowed too, so a scheduled poll can be released early
+        // ("Release Now") ahead of its scheduled date — it falls back to the
+        // recipients/attachments already stored when it was scheduled.
+        if (!['APPROVED', 'SCHEDULED'].includes(poll.status)) {
           return NextResponse.json({ error: `Cannot release a poll in ${poll.status} status — a double-click or retry after this poll already released would otherwise re-send to every recipient.` }, { status: 409 })
         }
-        const allEmails = body.allEmails as string[]
+        const allEmails = Array.isArray(body.allEmails) && body.allEmails.length > 0
+          ? body.allEmails as string[]
+          : (poll.scheduled_release_emails ? JSON.parse(poll.scheduled_release_emails) as string[] : [])
         if (!allEmails?.length) {
           return NextResponse.json({ error: 'Select at least one recipient.' }, { status: 400 })
         }
@@ -226,21 +232,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: 'No draft email body.' }, { status: 400 })
         }
 
-        const pollDeadline = poll.deadline ? formatDate(poll.deadline) : 'TBD'
-        const pollHtml = buildPollEmailHtml({
-          emailBody: poll.draft_email_body,
-          msFormLink: poll.ms_form_link,
-          deadline: pollDeadline,
-        })
-
         // Newly uploaded files from the release dialog (base64).
         const newAttachments = Array.isArray(body.attachments)
           ? (body.attachments as PollAttachment[])
           : []
 
-        // Attachments stored at approval time. The client sends only the names the
-        // user explicitly removed in the release dialog, so the safe default — no
-        // list, or a failed metadata load on the client — keeps everything stored.
+        // Attachments stored at approval (or scheduling) time. The client sends
+        // only the names the user explicitly removed in the release dialog, so
+        // the safe default — no list, or a failed metadata load on the client —
+        // keeps everything stored.
         const stored = await getPollAttachments(id)
         const removeNames = Array.isArray(body.removeAttachmentNames)
           ? new Set(body.removeAttachmentNames as string[])
@@ -257,25 +257,74 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const releaseSizeError = validateAttachmentSizes(releaseAttachments)
         if (releaseSizeError) return NextResponse.json({ error: releaseSizeError }, { status: 400 })
 
-        const pollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
-        const releaseMessageId = await sendEmailGetId({
-          from: process.env.PRIYA_EMAIL!,
-          to: pollsMailbox,
-          bcc: allEmails,
-          subject: poll.subject ?? (poll.department && poll.department !== 'All Departments' ? `Poll of ${poll.department} – ${poll.topic}` : `Poll – ${poll.topic}`),
-          htmlBody: pollHtml,
-          attachments: releaseAttachments,
-        })
+        await releasePollNow(poll, id, allEmails, releaseAttachments, userEmail)
+        break
+      }
 
-        // Persist the final released set so it reflects what actually went out.
-        await replacePollAttachments(id, releaseAttachments)
+      // Schedules a one-time poll to auto-release on a future date, without
+      // making it part of the recurring Cadence system — same poll, same
+      // approval flow, it just waits for the scheduled-poll-release cron to
+      // send it instead of sending immediately.
+      case 'SCHEDULE_RELEASE': {
+        if (poll.status !== 'APPROVED') {
+          return NextResponse.json({ error: `Cannot schedule a poll in ${poll.status} status.` }, { status: 409 })
+        }
+        const scheduledReleaseAt = body.scheduled_release_at as string
+        if (!scheduledReleaseAt) {
+          return NextResponse.json({ error: 'scheduled_release_at is required.' }, { status: 400 })
+        }
+        const scheduledDate = new Date(scheduledReleaseAt)
+        if (isNaN(scheduledDate.getTime())) {
+          return NextResponse.json({ error: 'Invalid date.' }, { status: 400 })
+        }
+        if (toISTDateStr(scheduledDate) <= toISTDateStr(new Date())) {
+          return NextResponse.json({ error: 'Scheduled date must be in the future.' }, { status: 400 })
+        }
 
-        await updatePollStatus(id, 'SENT', {
-          sent_at: new Date().toISOString(),
-          release_emails: JSON.stringify(allEmails),
-          release_message_id: releaseMessageId,
+        const scheduleEmails = body.allEmails as string[]
+        if (!scheduleEmails?.length) {
+          return NextResponse.json({ error: 'Select at least one recipient.' }, { status: 400 })
+        }
+        if (!poll.ms_form_link) {
+          return NextResponse.json({ error: 'Poll form not created yet.' }, { status: 400 })
+        }
+        if (!poll.draft_email_body) {
+          return NextResponse.json({ error: 'No draft email body.' }, { status: 400 })
+        }
+
+        const scheduleNewAttachments = Array.isArray(body.attachments)
+          ? (body.attachments as PollAttachment[])
+          : []
+        const scheduleStored = await getPollAttachments(id)
+        const scheduleRemoveNames = Array.isArray(body.removeAttachmentNames)
+          ? new Set(body.removeAttachmentNames as string[])
+          : new Set<string>()
+        const scheduleKeptStored = scheduleStored.filter((a) => !scheduleRemoveNames.has(a.name))
+        const scheduleNewNames = new Set(scheduleNewAttachments.map((a) => a.name))
+        const scheduledAttachments: PollAttachment[] = [
+          ...scheduleKeptStored.filter((a) => !scheduleNewNames.has(a.name)),
+          ...scheduleNewAttachments,
+        ]
+        const scheduleSizeError = validateAttachmentSizes(scheduledAttachments)
+        if (scheduleSizeError) return NextResponse.json({ error: scheduleSizeError }, { status: 400 })
+
+        await replacePollAttachments(id, scheduledAttachments)
+        await updatePoll(id, {
+          scheduled_release_at: scheduledDate.toISOString(),
+          scheduled_release_emails: JSON.stringify(scheduleEmails),
         })
-        await createAuditLog(id, 'POLL_RELEASED', userEmail, { emails: allEmails })
+        await updatePollStatus(id, 'SCHEDULED')
+        await createAuditLog(id, 'POLL_SCHEDULED', userEmail, { scheduled_release_at: scheduledDate.toISOString(), emails: scheduleEmails })
+        break
+      }
+
+      case 'CANCEL_SCHEDULE': {
+        if (poll.status !== 'SCHEDULED') {
+          return NextResponse.json({ error: 'Poll is not scheduled.' }, { status: 409 })
+        }
+        await updatePoll(id, { scheduled_release_at: null, scheduled_release_emails: null })
+        await updatePollStatus(id, 'APPROVED')
+        await createAuditLog(id, 'SCHEDULE_CANCELLED', userEmail)
         break
       }
 

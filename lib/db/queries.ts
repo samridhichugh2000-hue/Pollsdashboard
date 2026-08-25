@@ -152,6 +152,7 @@ export async function updatePoll(id: string, fields: Partial<Poll>): Promise<voi
     'deadline', 'ms_form_id', 'ms_form_link', 'rms_task_id', 'rms_news_id',
     'status', 'sent_at', 'reminder_at', 'reminder_sent_at', 'second_reminder_sent_at', 'closure_alert_sent_at', 'approved_at',
     'closed_at', 'results_uploaded_at', 'closed_message', 'remarks', 'release_emails', 'release_message_id', 'last_reminder_message_id',
+    'scheduled_release_at', 'scheduled_release_emails',
   ]
   const setClauses: string[] = ['updated_at = ?']
   const args: (string | null | boolean)[] = [now]

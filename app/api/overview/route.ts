@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
   const kpiRow = kpiRes.rows[0] as unknown as { process_improvements: number; rms_improvements: number; policy_announced: number } | undefined
 
   // Poll breakdown
-  const PENDING_STATUSES = ['DETECTED', 'DRAFT', 'FORM_CREATED', 'AWAITING_APPROVAL', 'APPROVED', 'RMS_TASK_CREATED', 'REJECTED', 'RMS_TASK_FAILED', 'RMS_PUBLISH_FAILED', 'SEND_FAILED']
+  const PENDING_STATUSES = ['DETECTED', 'DRAFT', 'FORM_CREATED', 'AWAITING_APPROVAL', 'APPROVED', 'SCHEDULED', 'RMS_TASK_CREATED', 'REJECTED', 'RMS_TASK_FAILED', 'RMS_PUBLISH_FAILED', 'SEND_FAILED']
   const ACTIVE_STATUSES = ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED']
   const CLOSED_STATUSES: string[] = CLOSED_POLL_STATUSES
 

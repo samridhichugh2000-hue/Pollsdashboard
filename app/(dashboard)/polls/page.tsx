@@ -20,7 +20,7 @@ const VALID_CARD_KEYS: CardKey[] = ['not-sent', 'approval-pending', 'active', 'c
 // PENDING_STATUSES) — that card's onClick used to route here with no matching
 // filter at all, so clicking it landed on the fully unfiltered list instead
 // of reproducing the count it showed.
-const PENDING_STATUSES = ['DETECTED', 'DRAFT', 'FORM_CREATED', 'AWAITING_APPROVAL', 'APPROVED', 'RMS_TASK_CREATED', 'REJECTED', 'RMS_TASK_FAILED', 'RMS_PUBLISH_FAILED', 'SEND_FAILED']
+const PENDING_STATUSES = ['DETECTED', 'DRAFT', 'FORM_CREATED', 'AWAITING_APPROVAL', 'APPROVED', 'SCHEDULED', 'RMS_TASK_CREATED', 'REJECTED', 'RMS_TASK_FAILED', 'RMS_PUBLISH_FAILED', 'SEND_FAILED']
 
 function filterByCard(polls: Poll[], key: CardKey): Poll[] {
   switch (key) {

@@ -268,6 +268,18 @@ export async function runMigrations() {
     await db.execute(`ALTER TABLE polls ADD COLUMN last_reminder_message_id TEXT`)
   } catch { /* already exists */ }
 
+  // One-time polls scheduled to auto-release on a future date, without being
+  // part of the recurring Cadence system. scheduled_release_emails holds the
+  // intended recipients chosen at scheduling time, kept separate from
+  // release_emails (which means "who it was actually sent to") until the
+  // cron performs the real send.
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN scheduled_release_at DATETIME`)
+  } catch { /* already exists */ }
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN scheduled_release_emails TEXT`)
+  } catch { /* already exists */ }
+
   // Optional custom message shown on the public respond page once a poll is
   // closed, e.g. to redirect respondents to a replacement poll. Falls back to
   // the generic "no longer accepting responses" text when unset.

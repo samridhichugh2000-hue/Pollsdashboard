@@ -88,6 +88,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
   const [existingAttachments, setExistingAttachments] = useState<{ name: string; size: number }[]>([])
   const [removedAttachmentNames, setRemovedAttachmentNames] = useState<string[]>([])
   const releaseFileInputRef = useRef<HTMLInputElement>(null)
+  const [releaseTiming, setReleaseTiming] = useState<'now' | 'later'>('now')
+  const [scheduledDate, setScheduledDate] = useState('')
   const draftFileInputRef = useRef<HTMLInputElement>(null)
 
   // Share results state
@@ -382,6 +384,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     setHuntGroupDropdownOpen(false)
     setReleaseAttachments([])
     setRemovedAttachmentNames([])
+    setReleaseTiming('now')
+    setScheduledDate('')
     setHuntGroupsLoading(true)
     // Load any attachments saved during approval so they carry into the release email.
     try {
@@ -407,6 +411,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     const manualEmails = parseEmails(customReleaseText)
     const allEmails = [...new Set([...huntGroupSelected.map(g => g.email), ...manualEmails])]
     if (!allEmails.length) { toast.error('Add at least one recipient.'); return }
+    if (releaseTiming === 'later' && !scheduledDate) { toast.error('Pick a release date.'); return }
 
     let attachments: { name: string; contentType: string; contentBytes: string }[] = []
     if (releaseAttachments.length > 0) {
@@ -425,7 +430,14 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     }
 
     setShowReleaseDialog(false)
-    void runAction('RELEASE_POLL', { allEmails, attachments, removeAttachmentNames: removedAttachmentNames })
+    if (releaseTiming === 'later') {
+      void runAction('SCHEDULE_RELEASE', {
+        allEmails, attachments, removeAttachmentNames: removedAttachmentNames,
+        scheduled_release_at: new Date(scheduledDate).toISOString(),
+      })
+    } else {
+      void runAction('RELEASE_POLL', { allEmails, attachments, removeAttachmentNames: removedAttachmentNames })
+    }
   }
 
   const addShareRecipient = () => {
@@ -845,6 +857,42 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                   {loading === 'RELEASE_POLL' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                   <Send className="mr-1.5 h-3.5 w-3.5" /> Release Poll
                 </Button>
+              )}
+
+              {poll.status === 'SCHEDULED' && (
+                <div className="space-y-2">
+                  <div className="rounded-md bg-indigo-50 border border-indigo-200 px-3 py-2 text-xs text-indigo-700 dark:bg-indigo-900/20 dark:border-indigo-900/50 dark:text-indigo-300">
+                    Scheduled to release on <strong>{formatDate(poll.scheduled_release_at)}</strong>
+                  </div>
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (confirm('Release this poll right now instead of waiting for its scheduled date?')) {
+                        void runAction('RELEASE_POLL')
+                      }
+                    }}
+                    disabled={!!loading}
+                  >
+                    {loading === 'RELEASE_POLL' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                    <Send className="mr-1.5 h-3.5 w-3.5" /> Release Now
+                  </Button>
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (confirm('Cancel the schedule? This poll will go back to Approved and won\'t release automatically.')) {
+                        void runAction('CANCEL_SCHEDULE')
+                      }
+                    }}
+                    disabled={!!loading}
+                  >
+                    {loading === 'CANCEL_SCHEDULE' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                    <X className="mr-1.5 h-3.5 w-3.5" /> Cancel Schedule
+                  </Button>
+                </div>
               )}
 
               {poll.status === 'AWAITING_APPROVAL' && (
@@ -1474,16 +1522,40 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             )}
           </div>
 
+          {/* Release timing */}
+          <div className="space-y-2 pt-1 border-t border-gray-100 dark:border-slate-700">
+            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide dark:text-slate-400">When</Label>
+            <div className="flex gap-3">
+              <label className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-slate-300 cursor-pointer">
+                <input type="radio" name="releaseTiming" checked={releaseTiming === 'now'} onChange={() => setReleaseTiming('now')} />
+                Now
+              </label>
+              <label className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-slate-300 cursor-pointer">
+                <input type="radio" name="releaseTiming" checked={releaseTiming === 'later'} onChange={() => setReleaseTiming('later')} />
+                Schedule for later
+              </label>
+            </div>
+            {releaseTiming === 'later' && (
+              <Input
+                type="date"
+                min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                value={scheduledDate}
+                onChange={(e) => setScheduledDate(e.target.value)}
+              />
+            )}
+          </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowReleaseDialog(false)}>
               Cancel
             </Button>
             {(() => {
               const total = selectedHuntGroupIds.length + parseEmails(customReleaseText).length
+              const label = total > 0 ? `${total} recipient${total > 1 ? 's' : ''}` : 'selected recipients'
               return (
                 <Button onClick={releasePoll} disabled={huntGroupsLoading}>
                   <Send className="mr-1.5 h-3.5 w-3.5" />
-                  Release to {total > 0 ? `${total} recipient${total > 1 ? 's' : ''}` : 'selected recipients'}
+                  {releaseTiming === 'later' ? `Schedule for ${label}` : `Release to ${label}`}
                 </Button>
               )
             })()}

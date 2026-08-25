@@ -4,6 +4,7 @@ export type PollStatus =
   | 'FORM_CREATED'
   | 'AWAITING_APPROVAL'
   | 'APPROVED'
+  | 'SCHEDULED'
   | 'RMS_TASK_CREATED'
   | 'SENT'
   | 'REMINDER_SENT'
@@ -46,6 +47,8 @@ export interface Poll {
   release_emails?: string | null // JSON array of email strings
   release_message_id?: string | null // Graph message ID of the release email
   last_reminder_message_id?: string | null // Graph message ID of the most recently sent reminder/closure-alert email
+  scheduled_release_at?: string | null // future date/time this poll should auto-release
+  scheduled_release_emails?: string | null // JSON array of intended recipients, set when scheduling, copied to release_emails on actual send
   status: PollStatus
   sent_at?: string | null
   reminder_at?: string | null
@@ -182,6 +185,7 @@ export const STATUS_LABELS: Record<PollStatus, string> = {
   FORM_CREATED: 'Form Created',
   AWAITING_APPROVAL: 'Awaiting Approval',
   APPROVED: 'Approved',
+  SCHEDULED: 'Scheduled',
   RMS_TASK_CREATED: 'RMS Task Created',
   SENT: 'Sent',
   REMINDER_SENT: 'Reminder Sent',
@@ -202,6 +206,7 @@ export const STATUS_COLORS: Record<PollStatus, string> = {
   FORM_CREATED: 'bg-indigo-100 text-indigo-800',
   AWAITING_APPROVAL: 'bg-yellow-100 text-yellow-800',
   APPROVED: 'bg-green-100 text-green-800',
+  SCHEDULED: 'bg-indigo-100 text-indigo-800',
   RMS_TASK_CREATED: 'bg-teal-100 text-teal-800',
   SENT: 'bg-purple-100 text-purple-800',
   REMINDER_SENT: 'bg-violet-100 text-violet-800',
