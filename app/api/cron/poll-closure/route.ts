@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse, getPollAttachments } from '@/lib/db/queries'
-import { sendEmail, forwardMessageWithHtml, getFormResponses } from '@/lib/graph'
+import { sendEmail, forwardMessageWithHtml, standardCC, getFormResponses } from '@/lib/graph'
 import { buildResultsEmailHtml, toISTDateStr, istMinutesOfDay } from '@/lib/utils'
 import * as XLSX from 'xlsx'
 
@@ -109,12 +109,14 @@ export async function GET(req: Request) {
         await forwardMessageWithHtml(process.env.PRIYA_EMAIL!, forwardSourceId, {
           htmlBody,
           to: [resultsRecipient],
+          cc: standardCC(),
           attachments: [...attachments, ...releaseAttachments],
         })
       } else {
         await sendEmail({
           from: process.env.PRIYA_EMAIL!,
           to: resultsRecipient,
+          cc: standardCC(),
           subject: `Poll Results: ${poll.topic}`,
           htmlBody,
           ...(attachments.length > 0 && { attachments }),

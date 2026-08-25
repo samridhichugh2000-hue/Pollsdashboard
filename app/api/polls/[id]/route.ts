@@ -18,7 +18,7 @@ import {
   CLOSED_POLL_STATUSES,
 } from '@/lib/db/queries'
 import type { PollAttachment } from '@/lib/db/queries'
-import { sendEmail, replyToMessageWithHtml, forwardMessageWithHtml } from '@/lib/graph'
+import { sendEmail, replyToMessageWithHtml, forwardMessageWithHtml, standardCC } from '@/lib/graph'
 import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, buildNoActionTakenHtml, formatDate, toISTDateStr } from '@/lib/utils'
 import { releasePollNow } from '@/lib/poll-release'
 import { generatePollDraft } from '@/lib/draft-generator'
@@ -86,7 +86,7 @@ async function sendNoActionTakenEmails(pollId: string, topic: string): Promise<v
       await sendEmail({
         from: process.env.POLLS_MAILBOX ?? 'polls@koenig-solutions.com',
         to: entry.email,
-        cc: process.env.PRIYA_EMAIL,
+        cc: standardCC(),
         subject: `Re: Your response to "${topic}"`,
         htmlBody: buildNoActionTakenHtml({
           name: entry.respondent ?? nameFromEmail(entry.email),
@@ -672,6 +672,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await forwardMessageWithHtml(process.env.PRIYA_EMAIL!, forwardSourceId, {
           htmlBody: emailHtml,
           to: shareRecipients,
+          cc: standardCC(),
           attachments: [attachment, ...releaseAttachments],
         })
 
@@ -856,6 +857,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await sendEmail({
           from: process.env.PRIYA_EMAIL!,
           to: replyEntry.email,
+          cc: standardCC(),
           subject: `Re: Your response to "${poll.topic}"`,
           htmlBody: buildReplyToRespondentHtml({ name: respondentName, topic: poll.topic, replyMessage, answers }),
         })

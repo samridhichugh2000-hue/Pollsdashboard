@@ -5,6 +5,13 @@
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
 
+// CC'd on results-sharing, no-action-taken, and respondent-reply emails sent
+// from the dashboard, so both the shared mailbox and whoever is currently
+// acting as it stay visibly in the loop on every outbound thread.
+export function standardCC(): string[] {
+  return [...new Set([process.env.POLLS_MAILBOX, process.env.PRIYA_EMAIL].filter(Boolean))] as string[]
+}
+
 async function getAppAccessToken(): Promise<string> {
   const tenantId = process.env.AZURE_AD_TENANT_ID!
   const clientId = process.env.AZURE_AD_CLIENT_ID!
@@ -341,11 +348,14 @@ export async function replyToMessageWithHtml(
 export async function forwardMessageWithHtml(
   from: string,
   internetMessageId: string,
-  options: { htmlBody: string; to: string[]; bcc?: string[]; attachments?: EmailAttachment[] }
+  options: { htmlBody: string; to: string[]; cc?: string[]; bcc?: string[]; attachments?: EmailAttachment[] }
 ): Promise<string> {
   const { mailbox: foundInMailbox, id: sourceMessageId } = await findSentMessage(from, internetMessageId, 'forwardMessageWithHtml')
 
   const toRecipients = options.to.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
+  const ccRecipients = options.cc?.length
+    ? options.cc.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
+    : undefined
   const bccRecipients = options.bcc?.length
     ? options.bcc.map((addr) => ({ emailAddress: { address: extractEmail(addr) } }))
     : undefined
@@ -360,6 +370,7 @@ export async function forwardMessageWithHtml(
       method: 'POST',
       body: JSON.stringify({
         toRecipients,
+        ...(ccRecipients && { ccRecipients }),
         ...(bccRecipients && { bccRecipients }),
         message: { from: { emailAddress: { address: pollsSender } } },
       }),
