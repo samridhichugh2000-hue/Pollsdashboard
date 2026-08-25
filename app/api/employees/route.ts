@@ -9,6 +9,13 @@ const KOENIG_PASS = process.env.KOENIG_EMPLOYEE_PASSWORD!
 const KOENIG_ROLE = process.env.KOENIG_EMPLOYEE_ROLE!
 const API_KEY = process.env.KOENIG_EMPLOYEE_API_KEY!
 
+// Separate account used only to fetch accurate emp codes — the main account above
+// returns manager/department/designation but its emp_code field comes back blank.
+const EMPCODE_USER = process.env.KOENIG_EMPCODE_USERNAME!
+const EMPCODE_PASS = process.env.KOENIG_EMPCODE_PASSWORD!
+const EMPCODE_ROLE = process.env.KOENIG_EMPCODE_ROLE!
+const EMPCODE_API_KEY = process.env.KOENIG_EMPCODE_API_KEY!
+
 interface KoenigEmployee {
   first_name: string | null
   last_name: string | null
@@ -19,14 +26,25 @@ interface KoenigEmployee {
   emp_code?: string | null
 }
 
-async function fetchAllEmployees(): Promise<KoenigEmployee[]> {
+interface KoenigEmpCodeEntry {
+  user_name: string | null
+  user_emp_code: string | number | null
+  user_id: number | null
+  user_email_address: string | null
+}
+
+async function getToken(user: string, pass: string, role: string): Promise<{ accessToken: string; deviceToken: string }> {
   const tokenRes = await fetch(`${KOENIG_BASE}/api/Kites/Operator/GetToken`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userName: KOENIG_USER, userPassword: KOENIG_PASS, userRole: KOENIG_ROLE }),
+    body: JSON.stringify({ userName: user, userPassword: pass, userRole: role }),
   })
   const tokenData = await tokenRes.json() as { content: { accessToken: string; deviceToken: string } }
-  const { accessToken, deviceToken } = tokenData.content
+  return tokenData.content
+}
+
+async function fetchAllEmployees(): Promise<KoenigEmployee[]> {
+  const { accessToken, deviceToken } = await getToken(KOENIG_USER, KOENIG_PASS, KOENIG_ROLE)
 
   const url = `${KOENIG_BASE}/api/Kites/Operator/common?apikey=${API_KEY}&accessToken=${encodeURIComponent(accessToken)}&deviceToken=${deviceToken}`
   const res = await fetch(url, {
@@ -37,6 +55,32 @@ async function fetchAllEmployees(): Promise<KoenigEmployee[]> {
   const data = await res.json() as { statuscode: number; content: string }
   if (data.statuscode !== 200 || !data.content) return []
   return JSON.parse(data.content) as KoenigEmployee[]
+}
+
+// Returns a map of lowercased email -> emp_code from the dedicated emp-code account.
+async function fetchEmpCodesByEmail(): Promise<Map<string, string>> {
+  const { accessToken, deviceToken } = await getToken(EMPCODE_USER, EMPCODE_PASS, EMPCODE_ROLE)
+
+  const url = `${KOENIG_BASE}/api/Kites/Operator/common?apikey=${EMPCODE_API_KEY}&accessToken=${encodeURIComponent(accessToken)}&deviceToken=${deviceToken}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+  const data = await res.json() as { statuscode: number; content: string; message?: string }
+  if (data.statuscode !== 200 || !data.content) {
+    console.error('[employees sync] emp-code fetch failed:', data.statuscode, data.message)
+    return new Map()
+  }
+
+  const entries = JSON.parse(data.content) as KoenigEmpCodeEntry[]
+  const map = new Map<string, string>()
+  for (const e of entries) {
+    const email = e.user_email_address?.trim().toLowerCase()
+    if (email && e.user_emp_code != null) map.set(email, String(e.user_emp_code))
+  }
+  console.log('[employees sync] emp-code map size:', map.size)
+  return map
 }
 
 export async function GET() {
@@ -59,7 +103,7 @@ export async function POST() {
   await runMigrations()
   const db = getDb()
 
-  const employees = await fetchAllEmployees()
+  const [employees, empCodesByEmail] = await Promise.all([fetchAllEmployees(), fetchEmpCodesByEmail()])
 
   // Never wipe the table on an empty/failed fetch — a transient upstream
   // hiccup (rate limit, bad token) would otherwise silently delete every
@@ -75,6 +119,7 @@ export async function POST() {
   for (const emp of employees) {
     const email = emp.email_address?.trim() ?? ''
     if (!email.toLowerCase().includes('@koenig-solutions.com')) continue
+    const empCode = emp.emp_code ?? empCodesByEmail.get(email.toLowerCase()) ?? null
     await db.execute({
       sql: `INSERT INTO employees (email_address, emp_code, first_name, last_name, manager_name, department_name, designation_name, synced_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -86,10 +131,10 @@ export async function POST() {
               department_name = excluded.department_name,
               designation_name = excluded.designation_name,
               synced_at = CURRENT_TIMESTAMP`,
-      args: [email, emp.emp_code ?? null, emp.first_name, emp.last_name, emp.manager_name, emp.deparment_name, emp.designation_name],
+      args: [email, empCode, emp.first_name, emp.last_name, emp.manager_name, emp.deparment_name, emp.designation_name],
     })
     synced++
   }
 
-  return NextResponse.json({ synced, message: `Synced ${synced} active employees`, complete: true })
+  return NextResponse.json({ synced, empCodeMapSize: empCodesByEmail.size, message: `Synced ${synced} active employees`, complete: true })
 }

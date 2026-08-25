@@ -236,9 +236,9 @@ export default function ParticipationPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => void fetchData(true)} disabled={loading}
+          <button onClick={() => void triggerBackgroundSync()} disabled={loading || bgSyncing}
             className="flex items-center gap-1.5 h-[34px] px-3 rounded border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[13px] text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${(loading || bgSyncing) ? 'animate-spin' : ''}`} />
           </button>
           <button className="flex items-center gap-1.5 h-[34px] px-3.5 rounded border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[13px] text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
             <Download className="h-3.5 w-3.5" /> Export
