@@ -84,7 +84,12 @@ export async function GET(req: Request) {
   for (const poll of reminderSentPolls) {
     if (!poll.deadline || !poll.ms_form_link || !poll.release_message_id) continue
     if (poll.second_reminder_sent_at) continue
-    if (toISTDateStr(new Date(poll.deadline)) !== todayISTDate) continue
+    // "Has the deadline arrived" (<=), not "is it exactly today" (!==) — a
+    // deadline landing on a weekend meant this cron's own weekend-skip above
+    // silently and permanently lost the reminder, since it never got a later
+    // day where the dates matched exactly. Still only fires once per poll
+    // (claimPollColumn below), it just isn't tied to one exact day.
+    if (toISTDateStr(new Date(poll.deadline)) > todayISTDate) continue
 
     const releaseEmails: string[] = poll.release_emails ? JSON.parse(poll.release_emails) : []
     if (!releaseEmails.length) {

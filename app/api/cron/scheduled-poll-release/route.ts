@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server'
 import { getPollsByStatus, getPollAttachments } from '@/lib/db/queries'
 import { releasePollNow } from '@/lib/poll-release'
-import { toISTDateStr } from '@/lib/utils'
+import { toISTDateStr, isISTWeekend } from '@/lib/utils'
 
 // Auto-releases one-time polls scheduled for a future date (SCHEDULE_RELEASE
-// action) once their scheduled IST calendar day arrives. Deliberately does
-// not skip weekends — unlike reminders/closure alerts, the release date here
-// was a deliberate choice by whoever scheduled it, not a routine nudge.
+// action) once their scheduled IST calendar day arrives. Weekends are
+// skipped the same way every other date-driven cron in this app skips them —
+// a poll scheduled for a Saturday/Sunday releases on the next working day
+// instead (the <= check below still holds once that day arrives).
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const todayISTDate = toISTDateStr(new Date())
+  const now = new Date()
+  if (isISTWeekend(now)) {
+    return NextResponse.json({ released: 0, skipped: 0, message: 'Weekend — scheduled polls only release on working days' })
+  }
+
+  const todayISTDate = toISTDateStr(now)
   let released = 0
   let skipped = 0
 

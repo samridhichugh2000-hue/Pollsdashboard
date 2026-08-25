@@ -6,7 +6,11 @@ import { v4 as uuidv4 } from 'uuid'
 // reports — these three previously each had their own, disagreeing list
 // (e.g. KPI omitting RESULTS_SHARED while overview included it), which is
 // exactly why the same poll could count as closed on one page and not another.
-export const CLOSED_POLL_STATUSES: PollStatus[] = ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED']
+// RMS_PUBLISHED ("Posted to Koenig News") is included here too — Push to RMS
+// and Upload Results can now only ever be run on an already-closed poll (see
+// their guards in app/api/polls/[id]/route.ts), so from here on RMS_PUBLISHED
+// never represents a poll still collecting responses.
+export const CLOSED_POLL_STATUSES: PollStatus[] = ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED', 'RMS_PUBLISHED']
 
 // ─── Polls ───────────────────────────────────────────────────────────────────
 
@@ -224,7 +228,7 @@ export async function getKPIData() {
   const [totalRes, approvalRes, activeRes, closedRes, rmsRes, resultsRes] = await Promise.all([
     db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE created_at >= ? AND status != 'ARCHIVED'", args: [iso] }),
     db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE status = 'AWAITING_APPROVAL'", args: [] }),
-    db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE status IN ('SENT', 'REMINDER_SENT', 'RMS_PUBLISHED')", args: [] }),
+    db.execute({ sql: "SELECT COUNT(*) as count FROM polls WHERE status IN ('SENT', 'REMINDER_SENT')", args: [] }),
     db.execute({ sql: `SELECT COUNT(*) as count FROM polls WHERE status IN (${closedPh}) AND closed_at >= ?`, args: [...CLOSED_POLL_STATUSES, iso] }),
     db.execute({ sql: "SELECT COUNT(*) as total, SUM(CASE WHEN rms_task_id IS NOT NULL THEN 1 ELSE 0 END) as created FROM polls WHERE created_at >= ? AND status != 'ARCHIVED'", args: [iso] }),
     db.execute({ sql: "SELECT COUNT(*) as total, SUM(CASE WHEN results_uploaded_at IS NOT NULL THEN 1 ELSE 0 END) as uploaded FROM polls WHERE closed_at >= ? AND status != 'ARCHIVED'", args: [iso] }),

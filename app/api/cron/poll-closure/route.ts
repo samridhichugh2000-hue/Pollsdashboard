@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse, getPollAttachments } from '@/lib/db/queries'
 import { sendEmail, forwardMessageWithHtml, standardCC, getFormResponses } from '@/lib/graph'
-import { buildResultsEmailHtml, toISTDateStr, istMinutesOfDay } from '@/lib/utils'
+import { buildResultsEmailHtml, toISTDateStr, istMinutesOfDay, isISTWeekend } from '@/lib/utils'
 import * as XLSX from 'xlsx'
 
 const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000
@@ -26,10 +26,22 @@ export async function GET(req: Request) {
     return NextResponse.json({ closed: 0, message: 'Too early — polls only close after 11:58 PM IST' })
   }
 
-  // RMS_PUBLISHED must be included — a poll pushed to RMS is still "active"
-  // and collecting responses, and was previously permanently immune to
-  // auto-close once it reached that status (one sat 2 months past deadline).
-  const activePolls = await getPollsByStatus(['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'] as Parameters<typeof getPollsByStatus>[0])
+  // Weekends are skipped the same way reminder-scheduler/closure-alert skip
+  // them — a poll whose deadline lands on a Saturday/Sunday simply closes on
+  // the next working day's run instead (deadlineISTDate <= todayISTDate
+  // below still holds once that day arrives). ?force=1 bypasses this too,
+  // same as the gate above, so an admin can still clear a backlog manually.
+  if (!forced && isISTWeekend(now)) {
+    return NextResponse.json({ closed: 0, message: 'Weekend — polls only auto-close on working days' })
+  }
+
+  // RMS_PUBLISHED is deliberately excluded — Push to RMS can now only ever
+  // run on an already-closed poll, so RMS_PUBLISHED never represents one
+  // still collecting responses. (It used to be included here because the
+  // old, unguarded Push to RMS action could regress an already-closed poll
+  // back to looking active — several polls sat months past deadline because
+  // of exactly that.)
+  const activePolls = await getPollsByStatus(['SENT', 'REMINDER_SENT'] as Parameters<typeof getPollsByStatus>[0])
   const todayISTDate = toISTDateStr(now)
   let closed = 0
 

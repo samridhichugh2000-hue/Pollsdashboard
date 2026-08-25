@@ -68,8 +68,8 @@ function filterByCard(requests: Poll[], key: CardKey): Poll[] {
   switch (key) {
     case 'not-sent':         return requests.filter(p => ['DETECTED', 'DRAFT', 'FORM_CREATED'].includes(p.status))
     case 'approval-pending': return requests.filter(p => p.status === 'AWAITING_APPROVAL')
-    case 'active':           return requests.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
-    case 'closed':           return requests.filter(p => ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status))
+    case 'active':           return requests.filter(p => ['SENT', 'REMINDER_SENT'].includes(p.status))
+    case 'closed':           return requests.filter(p => ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED', 'RMS_PUBLISHED'].includes(p.status))
     case 'total':            return requests
   }
 }
@@ -178,9 +178,9 @@ function KGTContent() {
     switch (tab) {
       case 'inbox':    base = nonArchived.filter(p => p.source === 'email'); break
       case 'manual':   base = nonArchived.filter(p => p.source === 'dashboard'); break
-      case 'active':   base = nonArchived.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)); break
+      case 'active':   base = nonArchived.filter(p => ['SENT', 'REMINDER_SENT'].includes(p.status)); break
       case 'not-sent': base = nonArchived.filter(p => p.status === 'DRAFT'); break
-      case 'closed':   base = nonArchived.filter(p => ['CLOSED', 'REJECTED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status)); break
+      case 'closed':   base = nonArchived.filter(p => ['CLOSED', 'REJECTED', 'RESULTS_UPLOADED', 'RESULTS_SHARED', 'RMS_PUBLISHED'].includes(p.status)); break
       default:         base = [...nonArchived]
     }
     return applySearch(base)

@@ -8,8 +8,12 @@ import { toast } from 'sonner'
 import { StatusBadge } from '@/components/polls/status-badge'
 import { formatDateTime, formatRelative, getErrorMessage } from '@/lib/utils'
 import type { Poll, PollResponse } from '@/types'
+import { STATUS_LABELS } from '@/types'
 
 const RELEASED_STATUSES = ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED', 'CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED']
+// Push to RMS / Upload Results can only run on an already-closed poll — kept
+// in sync with the server-side guard in app/api/polls/[id]/route.ts.
+const CLOSED_FOR_RMS_ACTIONS = ['CLOSED', 'RESULTS_SHARED', 'RESULTS_UPLOADED', 'RMS_PUBLISHED']
 
 interface ResponseEntry {
   respondent?: string
@@ -623,7 +627,9 @@ export default function ReportsPage() {
                   <div className="flex justify-end">
                     <StatusBadge status={poll.status} />
                   </div>
-                  <button onClick={() => void handleUploadToKoenig(poll)} disabled={uploadingKoenigId === poll.id}
+                  <button onClick={() => void handleUploadToKoenig(poll)}
+                    disabled={uploadingKoenigId === poll.id || !CLOSED_FOR_RMS_ACTIONS.includes(poll.status)}
+                    title={CLOSED_FOR_RMS_ACTIONS.includes(poll.status) ? undefined : `This poll is still active (${STATUS_LABELS[poll.status]}) — close it and share results before uploading to Koenig News.`}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-slate-300 hover:border-cyan-400 hover:text-cyan-600 transition-colors disabled:opacity-50 whitespace-nowrap">
                     {uploadingKoenigId === poll.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                     Upload Results
@@ -634,7 +640,9 @@ export default function ReportsPage() {
                   </button>
                 </div>
                 <div className="px-5 pb-3 flex items-center gap-3">
-                  <button onClick={() => void handlePushToRms(poll)} disabled={pushingRmsId === poll.id}
+                  <button onClick={() => void handlePushToRms(poll)}
+                    disabled={pushingRmsId === poll.id || !CLOSED_FOR_RMS_ACTIONS.includes(poll.status)}
+                    title={CLOSED_FOR_RMS_ACTIONS.includes(poll.status) ? undefined : `This poll is still active (${STATUS_LABELS[poll.status]}) — close it and share results before pushing to RMS.`}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20 px-3 py-1.5 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:bg-teal-100 transition-colors disabled:opacity-50">
                     {pushingRmsId === poll.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
                     Push to Koenig News

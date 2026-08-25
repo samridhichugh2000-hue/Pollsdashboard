@@ -26,8 +26,8 @@ function filterByCard(polls: Poll[], key: CardKey): Poll[] {
   switch (key) {
     case 'not-sent':         return polls.filter(p => ['DETECTED', 'DRAFT', 'FORM_CREATED'].includes(p.status))
     case 'approval-pending': return polls.filter(p => p.status === 'AWAITING_APPROVAL')
-    case 'active':           return polls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status))
-    case 'closed':           return polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status))
+    case 'active':           return polls.filter(p => ['SENT', 'REMINDER_SENT'].includes(p.status))
+    case 'closed':           return polls.filter(p => ['CLOSED', 'RESULTS_UPLOADED', 'RESULTS_SHARED', 'RMS_PUBLISHED'].includes(p.status))
     case 'result-sir':       return polls.filter(p => p.status === 'CLOSED')
     case 'total':            return polls.filter(p => p.status !== 'ARCHIVED')
     case 'pending':          return polls.filter(p => PENDING_STATUSES.includes(p.status))
@@ -139,9 +139,9 @@ function PollsContent() {
     switch (tab) {
       case 'inbox':    base = quarterPolls.filter(p => p.source === 'email'); break
       case 'via-form': base = quarterPolls.filter(p => p.source === 'dashboard'); break
-      case 'active':   base = quarterPolls.filter(p => ['SENT', 'REMINDER_SENT', 'RMS_PUBLISHED'].includes(p.status)); break
+      case 'active':   base = quarterPolls.filter(p => ['SENT', 'REMINDER_SENT'].includes(p.status)); break
       case 'not-sent': base = quarterPolls.filter(p => p.status === 'DRAFT'); break
-      case 'closed':   base = quarterPolls.filter(p => ['CLOSED', 'REJECTED', 'RESULTS_UPLOADED', 'RESULTS_SHARED'].includes(p.status)); break
+      case 'closed':   base = quarterPolls.filter(p => ['CLOSED', 'REJECTED', 'RESULTS_UPLOADED', 'RESULTS_SHARED', 'RMS_PUBLISHED'].includes(p.status)); break
       default:         base = [...quarterPolls]
     }
     return applySearch(base)

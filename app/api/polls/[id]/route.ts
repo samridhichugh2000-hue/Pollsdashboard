@@ -29,6 +29,7 @@ import { writeFileSync, mkdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import type { Poll } from '@/types'
+import { STATUS_LABELS } from '@/types'
 
 // Matches the client-side limit in components/polls/poll-detail.tsx — that
 // limit is enforced there for UX, but a modified client or a direct API call
@@ -608,6 +609,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'SET_RMS_NEWS': {
+        if (!CLOSED_POLL_STATUSES.includes(poll.status)) {
+          return NextResponse.json({ error: `This poll is still active (${STATUS_LABELS[poll.status]}) — close it and share results before setting a Koenig News ID.` }, { status: 409 })
+        }
         await updatePollStatus(id, 'RMS_PUBLISHED', { rms_news_id: body.rms_news_id as string })
         await createAuditLog(id, 'RMS_PUBLISHED', userEmail, { rms_news_id: body.rms_news_id })
         break
@@ -748,6 +752,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'UPLOAD_TO_KOENIG': {
+        if (!CLOSED_POLL_STATUSES.includes(poll.status)) {
+          return NextResponse.json({ error: `This poll is still active (${STATUS_LABELS[poll.status]}) — close it and share results before uploading to Koenig News.` }, { status: 409 })
+        }
         if (!poll.rms_news_id) {
           return NextResponse.json({ error: 'This poll has not been pushed to Koenig News yet. Push it first to get a News ID.' }, { status: 400 })
         }
@@ -807,6 +814,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       case 'PUSH_TO_RMS': {
+        if (!CLOSED_POLL_STATUSES.includes(poll.status)) {
+          return NextResponse.json({ error: `This poll is still active (${STATUS_LABELS[poll.status]}) — close it and share results before pushing to RMS.` }, { status: 409 })
+        }
         const pushResp = await getPollResponse(id)
         if (!pushResp?.response_data) {
           return NextResponse.json({ error: 'No responses available to push to RMS.' }, { status: 400 })
