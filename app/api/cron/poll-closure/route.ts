@@ -143,6 +143,11 @@ export async function GET(req: Request) {
       closed++
     } catch (err) {
       console.error(`Failed to close poll ${poll.id}:`, err)
+      try {
+        await createAuditLog(poll.id, 'AUTO_CLOSE_FAILED', 'cron', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      } catch { /* logging the failure must never itself break the loop */ }
     }
   }
 
