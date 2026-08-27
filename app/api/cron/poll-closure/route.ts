@@ -57,6 +57,32 @@ export async function GET(req: Request) {
       if (!poll.sent_at || Date.now() - new Date(poll.sent_at).getTime() < FORTY_EIGHT_HOURS) continue
     }
 
+    // Close the poll FIRST, before any Graph API calls — a poll whose
+    // deadline has passed must never stay open because a downstream email
+    // step failed. (This used to close last, after fetching form responses,
+    // building the Excel attachment, and sending the results email — any one
+    // of those throwing meant the poll silently never closed at all.)
+    try {
+      await updatePollStatus(poll.id, 'CLOSED', {
+        closed_at: new Date().toISOString(),
+      })
+      await createAuditLog(poll.id, 'AUTO_CLOSED', 'cron')
+      closed++
+    } catch (err) {
+      console.error(`Failed to close poll ${poll.id}:`, err)
+      try {
+        await createAuditLog(poll.id, 'AUTO_CLOSE_FAILED', 'cron', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      } catch { /* logging the failure must never itself break the loop */ }
+      continue // nothing to send results for if it didn't even close
+    }
+
+    // Best-effort from here: fetch responses, build the Excel attachment, and
+    // email results to EA. A failure in any of this leaves the poll CLOSED
+    // (already true above) but not RESULTS_SHARED — rms-retry-style cleanup
+    // isn't wired up for this yet, so a stuck one still needs a manual resend,
+    // but it's at least closed and out of the "still collecting" list.
     try {
       // Snapshot latest responses from MS Forms
       if (poll.ms_form_id) {
@@ -99,13 +125,6 @@ export async function GET(req: Request) {
         attachments = [{ name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }]
       }
 
-      // Mark CLOSED first — prevents duplicate sends if the email call fails
-      // and the cron retries tomorrow night.
-      await updatePollStatus(poll.id, 'CLOSED', {
-        closed_at: new Date().toISOString(),
-      })
-      await createAuditLog(poll.id, 'AUTO_CLOSED', 'cron')
-
       // Send results to EA — forward the last reminder sent for this poll
       // (falling back to the original release email, then to a plain new
       // email for older polls with no stored thread at all) so EA sees the
@@ -140,11 +159,10 @@ export async function GET(req: Request) {
       // once the send has actually succeeded (this line is unreachable if it throws).
       await updatePollStatus(poll.id, 'RESULTS_SHARED', { results_uploaded_at: new Date().toISOString() })
       await createAuditLog(poll.id, 'RESULTS_SHARED', 'cron')
-      closed++
     } catch (err) {
-      console.error(`Failed to close poll ${poll.id}:`, err)
+      console.error(`Poll ${poll.id} closed but failed to send results:`, err)
       try {
-        await createAuditLog(poll.id, 'AUTO_CLOSE_FAILED', 'cron', {
+        await createAuditLog(poll.id, 'RESULTS_SEND_FAILED', 'cron', {
           error: err instanceof Error ? err.message : String(err),
         })
       } catch { /* logging the failure must never itself break the loop */ }
