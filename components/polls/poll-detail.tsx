@@ -556,6 +556,30 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             </CardContent>
           </Card>
 
+          {/* FAQ — independent of poll status, can be added any time */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>FAQ</CardTitle>
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500 dark:border-slate-600"
+                    checked={!!poll.has_faq}
+                    disabled={!!loading}
+                    onChange={(e) => void toggleHasFaq(e.target.checked)}
+                  />
+                  This poll needs FAQ
+                </label>
+              </div>
+            </CardHeader>
+            {!!poll.has_faq && (
+              <CardContent>
+                <FaqSection pollId={poll.id} />
+              </CardContent>
+            )}
+          </Card>
+
           {/* DRAFT status — editable sections */}
           {poll.status === 'DRAFT' && (
             <>
@@ -839,30 +863,6 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               )}
             </>
           )}
-
-          {/* FAQ — independent of poll status, can be added any time */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>FAQ</CardTitle>
-                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-slate-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500 dark:border-slate-600"
-                    checked={!!poll.has_faq}
-                    disabled={!!loading}
-                    onChange={(e) => void toggleHasFaq(e.target.checked)}
-                  />
-                  This poll needs FAQ
-                </label>
-              </div>
-            </CardHeader>
-            {!!poll.has_faq && (
-              <CardContent>
-                <FaqSection pollId={poll.id} />
-              </CardContent>
-            )}
-          </Card>
 
         </div>
 
