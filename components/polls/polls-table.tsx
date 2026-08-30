@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ExternalLink, Trash2, ArchiveRestore, Award, X, Loader2, HelpCircle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ExternalLink, Trash2, ArchiveRestore, Award, X, Loader2, HelpCircle, Plus } from 'lucide-react'
 import { StatusBadge } from './status-badge'
 import { Button } from '@/components/ui/button'
 import { formatDateTime, formatRelative, isApprovalOverdue, getErrorMessage, deriveAudienceLabel, buildHuntGroupEmailMap } from '@/lib/utils'
@@ -148,6 +149,8 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [finalisedKitePoll, setFinalisedKitePoll] = useState<Poll | null>(null)
   const [faqPoll, setFaqPoll] = useState<Poll | null>(null)
+  const [addingFaqId, setAddingFaqId] = useState<string | null>(null)
+  const router = useRouter()
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [unarchiving, setUnarchiving] = useState(false)
@@ -212,6 +215,29 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
       toast.error(err instanceof Error ? err.message : 'Failed to unarchive polls')
     } finally {
       setUnarchiving(false)
+    }
+  }
+
+  // Enables FAQ for a poll (if not already) and opens its detail page with
+  // the FAQ section already visible, ready to add one.
+  const handleAddFaq = async (poll: Poll) => {
+    if (poll.has_faq) {
+      router.push(`${linkBase}/${poll.id}`)
+      return
+    }
+    setAddingFaqId(poll.id)
+    try {
+      const res = await fetch(`/api/polls/${poll.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SET_HAS_FAQ', has_faq: true }),
+      })
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to enable FAQ'))
+      router.push(`${linkBase}/${poll.id}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to enable FAQ')
+    } finally {
+      setAddingFaqId(null)
     }
   }
 
@@ -352,6 +378,15 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                       className="text-xs font-medium text-cyan-600 hover:text-cyan-800 hover:underline">
                       View
                     </Link>
+                    <button
+                      onClick={() => void handleAddFaq(poll)}
+                      disabled={addingFaqId === poll.id}
+                      title="Add FAQ"
+                      className="inline-flex items-center gap-0.5 text-xs font-medium text-emerald-600 hover:text-emerald-800 hover:underline disabled:opacity-50"
+                    >
+                      {addingFaqId === poll.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                      FAQ
+                    </button>
                     {poll.request_type === 'KGT' && isPastDeadline(poll) && (
                       <button onClick={() => setFinalisedKitePoll(poll)}
                         className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-800 hover:underline">
