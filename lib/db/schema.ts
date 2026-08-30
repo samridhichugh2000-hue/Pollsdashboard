@@ -304,6 +304,32 @@ export async function runMigrations() {
     `)
   } catch { /* already exists */ }
 
+  // Marks that a poll has one or more FAQs attached — drives whether the FAQ
+  // section shows on the poll detail page and the FAQ badge on the poll list.
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN has_faq INTEGER DEFAULT 0`)
+  } catch { /* already exists */ }
+
+  // FAQs are independent of poll lifecycle — they can be added, edited, and
+  // announced whether the poll itself is still a draft, active, or already
+  // closed/expired. status: DRAFT (not yet announced) | ANNOUNCED.
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS poll_faqs (
+        id TEXT PRIMARY KEY,
+        poll_id TEXT NOT NULL REFERENCES polls(id),
+        question TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'DRAFT',
+        announced_at DATETIME,
+        announce_emails TEXT,
+        created_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+
   // Migrate old emp_code-keyed table to email-keyed
   try {
     const cols = await db.execute(`PRAGMA table_info(employees)`)

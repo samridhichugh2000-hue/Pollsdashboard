@@ -1,5 +1,5 @@
 import { getDb } from './client'
-import type { Poll, PollApproval, PollResponse, User, AuditLog, PollStatus, CreatePollInput } from '@/types'
+import type { Poll, PollApproval, PollResponse, User, AuditLog, PollStatus, CreatePollInput, PollFaq } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 
 // Single source of truth for "this poll is closed" across KPI, overview, and
@@ -156,10 +156,10 @@ export async function updatePoll(id: string, fields: Partial<Poll>): Promise<voi
     'deadline', 'ms_form_id', 'ms_form_link', 'rms_task_id', 'rms_news_id',
     'status', 'sent_at', 'reminder_at', 'reminder_sent_at', 'second_reminder_sent_at', 'closure_alert_sent_at', 'approved_at',
     'closed_at', 'results_uploaded_at', 'closed_message', 'remarks', 'release_emails', 'release_message_id', 'last_reminder_message_id',
-    'scheduled_release_at', 'scheduled_release_emails',
+    'scheduled_release_at', 'scheduled_release_emails', 'has_faq',
   ]
   const setClauses: string[] = ['updated_at = ?']
-  const args: (string | null | boolean)[] = [now]
+  const args: (string | null | boolean | number)[] = [now]
 
   for (const [key, value] of Object.entries(fields)) {
     if (allowed.includes(key)) {
@@ -214,6 +214,56 @@ export async function getPollAttachmentsMeta(pollId: string): Promise<{ name: st
     // Approximate decoded byte size from base64 length (4 base64 chars ≈ 3 bytes).
     return { name: r.name as string, size: Math.floor((b64len * 3) / 4) }
   })
+}
+
+// ─── Poll FAQs ─────────────────────────────────────────────────────────────
+// Independent of poll lifecycle — FAQs can be added, edited, and announced
+// whether the poll itself is a draft, active, or already closed/expired.
+
+export async function getFaqsByPoll(pollId: string): Promise<PollFaq[]> {
+  const result = await getDb().execute({
+    sql: 'SELECT * FROM poll_faqs WHERE poll_id = ? ORDER BY created_at ASC',
+    args: [pollId],
+  })
+  return result.rows as unknown as PollFaq[]
+}
+
+export async function getFaqById(id: string): Promise<PollFaq | null> {
+  const result = await getDb().execute({ sql: 'SELECT * FROM poll_faqs WHERE id = ?', args: [id] })
+  return (result.rows[0] as unknown as PollFaq) ?? null
+}
+
+export async function createFaq(pollId: string, question: string, answer: string, createdBy?: string): Promise<PollFaq> {
+  const id = uuidv4()
+  await getDb().execute({
+    sql: 'INSERT INTO poll_faqs (id, poll_id, question, answer, created_by) VALUES (?, ?, ?, ?, ?)',
+    args: [id, pollId, question, answer, createdBy ?? null],
+  })
+  return (await getFaqById(id))!
+}
+
+export async function updateFaq(id: string, fields: Partial<Pick<PollFaq, 'question' | 'answer' | 'status' | 'announced_at' | 'announce_emails'>>): Promise<void> {
+  const now = new Date().toISOString()
+  const allowed = ['question', 'answer', 'status', 'announced_at', 'announce_emails']
+  const setClauses: string[] = ['updated_at = ?']
+  const args: (string | null)[] = [now]
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (allowed.includes(key)) {
+      setClauses.push(`${key} = ?`)
+      args.push(value as string | null)
+    }
+  }
+
+  args.push(id)
+  await getDb().execute({
+    sql: `UPDATE poll_faqs SET ${setClauses.join(', ')} WHERE id = ?`,
+    args,
+  })
+}
+
+export async function deleteFaq(id: string): Promise<void> {
+  await getDb().execute({ sql: 'DELETE FROM poll_faqs WHERE id = ?', args: [id] })
 }
 
 export async function getKPIData() {

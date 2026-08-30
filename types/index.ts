@@ -63,8 +63,34 @@ export interface Poll {
   single_response?: number | null // 1 or 0 (SQLite boolean)
   archived_from_status?: PollStatus | null
   request_type: RequestType
+  has_faq?: number | null // 1 or 0 (SQLite boolean) — whether the FAQ section is enabled for this poll
   created_at: string
   updated_at: string
+}
+
+export type FaqStatus = 'DRAFT' | 'ANNOUNCED'
+
+export interface PollFaq {
+  id: string
+  poll_id: string
+  question: string
+  answer: string
+  status: FaqStatus
+  announced_at?: string | null
+  announce_emails?: string | null // JSON array of email strings
+  created_by?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export const FAQ_STATUS_LABELS: Record<FaqStatus, string> = {
+  DRAFT: 'Draft',
+  ANNOUNCED: 'Announced',
+}
+
+export const FAQ_STATUS_COLORS: Record<FaqStatus, string> = {
+  DRAFT: 'bg-gray-100 text-gray-800',
+  ANNOUNCED: 'bg-emerald-100 text-emerald-800',
 }
 
 export interface PollApproval {

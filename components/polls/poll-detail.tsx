@@ -17,6 +17,7 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import type { Poll, PollApproval, AuditLog, PollResponse } from '@/types'
 import { QuestionBuilder, parseQuestions } from './question-builder'
 import type { Question } from './question-builder'
+import { FaqSection } from './faq-section'
 
 interface PollDetailProps {
   poll: Poll
@@ -340,6 +341,24 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
       toast.success('Questions updated')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const toggleHasFaq = async (checked: boolean) => {
+    setLoading('SET_HAS_FAQ')
+    try {
+      const res = await fetch(`/api/polls/${poll.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SET_HAS_FAQ', has_faq: checked }),
+      })
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to update'))
+      const updated = await res.json() as Poll
+      setPoll(updated)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update')
     } finally {
       setLoading(null)
     }
@@ -820,6 +839,30 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               )}
             </>
           )}
+
+          {/* FAQ — independent of poll status, can be added any time */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>FAQ</CardTitle>
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500 dark:border-slate-600"
+                    checked={!!poll.has_faq}
+                    disabled={!!loading}
+                    onChange={(e) => void toggleHasFaq(e.target.checked)}
+                  />
+                  This poll needs FAQ
+                </label>
+              </div>
+            </CardHeader>
+            {!!poll.has_faq && (
+              <CardContent>
+                <FaqSection pollId={poll.id} />
+              </CardContent>
+            )}
+          </Card>
 
         </div>
 

@@ -383,6 +383,33 @@ export function buildPollEmailHtml(params: {
 `
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// A single malformed address can make Graph reject the entire send —
+// validate each one instead of just checking for "@".
+export function parseEmailList(text: string): string[] {
+  return text.split(/[\n,;]+/).map(e => e.trim()).filter(e => EMAIL_RE.test(e))
+}
+
+export function buildFaqAnnounceEmailHtml(params: {
+  pollTopic: string
+  question: string
+  answer: string
+}): string {
+  return `
+<div style="font-family: Arial, sans-serif; max-width: 600px;">
+  <p>Hi Team,</p>
+  <p>An FAQ has been added for the poll — <strong>${escapeHtml(params.pollTopic)}</strong>:</p>
+  <div style="margin:16px 0;padding:14px 16px;background:#f9fafb;border-radius:6px;">
+    <p style="font-weight:600;color:#111827;margin:0 0 6px;">${escapeHtml(params.question)}</p>
+    <p style="color:#374151;margin:0;white-space:pre-wrap;">${linkifyUrls(escapeHtml(params.answer))}</p>
+  </div>
+  <br>
+  <p>Regards,<br>polls@koenig-solutions.com</p>
+</div>
+`
+}
+
 export function buildResultsEmailHtml(topic: string, hasResponses = true): string {
   return `
 <div style="font-family: Arial, sans-serif; max-width: 600px;">

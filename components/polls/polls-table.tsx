@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ExternalLink, Trash2, ArchiveRestore, Award, X, Loader2 } from 'lucide-react'
+import { ExternalLink, Trash2, ArchiveRestore, Award, X, Loader2, HelpCircle } from 'lucide-react'
 import { StatusBadge } from './status-badge'
 import { Button } from '@/components/ui/button'
 import { formatDateTime, formatRelative, isApprovalOverdue, getErrorMessage, deriveAudienceLabel, buildHuntGroupEmailMap } from '@/lib/utils'
 import { toast } from 'sonner'
-import type { Poll, PollResponse } from '@/types'
+import type { Poll, PollResponse, PollFaq } from '@/types'
+import { FAQ_STATUS_LABELS, FAQ_STATUS_COLORS } from '@/types'
 
 interface FinalisedEntry {
   respondent?: string
@@ -73,6 +74,56 @@ function FinalisedKiteModal({ poll, onClose }: { poll: Poll; onClose: () => void
   )
 }
 
+function FaqViewModal({ poll, onClose }: { poll: Poll; onClose: () => void }) {
+  const [loading, setLoading] = useState(true)
+  const [faqs, setFaqs] = useState<PollFaq[]>([])
+
+  useEffect(() => {
+    fetch(`/api/polls/${poll.id}/faqs`)
+      .then(r => r.ok ? r.json() : [])
+      .then((data: PollFaq[]) => setFaqs(data))
+      .catch(() => toast.error('Failed to load FAQs'))
+      .finally(() => setLoading(false))
+  }, [poll.id])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-slate-900 shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 dark:border-slate-700 px-6 py-5">
+          <div>
+            <h2 className="flex items-center gap-2 font-bold text-gray-900 dark:text-slate-100 text-lg leading-tight">
+              <HelpCircle className="h-5 w-5 text-cyan-500" /> FAQs
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">{poll.topic}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-6 py-5 space-y-3">
+          {loading ? (
+            <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>
+          ) : faqs.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-slate-500 py-6 text-center">No FAQs added for this poll yet.</p>
+          ) : (
+            faqs.map((faq) => (
+              <div key={faq.id} className="rounded-xl border border-gray-100 dark:border-slate-700 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-semibold text-gray-900 dark:text-slate-100">{faq.question}</p>
+                  <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${FAQ_STATUS_COLORS[faq.status]}`}>
+                    {FAQ_STATUS_LABELS[faq.status]}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-700 dark:text-slate-200 whitespace-pre-wrap mt-1.5">{faq.answer}</p>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function isPastDeadline(poll: Poll): boolean {
   return !!poll.deadline && new Date(poll.deadline).getTime() < Date.now()
 }
@@ -96,6 +147,7 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
   const [rejectReason, setRejectReason] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [finalisedKitePoll, setFinalisedKitePoll] = useState<Poll | null>(null)
+  const [faqPoll, setFaqPoll] = useState<Poll | null>(null)
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [unarchiving, setUnarchiving] = useState(false)
@@ -257,7 +309,17 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
                     {poll.source === 'email' ? 'Inbox' : poll.source === 'external' ? 'External' : 'Manual'}
                   </span>
                 </td>
-                <td className="px-5 py-3.5"><StatusBadge status={poll.status} /></td>
+                <td className="px-5 py-3.5">
+                  <StatusBadge status={poll.status} />
+                  {!!poll.has_faq && (
+                    <button
+                      onClick={() => setFaqPoll(poll)}
+                      className="mt-1 flex items-center gap-1 text-[11px] font-medium text-cyan-600 hover:text-cyan-800 hover:underline"
+                    >
+                      <HelpCircle className="h-3 w-3" /> FAQ
+                    </button>
+                  )}
+                </td>
                 <td className="px-5 py-3.5 text-gray-400 dark:text-slate-500 text-xs">
                   <span title={formatDateTime(poll.created_at)}>{formatRelative(poll.created_at)}</span>
                 </td>
@@ -389,6 +451,9 @@ export function PollsTable({ polls, onMarkClosed, onCloseExternal, onArchive, on
     </div>
     {finalisedKitePoll && (
       <FinalisedKiteModal poll={finalisedKitePoll} onClose={() => setFinalisedKitePoll(null)} />
+    )}
+    {faqPoll && (
+      <FaqViewModal poll={faqPoll} onClose={() => setFaqPoll(null)} />
     )}
     </div>
   )

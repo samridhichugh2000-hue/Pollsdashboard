@@ -602,6 +602,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break
       }
 
+      case 'SET_HAS_FAQ': {
+        // Toggles whether the FAQ section is enabled for this poll —
+        // independent of the poll's own status/lifecycle.
+        await updatePoll(id, { has_faq: body.has_faq ? 1 : 0 })
+        await createAuditLog(id, 'FAQ_TOGGLED', userEmail, { has_faq: !!body.has_faq })
+        break
+      }
+
       case 'SET_RMS_TASK': {
         await updatePollStatus(id, 'RMS_TASK_CREATED', { rms_task_id: body.rms_task_id as string })
         await createAuditLog(id, 'RMS_TASK_CREATED', userEmail, { rms_task_id: body.rms_task_id })
