@@ -26,6 +26,8 @@ interface PendingPoll {
 interface OverviewData {
   kpi: {
     totalPolls: number
+    cadenceOriginatedPolls: number
+    manualPolls: number
     totalPending: number
     totalSuggestions: number
     suggestionsPendingReview: number
@@ -87,7 +89,7 @@ interface FeedbackItem {
 }
 
 const defaultData: OverviewData = {
-  kpi: { totalPolls: 0, totalPending: 0, totalSuggestions: 0, suggestionsPendingReview: 0, processImprovements: 0, rmsImprovements: 0, totalKGTs: 0 },
+  kpi: { totalPolls: 0, cadenceOriginatedPolls: 0, manualPolls: 0, totalPending: 0, totalSuggestions: 0, suggestionsPendingReview: 0, processImprovements: 0, rmsImprovements: 0, totalKGTs: 0 },
   pollBreakdown: { notSentForApproval: 0, approvalPending: 0, activePolls: 0, pollsClosed: 0, resultNotSentSir: 0, resultNotSentVoter: 0 },
   cadenceBreakdown: { total: 0, monthly: 0, quarterly: 0, biAnnual: 0, annual: 0, scheduledReleased: 0, overdue: 0 },
   suggestionBreakdown: { total: 0, actionable: 0, pendingForAction: 0, processImproved: 0, nonActionable: 0 },
@@ -236,7 +238,7 @@ export default function DashboardPage() {
     return () => { ignoreRef.current = true; clearInterval(interval) }
   }, [fetchData])
 
-  const kpiCards: { label: string; value: number; icon: typeof ClipboardList; color: string; iconBg: string; onClick: (() => void) | undefined }[] = [
+  const kpiCards: { label: string; value: number; icon: typeof ClipboardList; color: string; iconBg: string; onClick: (() => void) | undefined; subtext?: string }[] = [
     {
       label: 'Total Polls',
       value: data.kpi.totalPolls,
@@ -244,6 +246,7 @@ export default function DashboardPage() {
       color: 'text-purple-600',
       iconBg: 'bg-purple-50',
       onClick: () => router.push('/polls?card=total'),
+      subtext: `${data.kpi.cadenceOriginatedPolls} Cadence + ${data.kpi.manualPolls} Manual polls`,
     },
     {
       label: 'Total Pending Polls',
@@ -310,7 +313,7 @@ export default function DashboardPage() {
     <div className="space-y-5">
       {/* KPI Row */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7">
-        {kpiCards.map(({ label, value, icon: Icon, color, iconBg, onClick }) => (
+        {kpiCards.map(({ label, value, icon: Icon, color, iconBg, onClick, subtext }) => (
           <div
             key={label}
             onClick={onClick}
@@ -321,6 +324,7 @@ export default function DashboardPage() {
             </div>
             <div className={`text-3xl font-bold ${color}`}>{value}</div>
             <p className="mt-1 text-sm font-medium text-gray-700 dark:text-slate-300">{label}</p>
+            {subtext && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">({subtext})</p>}
             {onClick && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Click to view →</p>}
           </div>
         ))}

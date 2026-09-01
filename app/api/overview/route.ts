@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db/client'
 import { CLOSED_POLL_STATUSES } from '@/lib/db/queries'
-import { deriveAudienceLabel, buildHuntGroupEmailMap } from '@/lib/utils'
+import { deriveAudienceLabel, buildHuntGroupEmailMap, advanceNextRunDate } from '@/lib/utils'
 
 export async function GET(req: NextRequest) {
   const db = getDb()
@@ -22,13 +22,19 @@ export async function GET(req: NextRequest) {
     return true
   }
 
-  const [pollsRes, regularPollsRes, feedbackRes, kpiRes, responsesRes, huntGroupsRes] = await Promise.all([
+  const [pollsRes, regularPollsRes, feedbackRes, kpiRes, responsesRes, huntGroupsRes, cadenceReleaseAuditRes] = await Promise.all([
     db.execute({ sql: 'SELECT id, topic, status, source, requested_by, department, recipient_email, release_emails, created_at, rms_task_id, results_uploaded_at, closed_at, request_type FROM polls WHERE status != ? ORDER BY created_at DESC', args: ['ARCHIVED'] }),
-    db.execute('SELECT id, frequency, is_active, next_run_date, last_run_date FROM regular_polls').catch(() => ({ rows: [] })),
+    db.execute('SELECT id, name, frequency, is_active, next_run_date, last_run_date FROM regular_polls').catch(() => ({ rows: [] })),
     db.execute('SELECT id, type, status, category, rms_task_id, task_pending, followup_done, summary, submitted_by, department, poll_title FROM feedback_items ORDER BY created_at DESC').catch(() => ({ rows: [] })),
     db.execute("SELECT process_improvements, rms_improvements, policy_announced FROM kpi_data WHERE id = 'singleton'").catch(() => ({ rows: [] })),
     db.execute('SELECT poll_id, response_data FROM poll_responses').catch(() => ({ rows: [] })),
     db.execute('SELECT name, email FROM hunt_groups').catch(() => ({ rows: [] })),
+    // Every actual cadence release (manual "Release" or cron auto-release) leaves
+    // one of these, tagged with the originating template's id — the only exact
+    // record of "this template fired on this date" (regular_polls itself only
+    // tracks last/next run, not history). Used below to count how many times
+    // each template actually ran within the selected quarter.
+    db.execute("SELECT metadata, created_at FROM audit_logs WHERE action IN ('POLL_RELEASED', 'POLL_AUTO_RELEASED')").catch(() => ({ rows: [] })),
   ])
 
   const huntGroupsByEmail = buildHuntGroupEmailMap(huntGroupsRes.rows as unknown as { name: string; email: string }[])
@@ -55,6 +61,7 @@ export async function GET(req: NextRequest) {
 
   const regularPolls = regularPollsRes.rows as unknown as Array<{
     id: string
+    name: string
     frequency: string
     is_active: number
     next_run_date: string
@@ -91,6 +98,14 @@ export async function GET(req: NextRequest) {
   const totalPolls = polls.length
   const totalPending = polls.filter(p => PENDING_STATUSES.includes(p.status)).length
 
+  // Cadence-originated polls are regular `polls` rows just like manual ones —
+  // the only marker is requested_by, set to this exact literal by both the
+  // manual RELEASE action and the auto-release cron (see
+  // app/api/regular-polls/[id]/route.ts and
+  // app/api/cron/regular-poll-scheduler/route.ts). Always sums to totalPolls.
+  const cadenceOriginatedPolls = polls.filter(p => p.requested_by === 'Regular Poll (Auto)').length
+  const manualPolls = totalPolls - cadenceOriginatedPolls
+
   const pollIdSet = new Set(polls.map(p => p.id))
   const responseRows = (responsesRes.rows as unknown as Array<{ poll_id: string; response_data: string | null }>)
     .filter(r => pollIdSet.has(r.poll_id))
@@ -109,13 +124,57 @@ export async function GET(req: NextRequest) {
       try { return sum + (JSON.parse(row.response_data ?? '[]') as unknown[]).length } catch { return sum }
     }, 0)
 
-  // Cadence breakdown
+  // Cadence breakdown — counts actual/expected RUNS in the selected range, not
+  // template count, so a monthly template contributes once per month it fires
+  // rather than once total (a quarterly template still only contributes once
+  // per quarter it's due). Combines:
+  //  1. Already-run releases this range, from the audit log (exact — tagged
+  //     with the originating template's id at release time).
+  //  2. Still-upcoming releases this range, projected forward from each
+  //     active template's next_run_date using the same date math the
+  //     scheduler itself uses (advanceNextRunDate). Only meaningful for a
+  //     bounded range — with no quarter selected (all-time) this is skipped,
+  //     since "future occurrences" has no natural cutoff.
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const totalCadence = regularPolls.length
-  const monthly = regularPolls.filter(p => p.frequency === 'monthly').length
-  const quarterly = regularPolls.filter(p => p.frequency === 'quarterly').length
-  const biAnnual = regularPolls.filter(p => p.frequency === 'bi-annual').length
-  const annual = regularPolls.filter(p => p.frequency === 'annual').length
+  const regularPollById = new Map(regularPolls.map(p => [p.id, p]))
+
+  const cadenceRunsByTemplate = new Map<string, number>()
+  for (const row of cadenceReleaseAuditRes.rows as unknown as Array<{ metadata: string | null; created_at: string }>) {
+    if (!inRange(row.created_at)) continue
+    let meta: { regular_poll_id?: string }
+    try { meta = JSON.parse(row.metadata ?? '{}') as { regular_poll_id?: string } } catch { continue }
+    if (!meta.regular_poll_id) continue // a manual (non-cadence) release
+    cadenceRunsByTemplate.set(meta.regular_poll_id, (cadenceRunsByTemplate.get(meta.regular_poll_id) ?? 0) + 1)
+  }
+
+  if (toMs != null) {
+    const rangeEnd = new Date(toMs)
+    for (const p of regularPolls) {
+      if (!p.is_active) continue
+      let runDate = new Date(p.next_run_date)
+      let guard = 0
+      while (runDate <= rangeEnd && guard < 24) {
+        if (inRange(runDate.toISOString())) {
+          cadenceRunsByTemplate.set(p.id, (cadenceRunsByTemplate.get(p.id) ?? 0) + 1)
+        }
+        runDate = new Date(advanceNextRunDate(runDate.toISOString().split('T')[0], p.frequency))
+        guard++
+      }
+    }
+  }
+
+  let totalCadence = 0, monthly = 0, quarterly = 0, biAnnual = 0, annual = 0
+  for (const [templateId, count] of cadenceRunsByTemplate) {
+    totalCadence += count
+    switch (regularPollById.get(templateId)?.frequency) {
+      case 'monthly': monthly += count; break
+      case 'quarterly': quarterly += count; break
+      case 'bi-annual': biAnnual += count; break
+      case 'annual': annual += count; break
+      // A template deleted since it ran still counts toward the total, just not a frequency bucket.
+    }
+  }
+
   const scheduledReleased = regularPolls.filter(p => p.is_active === 1 && p.last_run_date != null).length
   const overdueRegular = regularPolls.filter(p => {
     if (!p.is_active) return false
@@ -211,6 +270,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     kpi: {
       totalPolls,
+      cadenceOriginatedPolls,
+      manualPolls,
       totalPending,
       totalSuggestions: totalResponses,
       suggestionsPendingReview: pendingForAction,
