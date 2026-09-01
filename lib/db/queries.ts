@@ -276,26 +276,6 @@ export async function getAllPastKGTs(): Promise<PastKGT[]> {
   return result.rows as unknown as PastKGT[]
 }
 
-export async function updatePastKGT(id: string, fields: Partial<Pick<PastKGT, 'kgt_date' | 'topic' | 'audience' | 'participants' | 'outcome' | 'finalised_kite'>>): Promise<void> {
-  const allowed = ['kgt_date', 'topic', 'audience', 'participants', 'outcome', 'finalised_kite']
-  const setClauses: string[] = []
-  const args: (string | null)[] = []
-
-  for (const [key, value] of Object.entries(fields)) {
-    if (allowed.includes(key)) {
-      setClauses.push(`${key} = ?`)
-      args.push(value as string | null)
-    }
-  }
-  if (!setClauses.length) return
-
-  args.push(id)
-  await getDb().execute({
-    sql: `UPDATE past_kgts SET ${setClauses.join(', ')} WHERE id = ?`,
-    args,
-  })
-}
-
 export async function createPastKGT(fields: {
   kgt_date?: string | null
   topic: string

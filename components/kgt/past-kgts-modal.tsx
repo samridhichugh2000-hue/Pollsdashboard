@@ -1,74 +1,12 @@
 'use client'
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { X, Loader2, History, Search, Pencil, Check, Users } from 'lucide-react'
-import { toast } from 'sonner'
+import { X, Loader2, History, Search, Users } from 'lucide-react'
 import type { PastKGT } from '@/types'
 import { PAST_KGT_OUTCOME_LABELS, PAST_KGT_OUTCOME_COLORS } from '@/types'
-import { parsePastKgtParticipants, getErrorMessage } from '@/lib/utils'
+import { parsePastKgtParticipants } from '@/lib/utils'
 
 type ViewMode = 'by-kgt' | 'by-participant'
-
-// Editable inline — clicking the cell (or its pencil) turns it into a text
-// input; Enter/blur saves via PATCH, Escape cancels. Used for Finalised
-// Kite since that field doesn't exist in the source spreadsheet at all and
-// has to be filled in by hand after the fact.
-function EditableFinalisedKite({ record, onSaved }: { record: PastKGT; onSaved: (updated: PastKGT) => void }) {
-  const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(record.finalised_kite ?? '')
-  const [saving, setSaving] = useState(false)
-
-  const save = async () => {
-    const trimmed = value.trim()
-    if (trimmed === (record.finalised_kite ?? '')) { setEditing(false); return }
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/kgt/past/${record.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ finalised_kite: trimmed || null }),
-      })
-      if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to save'))
-      onSaved(await res.json() as PastKGT)
-      setEditing(false)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (editing) {
-    return (
-      <div className="flex items-center gap-1.5">
-        <input
-          autoFocus
-          value={value}
-          onChange={e => setValue(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') void save()
-            if (e.key === 'Escape') { setValue(record.finalised_kite ?? ''); setEditing(false) }
-          }}
-          placeholder="Kite name"
-          className="w-32 rounded border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-1 text-xs text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-100"
-        />
-        <button onClick={() => void save()} disabled={saving} className="text-emerald-600 hover:text-emerald-800 disabled:opacity-50">
-          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <button
-      onClick={() => setEditing(true)}
-      className="group flex items-center gap-1.5 text-gray-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-400"
-    >
-      <span>{record.finalised_kite || '—'}</span>
-      <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60" />
-    </button>
-  )
-}
 
 // Backfilled historical KGTs — flat records imported once from a spreadsheet,
 // never `polls` rows, so they're listed here rather than in the main table.
@@ -86,17 +24,12 @@ export function PastKGTsModal({ onClose }: { onClose: () => void }) {
       .finally(() => setLoading(false))
   }, [])
 
-  const updateRecord = (updated: PastKGT) => {
-    setRecords(prev => prev.map(r => r.id === updated.id ? updated : r))
-  }
-
   const q = search.toLowerCase().trim()
   const filtered = q
     ? records.filter(r =>
         r.topic.toLowerCase().includes(q) ||
         (r.audience ?? '').toLowerCase().includes(q) ||
-        parsePastKgtParticipants(r.participants).some(p => p.toLowerCase().includes(q)) ||
-        (r.finalised_kite ?? '').toLowerCase().includes(q)
+        parsePastKgtParticipants(r.participants).some(p => p.toLowerCase().includes(q))
       )
     : records
 
@@ -141,7 +74,7 @@ export function PastKGTsModal({ onClose }: { onClose: () => void }) {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search by topic, audience, participant, or finalised kite..."
+              placeholder="Search by topic, audience, or participant..."
               className="w-full rounded-md border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-2 pl-9 pr-3 text-sm text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-100"
             />
           </div>
@@ -177,7 +110,6 @@ export function PastKGTsModal({ onClose }: { onClose: () => void }) {
                   <th className="py-2 pr-4">Audience</th>
                   <th className="py-2 pr-4">Participants</th>
                   <th className="py-2 pr-4 whitespace-nowrap">Outcome</th>
-                  <th className="py-2 pr-4">Finalised Kite</th>
                 </tr>
               </thead>
               <tbody>
@@ -193,9 +125,6 @@ export function PastKGTsModal({ onClose }: { onClose: () => void }) {
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${PAST_KGT_OUTCOME_COLORS[r.outcome]}`}>
                           {PAST_KGT_OUTCOME_LABELS[r.outcome]}
                         </span>
-                      </td>
-                      <td className="py-3 pr-4 text-xs">
-                        <EditableFinalisedKite record={r} onSaved={updateRecord} />
                       </td>
                     </tr>
                   )
