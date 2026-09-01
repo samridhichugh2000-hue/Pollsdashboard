@@ -1,5 +1,5 @@
 import { getDb } from './client'
-import type { Poll, PollApproval, PollResponse, User, AuditLog, PollStatus, CreatePollInput, PollFaq } from '@/types'
+import type { Poll, PollApproval, PollResponse, User, AuditLog, PollStatus, CreatePollInput, PollFaq, PastKGT, PastKgtOutcome } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
 
 // Single source of truth for "this poll is closed" across KPI, overview, and
@@ -264,6 +264,53 @@ export async function updateFaq(id: string, fields: Partial<Pick<PollFaq, 'quest
 
 export async function deleteFaq(id: string): Promise<void> {
   await getDb().execute({ sql: 'DELETE FROM poll_faqs WHERE id = ?', args: [id] })
+}
+
+// ─── Past KGTs (backfilled historical records) ────────────────────────────────
+
+export async function getAllPastKGTs(): Promise<PastKGT[]> {
+  const result = await getDb().execute({
+    sql: 'SELECT * FROM past_kgts ORDER BY kgt_date DESC, created_at DESC',
+    args: [],
+  })
+  return result.rows as unknown as PastKGT[]
+}
+
+export async function updatePastKGT(id: string, fields: Partial<Pick<PastKGT, 'kgt_date' | 'topic' | 'audience' | 'participants' | 'outcome' | 'finalised_kite'>>): Promise<void> {
+  const allowed = ['kgt_date', 'topic', 'audience', 'participants', 'outcome', 'finalised_kite']
+  const setClauses: string[] = []
+  const args: (string | null)[] = []
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (allowed.includes(key)) {
+      setClauses.push(`${key} = ?`)
+      args.push(value as string | null)
+    }
+  }
+  if (!setClauses.length) return
+
+  args.push(id)
+  await getDb().execute({
+    sql: `UPDATE past_kgts SET ${setClauses.join(', ')} WHERE id = ?`,
+    args,
+  })
+}
+
+export async function createPastKGT(fields: {
+  kgt_date?: string | null
+  topic: string
+  audience?: string | null
+  participants?: string | null
+  outcome: PastKgtOutcome
+  finalised_kite?: string | null
+}): Promise<PastKGT> {
+  const id = uuidv4()
+  await getDb().execute({
+    sql: 'INSERT INTO past_kgts (id, kgt_date, topic, audience, participants, outcome, finalised_kite) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    args: [id, fields.kgt_date ?? null, fields.topic, fields.audience ?? null, fields.participants ?? null, fields.outcome, fields.finalised_kite ?? null],
+  })
+  const result = await getDb().execute({ sql: 'SELECT * FROM past_kgts WHERE id = ?', args: [id] })
+  return result.rows[0] as unknown as PastKGT
 }
 
 export async function getKPIData() {

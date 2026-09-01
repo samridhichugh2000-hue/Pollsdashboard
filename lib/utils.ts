@@ -6,6 +6,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// past_kgts.participants is stored as a JSON string array (one normalized
+// name per participant) rather than free text, specifically so callers can
+// count participation per person instead of re-parsing mixed newline/pipe
+// separators every time.
+export function parsePastKgtParticipants(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : []
+  } catch {
+    return []
+  }
+}
+
 // Server errors aren't always JSON — a platform-level failure (e.g. Vercel's
 // 413 "Request Entity Too Large" when a request body is too big) returns
 // plain text, and calling res.json() on that throws a confusing

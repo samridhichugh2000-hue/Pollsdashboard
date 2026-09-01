@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Plus, RefreshCw, X, Award, Loader2 } from 'lucide-react'
+import { Plus, RefreshCw, X, Award, Loader2, History } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { PollsTable } from '@/components/polls/polls-table'
 import { KGTForm } from '@/components/polls/kgt-form'
+import { PastKGTsModal } from '@/components/kgt/past-kgts-modal'
 import { getErrorMessage } from '@/lib/utils'
 import type { Poll, PollResponse } from '@/types'
 
@@ -82,6 +83,7 @@ function KGTContent() {
   const [finalisedCandidates, setFinalisedCandidates] = useState<FinalisedCandidate[]>([])
   const [finalisedLoading, setFinalisedLoading] = useState(false)
   const [showFinalisedModal, setShowFinalisedModal] = useState(false)
+  const [showPastKgtsModal, setShowPastKgtsModal] = useState(false)
 
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -224,6 +226,9 @@ function KGTContent() {
           <Button variant="outline" size="sm" className="border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm" onClick={() => void handleRefresh()}>
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
           </Button>
+          <Button variant="outline" size="sm" className="border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm" onClick={() => setShowPastKgtsModal(true)}>
+            <History className="mr-1.5 h-3.5 w-3.5" /> Past KGTs
+          </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="bg-teal-600 text-white hover:bg-teal-700 font-semibold shadow-sm">
@@ -308,6 +313,10 @@ function KGTContent() {
           loading={finalisedLoading}
           onClose={() => setShowFinalisedModal(false)}
         />
+      )}
+
+      {showPastKgtsModal && (
+        <PastKGTsModal onClose={() => setShowPastKgtsModal(false)} />
       )}
     </div>
   )

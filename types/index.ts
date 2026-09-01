@@ -174,6 +174,39 @@ export interface KGTAuthorizedSender {
   created_at: string
 }
 
+// ON_HOLD covers records the source data left with no status yet (still
+// pending / paused) — distinct from DISCARDED so a paused KGT isn't
+// mislabeled as abandoned.
+export type PastKgtOutcome = 'SUCCESSFUL' | 'UNSUCCESSFUL' | 'DISCARDED' | 'ON_HOLD'
+
+export const PAST_KGT_OUTCOME_LABELS: Record<PastKgtOutcome, string> = {
+  SUCCESSFUL: 'Successful',
+  UNSUCCESSFUL: 'Unsuccessful',
+  DISCARDED: 'Discarded',
+  ON_HOLD: 'On Hold',
+}
+
+export const PAST_KGT_OUTCOME_COLORS: Record<PastKgtOutcome, string> = {
+  SUCCESSFUL: 'bg-emerald-100 text-emerald-800',
+  UNSUCCESSFUL: 'bg-rose-100 text-rose-800',
+  DISCARDED: 'bg-gray-100 text-gray-800',
+  ON_HOLD: 'bg-amber-100 text-amber-800',
+}
+
+// A backfilled historical record — never a `polls` row, since these KGTs
+// were run before the dashboard existed and never went through its
+// draft/approve/release lifecycle.
+export interface PastKGT {
+  id: string
+  kgt_date?: string | null
+  topic: string
+  audience?: string | null
+  participants?: string | null
+  outcome: PastKgtOutcome
+  finalised_kite?: string | null
+  created_at: string
+}
+
 export type RegularPollFrequency = 'monthly' | 'quarterly' | 'bi-annual' | 'annual'
 
 export interface RegularPoll {

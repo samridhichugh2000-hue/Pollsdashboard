@@ -330,6 +330,25 @@ export async function runMigrations() {
     `)
   } catch { /* already exists */ }
 
+  // Historical KGTs run before this dashboard existed — a flat backfilled
+  // record, not a `polls` row, since they never went through (and never will
+  // go through) the draft/approve/release lifecycle. outcome:
+  // SUCCESSFUL | UNSUCCESSFUL | DISCARDED.
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS past_kgts (
+        id TEXT PRIMARY KEY,
+        kgt_date TEXT,
+        topic TEXT NOT NULL,
+        audience TEXT,
+        participants TEXT,
+        outcome TEXT NOT NULL DEFAULT 'DISCARDED',
+        finalised_kite TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+  } catch { /* already exists */ }
+
   // Migrate old emp_code-keyed table to email-keyed
   try {
     const cols = await db.execute(`PRAGMA table_info(employees)`)
