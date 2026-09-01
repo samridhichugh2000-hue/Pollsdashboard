@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db/client'
+import { deriveAudienceLabel, buildHuntGroupEmailMap } from '@/lib/utils'
 
 // Public, API-key-gated feed of released polls for Trainers@koenig-solutions.com
 // and Kites@koenig-solutions.com, consumed by the separate Trainer Dashboard to
@@ -10,7 +11,11 @@ import { getDb } from '@/lib/db/client'
 const TARGET_AUDIENCES = ['trainers@koenig-solutions.com', 'kites@koenig-solutions.com']
 
 // Statuses that mean "this poll has actually gone out to recipients".
-const RELEASED_STATUSES = ['SENT', 'REMINDER_SENT', 'CLOSED']
+// RESULTS_SHARED / RMS_PUBLISHED / RESULTS_UPLOADED only happen after a poll
+// has already closed, so they count as closed/expired here too — same as
+// CLOSED itself. ARCHIVED is deliberately excluded: an archived poll has been
+// pulled from view and should not resurface in this visibility feed.
+const RELEASED_STATUSES = ['SENT', 'REMINDER_SENT', 'CLOSED', 'RESULTS_SHARED', 'RMS_PUBLISHED', 'RESULTS_UPLOADED']
 
 // Statuses where the poll is still open and accepting responses.
 const ACTIVE_STATUSES = ['SENT', 'REMINDER_SENT']
@@ -75,14 +80,18 @@ export async function GET(req: NextRequest) {
 
   try {
     const db = getDb()
-    const result = await db.execute(`
-      SELECT id, topic, department, status, sent_at, closed_at, deadline, recipient_email, release_emails, ms_form_link
-      FROM polls
-      WHERE status IN (${RELEASED_STATUSES.map(s => `'${s}'`).join(',')})
-      ORDER BY sent_at DESC
-    `)
+    const [result, huntGroupsResult] = await Promise.all([
+      db.execute(`
+        SELECT id, topic, department, status, sent_at, closed_at, deadline, recipient_email, release_emails, ms_form_link
+        FROM polls
+        WHERE status IN (${RELEASED_STATUSES.map(s => `'${s}'`).join(',')})
+        ORDER BY sent_at DESC
+      `),
+      db.execute('SELECT name, email FROM hunt_groups'),
+    ])
 
     const rows = result.rows as unknown as PollRow[]
+    const huntGroupsByEmail = buildHuntGroupEmailMap(huntGroupsResult.rows as unknown as { name: string; email: string }[])
     const now = Date.now()
     const appUrl = process.env.NEXTAUTH_URL?.replace('http://localhost:3000', 'https://pollsdashboard.vercel.app') ?? 'https://pollsdashboard.vercel.app'
 
@@ -96,7 +105,7 @@ export async function GET(req: NextRequest) {
         return {
           id: row.id,
           topic: row.topic,
-          department: row.department,
+          department: deriveAudienceLabel(row, huntGroupsByEmail),
           release_date: row.sent_at,
           closure_date: closureDate,
           is_accepting_responses: isAcceptingResponses,

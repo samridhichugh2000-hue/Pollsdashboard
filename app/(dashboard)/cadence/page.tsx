@@ -448,7 +448,7 @@ function CadencePageInner() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800 dark:text-white">Poll Cadence</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{polls.length} template{polls.length !== 1 ? 's' : ''} &middot; auto-releases daily at 9 AM</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{polls.length} template{polls.length !== 1 ? 's' : ''} &middot; auto-releases daily at 2:30 PM IST</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm" onClick={fetchPolls}>
@@ -492,7 +492,7 @@ function CadencePageInner() {
           <div className="flex items-center gap-2 mb-1">
             <CalendarClock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
             <span className="font-semibold text-amber-800 dark:text-amber-300">
-              {upcomingPolls.length} poll{upcomingPolls.length > 1 ? 's' : ''} will auto-release {upcomingPolls.some(p => isDueTomorrow(p.next_run_date)) ? 'tomorrow' : 'today'} at 9 AM
+              {upcomingPolls.length} poll{upcomingPolls.length > 1 ? 's' : ''} will auto-release {upcomingPolls.some(p => isDueTomorrow(p.next_run_date)) ? 'tomorrow' : 'today'} at 2:30 PM IST
             </span>
           </div>
           <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">Pause a poll now if you want to skip this cycle, or update its attachment before it goes out.</p>

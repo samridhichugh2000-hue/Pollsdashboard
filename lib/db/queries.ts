@@ -408,7 +408,10 @@ export async function closeOutUntouchedEntries(pollId: string): Promise<number> 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 export async function getUserByEmail(email: string): Promise<User | null> {
-  const result = await getDb().execute({ sql: 'SELECT * FROM users WHERE email = ?', args: [email] })
+  const result = await getDb().execute({
+    sql: 'SELECT * FROM users WHERE lower(trim(email)) = lower(trim(?))',
+    args: [email],
+  })
   return (result.rows[0] as unknown as User) ?? null
 }
 
