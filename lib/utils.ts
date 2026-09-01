@@ -391,21 +391,30 @@ export function parseEmailList(text: string): string[] {
   return text.split(/[\n,;]+/).map(e => e.trim()).filter(e => EMAIL_RE.test(e))
 }
 
-export function buildFaqAnnounceEmailHtml(params: {
+// Prepended ahead of the forwarded poll-released email's own quoted content
+// (see forwardMessageWithHtml) — announcing all pending FAQs at once rather
+// than one email per FAQ. Reads as a real FAQ document: a plain numbered
+// list (browser/mail-client numbering, not manually typed "Q1:") with the
+// bold question as the list item and the answer directly beneath it, all
+// in black text with no boxes or color accents.
+export function buildFaqAnnounceAllEmailHtml(params: {
   pollTopic: string
-  question: string
-  answer: string
+  faqs: { question: string; answer: string }[]
 }): string {
+  const faqsHtml = params.faqs.map((faq, i) => `
+    <li style="${i < params.faqs.length - 1 ? 'margin-bottom:20px;' : ''}">
+      <strong>${escapeHtml(faq.question)}</strong>
+      <p style="margin:6px 0 0;white-space:pre-wrap;">${linkifyUrls(escapeHtml(faq.answer))}</p>
+    </li>`).join('')
+
   return `
-<div style="font-family: Arial, sans-serif; max-width: 600px;">
-  <p>Hi Team,</p>
-  <p>An FAQ has been added for the poll — <strong>${escapeHtml(params.pollTopic)}</strong>:</p>
-  <div style="margin:16px 0;padding:14px 16px;background:#f9fafb;border-radius:6px;">
-    <p style="font-weight:600;color:#111827;margin:0 0 6px;">${escapeHtml(params.question)}</p>
-    <p style="color:#374151;margin:0;white-space:pre-wrap;">${linkifyUrls(escapeHtml(params.answer))}</p>
-  </div>
-  <br>
-  <p>Regards,<br>polls@koenig-solutions.com</p>
+<div style="font-family: Arial, Helvetica, sans-serif; max-width: 600px; color:#000000; font-size:15px; line-height:1.7;">
+  <p style="margin:0 0 16px;">Hi Team,</p>
+  <p style="margin:0 0 20px;">Please find below the FAQ${params.faqs.length > 1 ? 's' : ''} for the poll — <strong>${escapeHtml(params.pollTopic)}</strong>:</p>
+  <ol style="margin:0 0 20px;padding-left:20px;">
+    ${faqsHtml}
+  </ol>
+  <p style="margin:0;">Regards,<br>polls@koenig-solutions.com</p>
 </div>
 `
 }

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPollById, getFaqById, updateFaq, deleteFaq, createAuditLog } from '@/lib/db/queries'
-import { sendEmail } from '@/lib/graph'
-import { buildFaqAnnounceEmailHtml } from '@/lib/utils'
+import { getFaqById, updateFaq, deleteFaq, createAuditLog } from '@/lib/db/queries'
 
 const userEmail = 'gunjan.setia@koenig-solutions.com'
 
+// Per-FAQ announcing was removed in favor of a single batch announce for all
+// pending FAQs at once — see the PATCH handler on the parent /faqs route.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; faqId: string }> }) {
   const { id, faqId } = await params
   const faq = await getFaqById(faqId)
@@ -21,32 +21,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     await updateFaq(faqId, { question, answer })
     await createAuditLog(id, 'FAQ_UPDATED', userEmail, { faqId })
-  } else if (action === 'ANNOUNCE') {
-    const emails = Array.isArray(body.emails)
-      ? (body.emails as unknown[]).map(e => String(e).trim()).filter(Boolean)
-      : []
-    if (!emails.length) {
-      return NextResponse.json({ error: 'Add at least one recipient' }, { status: 400 })
-    }
-
-    const poll = await getPollById(id)
-    if (!poll) return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
-
-    const pollsMailbox = process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!
-    await sendEmail({
-      from: process.env.PRIYA_EMAIL!,
-      to: pollsMailbox,
-      bcc: emails,
-      subject: `FAQ – ${poll.subject ?? poll.topic}`,
-      htmlBody: buildFaqAnnounceEmailHtml({ pollTopic: poll.topic, question: faq.question, answer: faq.answer }),
-    })
-
-    await updateFaq(faqId, {
-      status: 'ANNOUNCED',
-      announced_at: new Date().toISOString(),
-      announce_emails: JSON.stringify(emails),
-    })
-    await createAuditLog(id, 'FAQ_ANNOUNCED', userEmail, { faqId, emails })
   } else {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   }

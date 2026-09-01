@@ -575,7 +575,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
             </CardHeader>
             {!!poll.has_faq && (
               <CardContent>
-                <FaqSection pollId={poll.id} />
+                <FaqSection pollId={poll.id} pollReleased={!!poll.release_message_id} />
               </CardContent>
             )}
           </Card>

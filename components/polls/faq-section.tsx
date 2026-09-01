@@ -14,12 +14,16 @@ import { FAQ_STATUS_LABELS, FAQ_STATUS_COLORS } from '@/types'
 
 interface FaqSectionProps {
   pollId: string
+  // Whether the poll's release email exists yet — FAQs can only be
+  // announced by forwarding that email, so announcing is disabled until
+  // the poll has actually been released.
+  pollReleased: boolean
 }
 
 // Standalone FAQ manager for a single poll — independent of the poll's own
 // status/lifecycle, so it works the same whether the poll is a draft, still
 // active, or already closed/expired.
-export function FaqSection({ pollId }: FaqSectionProps) {
+export function FaqSection({ pollId, pollReleased }: FaqSectionProps) {
   const [faqs, setFaqs] = useState<PollFaq[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
@@ -33,12 +37,15 @@ export function FaqSection({ pollId }: FaqSectionProps) {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
-  const [announcingFaq, setAnnouncingFaq] = useState<PollFaq | null>(null)
+  const [announceAllOpen, setAnnounceAllOpen] = useState(false)
+  const [announcingAll, setAnnouncingAll] = useState(false)
   const [huntGroups, setHuntGroups] = useState<{ id: string; name: string; email: string }[]>([])
   const [huntGroupsLoading, setHuntGroupsLoading] = useState(false)
   const [selectedHuntGroupIds, setSelectedHuntGroupIds] = useState<string[]>([])
   const [manualEmailsText, setManualEmailsText] = useState('')
   const [huntGroupDropdownOpen, setHuntGroupDropdownOpen] = useState(false)
+
+  const pendingFaqs = faqs.filter(f => f.status === 'DRAFT')
 
   useEffect(() => {
     setLoading(true)
@@ -123,8 +130,8 @@ export function FaqSection({ pollId }: FaqSectionProps) {
     }
   }
 
-  const openAnnounce = async (faq: PollFaq) => {
-    setAnnouncingFaq(faq)
+  const openAnnounceAll = async () => {
+    setAnnounceAllOpen(true)
     setSelectedHuntGroupIds([])
     setManualEmailsText('')
     setHuntGroupDropdownOpen(false)
@@ -142,30 +149,28 @@ export function FaqSection({ pollId }: FaqSectionProps) {
     }
   }
 
-  const confirmAnnounce = async () => {
-    if (!announcingFaq) return
+  const confirmAnnounceAll = async () => {
     const huntGroupSelected = huntGroups.filter(g => selectedHuntGroupIds.includes(g.id))
     const manualEmails = parseEmailList(manualEmailsText)
     const emails = [...new Set([...huntGroupSelected.map(g => g.email), ...manualEmails])]
     if (!emails.length) { toast.error('Add at least one recipient'); return }
 
-    const faqId = announcingFaq.id
-    setSaving(faqId)
+    setAnnouncingAll(true)
     try {
-      const res = await fetch(`/api/polls/${pollId}/faqs/${faqId}`, {
+      const res = await fetch(`/api/polls/${pollId}/faqs`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'ANNOUNCE', emails }),
+        body: JSON.stringify({ action: 'ANNOUNCE_ALL', emails }),
       })
-      if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to announce FAQ'))
-      const updated = await res.json() as PollFaq
-      setFaqs(prev => prev.map(f => f.id === updated.id ? updated : f))
-      setAnnouncingFaq(null)
-      toast.success('FAQ announced')
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to announce FAQs'))
+      const updated = await res.json() as PollFaq[]
+      setFaqs(updated)
+      setAnnounceAllOpen(false)
+      toast.success('FAQs announced')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to announce FAQ')
+      toast.error(err instanceof Error ? err.message : 'Failed to announce FAQs')
     } finally {
-      setSaving(null)
+      setAnnouncingAll(false)
     }
   }
 
@@ -203,7 +208,6 @@ export function FaqSection({ pollId }: FaqSectionProps) {
                   <p className="text-sm text-gray-600 dark:text-slate-300 whitespace-pre-wrap">{faq.answer}</p>
                   <div className="flex items-center gap-3 pt-1">
                     <button className="text-xs font-medium text-cyan-600 hover:text-cyan-800 hover:underline" onClick={() => startEdit(faq)}>Edit</button>
-                    <button className="text-xs font-medium text-cyan-600 hover:text-cyan-800 hover:underline" onClick={() => void openAnnounce(faq)}>Announce</button>
                     {confirmDeleteId === faq.id ? (
                       <span className="flex items-center gap-2">
                         <span className="text-xs text-gray-400">Delete?</span>
@@ -226,6 +230,23 @@ export function FaqSection({ pollId }: FaqSectionProps) {
         </div>
       )}
 
+      {pendingFaqs.length > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-dashed border-gray-300 dark:border-slate-600 p-3">
+          <div className="text-xs text-gray-500 dark:text-slate-400">
+            {pendingFaqs.length} draft FAQ{pendingFaqs.length > 1 ? 's' : ''} not yet announced
+          </div>
+          <Button
+            size="sm"
+            onClick={() => void openAnnounceAll()}
+            disabled={!pollReleased}
+            title={pollReleased ? undefined : 'Poll has not been released yet'}
+          >
+            <Megaphone className="mr-1.5 h-3.5 w-3.5" />
+            Announce All FAQs
+          </Button>
+        </div>
+      )}
+
       {/* Add new FAQ */}
       <div className="space-y-2 rounded-lg border border-dashed border-gray-300 dark:border-slate-600 p-3">
         <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide dark:text-slate-400">Add FAQ</Label>
@@ -239,18 +260,24 @@ export function FaqSection({ pollId }: FaqSectionProps) {
         </div>
       </div>
 
-      {/* Announce dialog */}
-      <Dialog open={!!announcingFaq} onOpenChange={(open) => { if (!open) setAnnouncingFaq(null) }}>
+      {/* Announce all dialog */}
+      <Dialog open={announceAllOpen} onOpenChange={(open) => { if (!open) setAnnounceAllOpen(false) }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Announce FAQ</DialogTitle>
-            <DialogDescription>Select who this FAQ should be emailed to.</DialogDescription>
+            <DialogTitle>Announce All FAQs</DialogTitle>
+            <DialogDescription>
+              Sent as a reply-forward of the poll&apos;s release email, with all pending FAQs below. Select who it should be emailed to.
+            </DialogDescription>
           </DialogHeader>
 
-          {announcingFaq && (
-            <div className="rounded-md bg-gray-50 dark:bg-slate-800 p-3 text-sm">
-              <p className="font-medium text-gray-900 dark:text-slate-100">{announcingFaq.question}</p>
-              <p className="text-gray-600 dark:text-slate-300 mt-1 whitespace-pre-wrap">{announcingFaq.answer}</p>
+          {pendingFaqs.length > 0 && (
+            <div className="max-h-56 overflow-y-auto space-y-2">
+              {pendingFaqs.map(faq => (
+                <div key={faq.id} className="rounded-md bg-gray-50 dark:bg-slate-800 p-3 text-sm">
+                  <p className="font-medium text-gray-900 dark:text-slate-100">{faq.question}</p>
+                  <p className="text-gray-600 dark:text-slate-300 mt-1 whitespace-pre-wrap">{faq.answer}</p>
+                </div>
+              ))}
             </div>
           )}
 
@@ -325,10 +352,10 @@ export function FaqSection({ pollId }: FaqSectionProps) {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAnnouncingFaq(null)}>Cancel</Button>
-            <Button onClick={() => void confirmAnnounce()} disabled={huntGroupsLoading || saving === announcingFaq?.id}>
-              {saving === announcingFaq?.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Megaphone className="mr-1.5 h-3.5 w-3.5" />}
-              Announce
+            <Button variant="outline" onClick={() => setAnnounceAllOpen(false)}>Cancel</Button>
+            <Button onClick={() => void confirmAnnounceAll()} disabled={huntGroupsLoading || announcingAll}>
+              {announcingAll ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Megaphone className="mr-1.5 h-3.5 w-3.5" />}
+              Announce All
             </Button>
           </DialogFooter>
         </DialogContent>
