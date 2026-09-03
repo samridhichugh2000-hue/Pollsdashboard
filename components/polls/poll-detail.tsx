@@ -181,7 +181,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
     JSON.stringify(editQuestions) !== JSON.stringify(parseQuestions(poll.questions ?? '')) ||
     editDeadline !== (poll.deadline ? poll.deadline.split('T')[0] : defaultDeadline)
 
-  const runAction = async (action: string, extra?: Record<string, unknown>) => {
+  const runAction = async (action: string, extra?: Record<string, unknown>, successMessage?: string) => {
     setLoading(action)
     try {
       const res = await fetch(`/api/polls/${poll.id}`, {
@@ -192,7 +192,7 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
       if (!res.ok) throw new Error(await getErrorMessage(res, 'Action failed'))
       const updated = await res.json() as Poll
       setPoll(updated)
-      toast.success(`Action completed: ${action.replace(/_/g, ' ')}`)
+      toast.success(successMessage ?? `Action completed: ${action.replace(/_/g, ' ')}`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Action failed')
     } finally {
@@ -1650,7 +1650,8 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
               disabled={shareRecipients.length === 0 || !!loading}
               onClick={() => {
                 setShowShareDialog(false)
-                void runAction('SHARE_RESULTS', { recipients: shareRecipients })
+                const hasResponses = !!response?.response_data && (JSON.parse(response.response_data) as unknown[]).length > 0
+                void runAction('SHARE_RESULTS', { recipients: shareRecipients }, hasResponses ? undefined : 'Email sent — no responses on the poll')
               }}
             >
               {loading === 'SHARE_RESULTS' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}

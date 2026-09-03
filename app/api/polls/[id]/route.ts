@@ -636,40 +636,44 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           : [process.env.RESULTS_RECIPIENT_EMAIL ?? 'ea@koenig-solutions.com']
 
         const pollResponse = await getPollResponse(id)
-        if (!pollResponse?.response_data) {
-          return NextResponse.json({ error: 'No responses available to share.' }, { status: 400 })
+
+        // No responses is a legitimate outcome, not an error — follow the
+        // same path as when there are responses, just without an Excel
+        // attachment and with the email body saying so (mirrors the
+        // cron poll-closure flow, which already handles this the same way).
+        interface ResponseEntry { respondent?: string; email?: string; submitted_at: string; answers: { question: string; answer: string }[] }
+        const entries: ResponseEntry[] = pollResponse?.response_data ? JSON.parse(pollResponse.response_data) : []
+
+        let resultAttachment: { name: string; contentType: string; contentBytes: string } | null = null
+        if (entries.length > 0) {
+          const rows = entries.map((entry, i) => {
+            const row: Record<string, string> = {
+              '#': String(i + 1),
+              Name: entry.respondent ?? 'Anonymous',
+            }
+            entry.answers.forEach((a, qi) => {
+              row[`Q${qi + 1}: ${a.question}`] = a.answer
+            })
+            return row
+          })
+          const headers = Object.keys(rows[0] ?? {})
+          const ws = XLSX.utils.aoa_to_sheet([
+            [`Poll: ${poll.topic}`],
+            [],
+            headers,
+            ...rows.map(r => headers.map(h => r[h] ?? '')),
+          ])
+          ws['!cols'] = headers.map((key) => ({
+            wch: Math.max(key.length, ...rows.map((r) => String(r[key] ?? '').length)) + 2,
+          }))
+          const wb = XLSX.utils.book_new()
+          XLSX.utils.book_append_sheet(wb, ws, 'Responses')
+          const xlsxBase64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }) as string
+          const filename = `poll-responses-${poll.topic.slice(0, 30).replace(/\s+/g, '-').toLowerCase()}.xlsx`
+          resultAttachment = { name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }
         }
 
-        // Build Excel attachment from stored responses
-        interface ResponseEntry { respondent?: string; email?: string; submitted_at: string; answers: { question: string; answer: string }[] }
-        const entries: ResponseEntry[] = JSON.parse(pollResponse.response_data)
-        const rows = entries.map((entry, i) => {
-          const row: Record<string, string> = {
-            '#': String(i + 1),
-            Name: entry.respondent ?? 'Anonymous',
-          }
-          entry.answers.forEach((a, qi) => {
-            row[`Q${qi + 1}: ${a.question}`] = a.answer
-          })
-          return row
-        })
-        const headers = Object.keys(rows[0] ?? {})
-        const ws = XLSX.utils.aoa_to_sheet([
-          [`Poll: ${poll.topic}`],
-          [],
-          headers,
-          ...rows.map(r => headers.map(h => r[h] ?? '')),
-        ])
-        ws['!cols'] = headers.map((key) => ({
-          wch: Math.max(key.length, ...rows.map((r) => String(r[key] ?? '').length)) + 2,
-        }))
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, 'Responses')
-        const xlsxBase64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }) as string
-        const filename = `poll-responses-${poll.topic.slice(0, 30).replace(/\s+/g, '-').toLowerCase()}.xlsx`
-
-        const emailHtml = buildResultsEmailHtml(poll.topic)
-        const attachment = { name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }
+        const emailHtml = buildResultsEmailHtml(poll.topic, entries.length > 0)
 
         const forwardSourceId = poll.last_reminder_message_id ?? poll.release_message_id
         if (!forwardSourceId) {
@@ -687,11 +691,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           htmlBody: emailHtml,
           to: shareRecipients,
           cc: standardCC(),
-          attachments: [attachment, ...releaseAttachments],
+          attachments: [...(resultAttachment ? [resultAttachment] : []), ...releaseAttachments],
         })
 
         await updatePollStatus(id, 'RESULTS_SHARED')
-        await createAuditLog(id, 'RESULTS_SHARED', userEmail, { recipients: shareRecipients })
+        await createAuditLog(id, 'RESULTS_SHARED', userEmail, { recipients: shareRecipients, hasResponses: entries.length > 0 })
         break
       }
 
