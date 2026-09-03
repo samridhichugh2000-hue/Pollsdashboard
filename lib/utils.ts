@@ -433,11 +433,19 @@ export function buildFaqAnnounceAllEmailHtml(params: {
 `
 }
 
-export function buildResultsEmailHtml(topic: string, hasResponses = true): string {
+export function buildResultsEmailHtml(topic: string, hasResponses = true, questions: string[] = []): string {
+  const questionsHtml = questions.length > 0
+    ? `<p style="margin:16px 0 6px;">Questions asked in this poll:</p>
+  <ol style="margin:0 0 16px;padding-left:20px;">
+    ${questions.map(q => `<li style="margin:0 0 4px;">${escapeHtml(q)}</li>`).join('')}
+  </ol>`
+    : ''
+
   return `
 <div style="font-family: Arial, sans-serif; max-width: 600px;">
   <p>Hi Team,</p>
   <p>PFA the results for the poll — <strong>${escapeHtml(topic)}</strong></p>
+  ${questionsHtml}
   ${hasResponses
     ? '<p>Please find the poll response export attached.</p>'
     : '<p>No responses received on this poll.</p>'}

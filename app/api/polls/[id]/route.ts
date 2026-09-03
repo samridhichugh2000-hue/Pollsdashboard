@@ -673,7 +673,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           resultAttachment = { name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }
         }
 
-        const emailHtml = buildResultsEmailHtml(poll.topic, entries.length > 0)
+        const pollQuestions = poll.questions
+          ? (JSON.parse(poll.questions) as Array<string | { text: string }>).map(q => typeof q === 'string' ? q : q.text)
+          : []
+        const emailHtml = buildResultsEmailHtml(poll.topic, entries.length > 0, pollQuestions)
 
         const forwardSourceId = poll.last_reminder_message_id ?? poll.release_message_id
         if (!forwardSourceId) {

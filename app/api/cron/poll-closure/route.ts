@@ -132,7 +132,10 @@ export async function GET(req: Request) {
       // was attached at release time alongside the responses excel; forwarding
       // already carries those along, but this covers polls closed same-day
       // as release with no reminder/forward chain to inherit from.
-      const htmlBody = buildResultsEmailHtml(poll.topic, attachments.length > 0)
+      const pollQuestions = poll.questions
+        ? (JSON.parse(poll.questions) as Array<string | { text: string }>).map(q => typeof q === 'string' ? q : q.text)
+        : []
+      const htmlBody = buildResultsEmailHtml(poll.topic, attachments.length > 0, pollQuestions)
       const resultsRecipient = process.env.RESULTS_RECIPIENT_EMAIL ?? 'ea@koenig-solutions.com'
       const forwardSourceId = poll.last_reminder_message_id ?? poll.release_message_id
       if (forwardSourceId) {
