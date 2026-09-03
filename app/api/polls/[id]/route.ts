@@ -25,7 +25,7 @@ import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buil
 import { releasePollNow } from '@/lib/poll-release'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
-import { pushPollToKites, buildResponsesHtml, uploadPollResults, insertPolicyFaqs } from '@/lib/kites-api'
+import { pushPollToKites, buildResponsesHtml, uploadPollResults, insertPolicyFaqs, autoPublishResultsToRms } from '@/lib/kites-api'
 import * as XLSX from 'xlsx'
 import { writeFileSync, mkdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
@@ -711,6 +711,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         await updatePollStatus(id, 'RESULTS_SHARED')
         await createAuditLog(id, 'RESULTS_SHARED', userEmail, { recipients: shareRecipients, hasResponses: entries.length > 0 })
+
+        // Best-effort: auto-push to RMS and upload results now that they've
+        // been shared, so staff don't need the separate Push to RMS / Upload
+        // to Koenig News buttons for the common case. A failure here never
+        // undoes the results-shared status above — it's logged and left for
+        // manual retry via those same buttons.
+        try {
+          const autoResult = await autoPublishResultsToRms(poll, entries)
+          if (autoResult.uploaded && autoResult.newsId) {
+            await updatePollStatus(id, 'RESULTS_UPLOADED', { rms_news_id: autoResult.newsId, results_uploaded_at: new Date().toISOString() })
+            await createAuditLog(id, 'RESULTS_UPLOADED', userEmail, { newsId: autoResult.newsId, via: 'auto' })
+          } else if (autoResult.pushed && autoResult.newsId) {
+            await updatePollStatus(id, 'RMS_PUBLISHED', { rms_news_id: autoResult.newsId })
+            await createAuditLog(id, 'PUSHED_TO_RMS', userEmail, { newsId: autoResult.newsId, via: 'auto' })
+            await createAuditLog(id, 'RESULTS_UPLOAD_FAILED', userEmail, { error: autoResult.error, step: autoResult.step })
+          } else if (autoResult.error) {
+            await createAuditLog(id, 'RMS_PUSH_FAILED', userEmail, { error: autoResult.error, step: autoResult.step })
+          }
+        } catch (err) {
+          await createAuditLog(id, 'RMS_PUSH_FAILED', userEmail, { error: err instanceof Error ? err.message : String(err) })
+        }
         break
       }
 

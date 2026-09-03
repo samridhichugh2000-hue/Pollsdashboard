@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse, getPollAttachments } from '@/lib/db/queries'
 import { sendEmail, forwardMessageWithHtml, standardCC, getFormResponses } from '@/lib/graph'
 import { buildResultsEmailHtml, toISTDateStr, istMinutesOfDay, isISTWeekend } from '@/lib/utils'
+import { autoPublishResultsToRms } from '@/lib/kites-api'
 import * as XLSX from 'xlsx'
 
 const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000
@@ -95,11 +96,11 @@ export async function GET(req: Request) {
       // Build Excel attachment from stored responses
       const pollResponse = await getPollResponse(poll.id)
       let attachments: { name: string; contentType: string; contentBytes: string }[] = []
-      if (pollResponse?.response_data) {
-        const entries = JSON.parse(pollResponse.response_data) as Array<{
-          respondent?: string; email?: string; submitted_at: string;
-          answers: { question: string; answer: string }[]
-        }>
+      const entries: Array<{
+        respondent?: string; email?: string; submitted_at: string;
+        answers: { question: string; answer: string }[]
+      }> = pollResponse?.response_data ? JSON.parse(pollResponse.response_data) : []
+      if (entries.length > 0) {
         const rows = entries.map((entry, i) => {
           const row: Record<string, string> = {
             '#': String(i + 1),
@@ -162,6 +163,25 @@ export async function GET(req: Request) {
       // once the send has actually succeeded (this line is unreachable if it throws).
       await updatePollStatus(poll.id, 'RESULTS_SHARED', { results_uploaded_at: new Date().toISOString() })
       await createAuditLog(poll.id, 'RESULTS_SHARED', 'cron')
+
+      // Best-effort: auto-push to RMS and upload results, same as the manual
+      // Push to RMS / Upload to Koenig News actions — a failure here never
+      // undoes RESULTS_SHARED above, just leaves it for manual retry.
+      try {
+        const autoResult = await autoPublishResultsToRms(poll, entries)
+        if (autoResult.uploaded && autoResult.newsId) {
+          await updatePollStatus(poll.id, 'RESULTS_UPLOADED', { rms_news_id: autoResult.newsId, results_uploaded_at: new Date().toISOString() })
+          await createAuditLog(poll.id, 'RESULTS_UPLOADED', 'cron', { newsId: autoResult.newsId, via: 'auto' })
+        } else if (autoResult.pushed && autoResult.newsId) {
+          await updatePollStatus(poll.id, 'RMS_PUBLISHED', { rms_news_id: autoResult.newsId })
+          await createAuditLog(poll.id, 'PUSHED_TO_RMS', 'cron', { newsId: autoResult.newsId, via: 'auto' })
+          await createAuditLog(poll.id, 'RESULTS_UPLOAD_FAILED', 'cron', { error: autoResult.error, step: autoResult.step })
+        } else if (autoResult.error) {
+          await createAuditLog(poll.id, 'RMS_PUSH_FAILED', 'cron', { error: autoResult.error, step: autoResult.step })
+        }
+      } catch (err) {
+        await createAuditLog(poll.id, 'RMS_PUSH_FAILED', 'cron', { error: err instanceof Error ? err.message : String(err) })
+      }
     } catch (err) {
       console.error(`Poll ${poll.id} closed but failed to send results:`, err)
       try {

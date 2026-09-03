@@ -393,6 +393,91 @@ export async function insertPolicyFaqs(
   return { success: true, results }
 }
 
+export interface AutoPublishResult {
+  pushed: boolean
+  uploaded: boolean
+  newsId?: string
+  error?: string
+  step?: 'push' | 'upload'
+}
+
+// Chains PUSH_TO_RMS + UPLOAD_TO_KOENIG into one best-effort call, fired right
+// after a poll's results are shared (auto-close cron or manual Share Results).
+// Never throws — callers treat this as fire-and-forget and log the outcome
+// via the audit log rather than failing the caller's own flow.
+export async function autoPublishResultsToRms(
+  poll: PollFields & { id: string; rms_news_id?: string | null },
+  entries: {
+    respondent?: string
+    email?: string
+    submitted_at: string
+    answers: { question: string; answer: string }[]
+    actionable?: boolean | null
+    classification?: string | null
+    status?: string | null
+    remarks?: string
+    reply_sent_at?: string
+  }[],
+): Promise<AutoPublishResult> {
+  if (entries.length === 0) return { pushed: false, uploaded: false, error: 'No responses to push' }
+
+  let newsId = poll.rms_news_id ?? null
+  if (!newsId) {
+    const responsesHtml = buildResponsesHtml(entries)
+    const para = `<p><strong>Topic:</strong> ${poll.topic}</p><p><strong>Department:</strong> ${poll.department}</p><p><strong>Total responses:</strong> ${entries.length}</p>`
+    const pushResult = await pushPollToKites(poll, { htmlContent: responsesHtml, para })
+    if (!pushResult.success) {
+      return { pushed: false, uploaded: false, error: pushResult.error, step: 'push' }
+    }
+    newsId = pushResult.newsId ? String(pushResult.newsId) : null
+    if (!newsId) {
+      return { pushed: false, uploaded: false, error: 'Kites push succeeded but returned no news ID', step: 'push' }
+    }
+  }
+
+  // Build the results Excel and register it with the Insert Poll API, same
+  // shape as the manual UPLOAD_TO_KOENIG action.
+  const XLSX = await import('xlsx')
+  const { writeFileSync, unlinkSync, mkdirSync } = await import('fs')
+  const { join } = await import('path')
+  const { tmpdir } = await import('os')
+
+  const rows = entries.map((entry, i) => {
+    const row: Record<string, string> = {
+      '#': String(i + 1),
+      'Name': entry.respondent ?? '',
+      'Email': entry.email ?? '',
+      'Submitted At': new Date(entry.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+    }
+    entry.answers.forEach((a, qi) => { row[`Q${qi + 1}: ${a.question}`] = a.answer })
+    return row
+  })
+  const headers = Object.keys(rows[0] ?? {})
+  const ws = XLSX.utils.aoa_to_sheet([
+    [`Poll: ${poll.topic}`],
+    [],
+    headers,
+    ...rows.map(r => headers.map(h => r[h] ?? '')),
+  ])
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Responses')
+
+  const repoDir = process.env.POLLS_REPO_PATH ?? tmpdir()
+  mkdirSync(repoDir, { recursive: true })
+  const safeSlug = poll.topic.slice(0, 40).replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()
+  const filePath = join(repoDir, `poll-${safeSlug}-${newsId}.xlsx`)
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+  writeFileSync(filePath, buffer)
+
+  const uploadOutcome = await uploadPollResults(newsId, filePath, entries)
+  try { unlinkSync(filePath) } catch { /* best-effort cleanup */ }
+
+  if (!uploadOutcome.success) {
+    return { pushed: true, uploaded: false, newsId, error: uploadOutcome.error, step: 'upload' }
+  }
+  return { pushed: true, uploaded: true, newsId }
+}
+
 export function buildResponsesHtml(
   entries: {
     respondent?: string
