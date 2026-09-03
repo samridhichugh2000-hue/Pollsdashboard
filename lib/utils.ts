@@ -444,11 +444,12 @@ export function buildResultsEmailHtml(topic: string, hasResponses = true, questi
   return `
 <div style="font-family: Arial, sans-serif; max-width: 600px;">
   <p>Hi Team,</p>
-  <p>PFA the results for the poll — <strong>${escapeHtml(topic)}</strong></p>
-  ${questionsHtml}
   ${hasResponses
-    ? '<p>Please find the poll response export attached.</p>'
-    : '<p>No responses received on this poll.</p>'}
+    ? `<p>PFA the results for the poll — <strong>${escapeHtml(topic)}</strong></p>
+  ${questionsHtml}
+  <p>Please find the poll response export attached.</p>`
+    : `<p>No responses received on this poll. <strong>${escapeHtml(topic)}</strong></p>
+  ${questionsHtml}`}
   <br>
   <p>Regards,<br>polls@koenig-solutions.com</p>
 </div>
