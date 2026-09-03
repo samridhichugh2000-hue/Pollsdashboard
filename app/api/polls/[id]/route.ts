@@ -344,6 +344,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         break
       }
 
+      // Records that results were shared with the requester outside the app
+      // (in person, over chat, etc.) — updates status without sending an
+      // email, unlike SHARE_RESULTS which always forwards one.
+      case 'MARK_RESULTS_SHARED': {
+        if (!CLOSED_POLL_STATUSES.includes(poll.status)) {
+          return NextResponse.json({ error: `This poll is still active (${STATUS_LABELS[poll.status]}) — it must be closed first.` }, { status: 409 })
+        }
+        await updatePollStatus(id, 'RESULTS_SHARED', { results_uploaded_at: new Date().toISOString() })
+        await createAuditLog(id, 'RESULTS_SHARED', userEmail, { via: 'manual-mark', notified: false })
+        break
+      }
+
       // Sends the "no action taken" notice to any respondent still without an
       // actionable/not-actionable decision, then marks those entries resolved.
       // Deliberately a separate, explicit action from closing the poll (or
