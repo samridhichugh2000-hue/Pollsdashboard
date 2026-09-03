@@ -15,6 +15,8 @@ import {
   getPollAttachments,
   getPollAttachmentsMeta,
   closeOutUntouchedEntries,
+  getFaqsByPoll,
+  updateFaq,
   CLOSED_POLL_STATUSES,
 } from '@/lib/db/queries'
 import type { PollAttachment } from '@/lib/db/queries'
@@ -23,7 +25,7 @@ import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buil
 import { releasePollNow } from '@/lib/poll-release'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
-import { pushPollToKites, buildResponsesHtml, uploadPollResults } from '@/lib/kites-api'
+import { pushPollToKites, buildResponsesHtml, uploadPollResults, insertPolicyFaqs } from '@/lib/kites-api'
 import * as XLSX from 'xlsx'
 import { writeFileSync, mkdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
@@ -847,6 +849,43 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           return NextResponse.json({ error: `Kites API push failed: ${kitesResult.error}` }, { status: 502 })
         }
         break
+      }
+
+      // Pushes every FAQ on this poll that hasn't already synced to RMS —
+      // irrespective of whether it's been announced by email. PolicyId is
+      // the poll's own rms_news_id (set when the poll itself was pushed via
+      // PUSH_TO_RMS above), so that must already exist.
+      case 'POST_FAQ': {
+        if (!poll.rms_news_id) {
+          return NextResponse.json({ error: 'This poll has not been pushed to Koenig News yet. Push it first to get a Policy ID.' }, { status: 400 })
+        }
+        const allFaqs = await getFaqsByPoll(id)
+        const unsynced = allFaqs.filter(f => !f.rms_synced_at)
+        if (!unsynced.length) {
+          return NextResponse.json({ success: true, pushed: 0, failed: 0, message: 'All FAQs already synced to RMS.' })
+        }
+
+        const outcome = await insertPolicyFaqs(poll.rms_news_id, unsynced.map(f => ({ question: f.question, answer: f.answer })))
+        if (!outcome.success) {
+          await createAuditLog(id, 'FAQ_RMS_SYNC_FAILED', userEmail, { error: outcome.error })
+          return NextResponse.json({ error: `RMS push failed: ${outcome.error}` }, { status: 502 })
+        }
+
+        // insertPolicyFaqs returns one result per input FAQ, in the same order.
+        let pushed = 0
+        const failed: { question: string; error?: string }[] = []
+        for (const [i, f] of unsynced.entries()) {
+          const result = outcome.results[i]
+          if (result?.success) {
+            await updateFaq(f.id, { rms_synced_at: new Date().toISOString(), rms_sync_error: null, rms_faq_id: result.faqId ?? null })
+            pushed++
+          } else {
+            await updateFaq(f.id, { rms_sync_error: result?.error ?? 'Unknown error' })
+            failed.push({ question: f.question, error: result?.error })
+          }
+        }
+        await createAuditLog(id, 'FAQ_POSTED_TO_RMS', userEmail, { rms_news_id: poll.rms_news_id, pushed, failed })
+        return NextResponse.json({ success: true, pushed, failed: failed.length, failedDetail: failed })
       }
 
       case 'REPLY_TO_RESPONDENT': {

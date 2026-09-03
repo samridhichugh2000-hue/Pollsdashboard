@@ -43,7 +43,7 @@ export interface Poll {
   ms_form_id?: string | null
   ms_form_link?: string | null
   rms_task_id?: string | null
-  rms_news_id?: string | null
+  rms_news_id?: string | null // also doubles as the RMS "PolicyId" used when pushing this poll's FAQs via Insert PolicyFAQs
   release_emails?: string | null // JSON array of email strings
   release_message_id?: string | null // Graph message ID of the release email
   last_reminder_message_id?: string | null // Graph message ID of the most recently sent reminder/closure-alert email
@@ -64,6 +64,7 @@ export interface Poll {
   archived_from_status?: PollStatus | null
   request_type: RequestType
   has_faq?: number | null // 1 or 0 (SQLite boolean) — whether the FAQ section is enabled for this poll
+  faq_count?: number | null // count of poll_faqs rows for this poll, any status — only present on getAllPolls() results
   created_at: string
   updated_at: string
 }
@@ -78,6 +79,9 @@ export interface PollFaq {
   status: FaqStatus
   announced_at?: string | null
   announce_emails?: string | null // JSON array of email strings
+  rms_synced_at?: string | null // set once this FAQ has been pushed to the RMS Insert PolicyFAQs API
+  rms_sync_error?: string | null // last error message if the RMS push failed
+  rms_faq_id?: string | null // the "NewId" RMS assigned this FAQ record on successful insert
   created_by?: string | null
   created_at: string
   updated_at: string

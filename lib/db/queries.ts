@@ -15,7 +15,10 @@ export const CLOSED_POLL_STATUSES: PollStatus[] = ['CLOSED', 'RESULTS_UPLOADED',
 // ─── Polls ───────────────────────────────────────────────────────────────────
 
 export async function getAllPolls(): Promise<Poll[]> {
-  const result = await getDb().execute(`SELECT * FROM polls WHERE request_type != 'KGT' ORDER BY created_at DESC`)
+  const result = await getDb().execute(`
+    SELECT p.*, (SELECT COUNT(*) FROM poll_faqs f WHERE f.poll_id = p.id) AS faq_count
+    FROM polls p WHERE p.request_type != 'KGT' ORDER BY p.created_at DESC
+  `)
   return result.rows as unknown as Poll[]
 }
 
@@ -242,9 +245,9 @@ export async function createFaq(pollId: string, question: string, answer: string
   return (await getFaqById(id))!
 }
 
-export async function updateFaq(id: string, fields: Partial<Pick<PollFaq, 'question' | 'answer' | 'status' | 'announced_at' | 'announce_emails'>>): Promise<void> {
+export async function updateFaq(id: string, fields: Partial<Pick<PollFaq, 'question' | 'answer' | 'status' | 'announced_at' | 'announce_emails' | 'rms_synced_at' | 'rms_sync_error' | 'rms_faq_id'>>): Promise<void> {
   const now = new Date().toISOString()
-  const allowed = ['question', 'answer', 'status', 'announced_at', 'announce_emails']
+  const allowed = ['question', 'answer', 'status', 'announced_at', 'announce_emails', 'rms_synced_at', 'rms_sync_error', 'rms_faq_id']
   const setClauses: string[] = ['updated_at = ?']
   const args: (string | null)[] = [now]
 

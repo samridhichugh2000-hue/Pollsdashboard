@@ -223,6 +223,13 @@ export function FaqSection({ pollId, pollReleased }: FaqSectionProps) {
                       Announced to {(() => { try { return (JSON.parse(faq.announce_emails) as string[]).join(', ') } catch { return '' } })()}
                     </p>
                   )}
+                  {faq.rms_sync_error ? (
+                    <p className="text-[11px] text-rose-500 dark:text-rose-400">RMS sync failed: {faq.rms_sync_error}</p>
+                  ) : faq.rms_synced_at ? (
+                    <p className="text-[11px] text-emerald-500 dark:text-emerald-400">
+                      Synced to RMS{faq.rms_faq_id ? ` (ID: ${faq.rms_faq_id})` : ''}
+                    </p>
+                  ) : null}
                 </div>
               )}
             </div>

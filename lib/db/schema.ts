@@ -349,6 +349,21 @@ export async function runMigrations() {
     `)
   } catch { /* already exists */ }
 
+  // Tracks whether each FAQ was successfully pushed to RMS via the "Post FAQ"
+  // action — independent of (and unrelated to) the email announce.
+  try {
+    await db.execute(`ALTER TABLE poll_faqs ADD COLUMN rms_synced_at DATETIME`)
+  } catch { /* already exists */ }
+  try {
+    await db.execute(`ALTER TABLE poll_faqs ADD COLUMN rms_sync_error TEXT`)
+  } catch { /* already exists */ }
+  // The ID RMS assigns the FAQ record on a successful insert (its "NewId") —
+  // confirms the push actually persisted, since the API returns 200 OK even
+  // for a malformed request that silently inserts nothing.
+  try {
+    await db.execute(`ALTER TABLE poll_faqs ADD COLUMN rms_faq_id TEXT`)
+  } catch { /* already exists */ }
+
   // Migrate old emp_code-keyed table to email-keyed
   try {
     const cols = await db.execute(`PRAGMA table_info(employees)`)

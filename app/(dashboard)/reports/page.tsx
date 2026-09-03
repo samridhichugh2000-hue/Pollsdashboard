@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useCallback, useEffect, useState } from 'react'
-import { BarChart3, X, Loader2, RefreshCw, Clock, User, Mail, ChevronDown, ChevronUp, Save, ExternalLink, Send, Upload, Zap, TrendingUp } from 'lucide-react'
+import { BarChart3, X, Loader2, RefreshCw, Clock, User, Mail, ChevronDown, ChevronUp, Save, ExternalLink, Send, Upload, Zap, TrendingUp, MessageCircleQuestion } from 'lucide-react'
 import { toast } from 'sonner'
 import { StatusBadge } from '@/components/polls/status-badge'
 import { formatDateTime, formatRelative, getErrorMessage } from '@/lib/utils'
@@ -448,6 +448,7 @@ export default function ReportsPage() {
   const [managePoll, setManagePoll] = useState<Poll | null>(null)
   const [pushingRmsId, setPushingRmsId] = useState<string | null>(null)
   const [uploadingKoenigId, setUploadingKoenigId] = useState<string | null>(null)
+  const [postingFaqId, setPostingFaqId] = useState<string | null>(null)
   const [chartData, setChartData] = useState<ChartData | null>(null)
   const [chartFrom, setChartFrom] = useState('2026-05')
   const [chartTo, setChartTo] = useState(() => {
@@ -515,6 +516,27 @@ export default function ReportsPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Push to Koenig News failed')
     } finally { setPushingRmsId(null) }
+  }
+
+  const handlePostFaq = async (poll: Poll) => {
+    setPostingFaqId(poll.id)
+    try {
+      const res = await fetch(`/api/polls/${poll.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'POST_FAQ' }),
+      })
+      if (!res.ok) throw new Error(await getErrorMessage(res, 'Post FAQ to RMS failed'))
+      const data = await res.json() as { pushed?: number; failed?: number; message?: string }
+      if (data.message) {
+        toast.success(data.message)
+      } else if (data.failed) {
+        toast.warning(`Posted ${data.pushed} FAQ${data.pushed === 1 ? '' : 's'} to RMS, ${data.failed} failed`)
+      } else {
+        toast.success(`Posted ${data.pushed} FAQ${data.pushed === 1 ? '' : 's'} to RMS`)
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Post FAQ to RMS failed')
+    } finally { setPostingFaqId(null) }
   }
 
   return (
@@ -651,6 +673,15 @@ export default function ReportsPage() {
                     <span className="text-xs text-slate-500 dark:text-slate-400">
                       News ID: <span className="font-semibold text-teal-600 dark:text-teal-400">{poll.rms_news_id}</span>
                     </span>
+                  )}
+                  {!!poll.faq_count && (
+                    <button onClick={() => void handlePostFaq(poll)}
+                      disabled={postingFaqId === poll.id || !poll.rms_news_id}
+                      title={poll.rms_news_id ? undefined : 'Push this poll to Koenig News first to get a Policy ID'}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-900/20 px-3 py-1.5 text-xs font-semibold text-violet-700 dark:text-violet-400 hover:bg-violet-100 transition-colors disabled:opacity-50 whitespace-nowrap">
+                      {postingFaqId === poll.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircleQuestion className="h-3.5 w-3.5" />}
+                      Post FAQ
+                    </button>
                   )}
                 </div>
               </div>

@@ -32,16 +32,53 @@ interface KitesTokenResult {
   deviceToken: string
 }
 
-async function getKitesToken(username: string, password: string, role: string): Promise<KitesTokenResult> {
+async function getKitesTokenOnce(username: string, password: string, role: string): Promise<KitesTokenResult> {
   const res = await fetch(`${KITES_BASE}/api/Kites/Operator/GetToken`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userName: username, userPassword: password, userRole: role }),
   })
-  if (!res.ok) throw new Error(`GetToken failed: ${res.status}`)
-  const json = await res.json() as { statuscode: number; content: { accessToken: string; deviceToken: string } }
-  if (json.statuscode !== 200) throw new Error(`GetToken error: ${json.statuscode}`)
+  const text = await res.text()
+  if (!res.ok) throw new Error(`GetToken failed: ${res.status}: ${text}`)
+  const json = JSON.parse(text) as { statuscode: number; message?: string; content: { accessToken: string; deviceToken: string } }
+  if (json.statuscode !== 200) throw new Error(`GetToken error: ${json.statuscode}${json.message ? ` — ${json.message}` : ''}`)
   return { accessToken: json.content.accessToken, deviceToken: json.content.deviceToken }
+}
+
+// GetToken intermittently returns a bogus "403 Forbidden: Permission denied"
+// for valid credentials — the same call succeeds again seconds later — so a
+// couple of short retries clear it up rather than failing the whole push.
+async function fetchKitesTokenWithRetry(username: string, password: string, role: string): Promise<KitesTokenResult> {
+  const delaysMs = [1000, 2000]
+  let lastErr: unknown
+  for (let attempt = 0; attempt <= delaysMs.length; attempt++) {
+    try {
+      return await getKitesTokenOnce(username, password, role)
+    } catch (err) {
+      lastErr = err
+      if (attempt < delaysMs.length) await new Promise(r => setTimeout(r, delaysMs[attempt]))
+    }
+  }
+  throw lastErr
+}
+
+// The token this account gets back doesn't rotate per call (same accessToken
+// across many calls in testing), and re-hitting GetToken repeatedly is what
+// seems to trip its intermittent "Forbidden: Permission denied" response —
+// so fetch it once per process and reuse it, instead of re-authenticating on
+// every single push. Keyed by username since each Kites operation in this
+// file (poll push, insert poll results, insert FAQ) uses its own account.
+const kitesTokenCache = new Map<string, { token: KitesTokenResult; expiresAt: number }>()
+const KITES_TOKEN_TTL_MS = 6 * 60 * 60 * 1000
+
+async function getKitesToken(username: string, password: string, role: string, forceRefresh = false): Promise<KitesTokenResult> {
+  const cached = kitesTokenCache.get(username)
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+    return cached.token
+  }
+  const token = await fetchKitesTokenWithRetry(username, password, role)
+  kitesTokenCache.set(username, { token, expiresAt: Date.now() + KITES_TOKEN_TTL_MS })
+  return token
 }
 
 export async function pushPollToKites(
@@ -255,6 +292,105 @@ export async function uploadPollResults(
   }
 
   return { success: true, questionResults }
+}
+
+// ─── Insert PolicyFAQs (RMS) ─────────────────────────────────────────────────
+// Pushes a poll's FAQs into RMS. PolicyId is the poll's own rms_news_id — the
+// ID RMS returned when the poll itself was pushed (pushPollToKites, above) —
+// not something this endpoint generates; every FAQ for a poll is inserted
+// under that same, already-existing PolicyId.
+
+async function callInsertFaqApi(
+  accessToken: string, deviceToken: string, apiKey: string,
+  payload: { Type: number; PolicyId: string; Question: string; Answer: string },
+): Promise<string | undefined> {
+  const url = `${KITES_BASE}/api/Kites/Operator/common?apikey=${encodeURIComponent(apiKey)}&accessToken=${encodeURIComponent(accessToken)}&deviceToken=${encodeURIComponent(deviceToken)}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+
+  const text = await res.text()
+  let data: unknown
+  try { data = JSON.parse(text) } catch { data = text }
+
+  if (!res.ok) throw new Error(`Insert PolicyFAQs API ${res.status}: ${text}`)
+
+  const statuscode = (data as Record<string, unknown> | undefined)?.statuscode
+  if (statuscode !== 200) throw new Error(`Insert PolicyFAQs error (${statuscode ?? 'unknown'}): ${text}`)
+
+  // On success, content is a JSON-encoded string with the new record's ID,
+  // e.g. "[{\"NewId\":7.0}]" — without Type:1 in the request this comes back
+  // as "[]" instead (a silent no-op), so this confirms the insert actually happened.
+  try {
+    const content = (data as Record<string, unknown>).content
+    const parsed = JSON.parse(typeof content === 'string' ? content : JSON.stringify(content ?? [])) as Record<string, unknown>[]
+    const first = Array.isArray(parsed) ? parsed[0] : parsed
+    const idVal = first?.NewId ?? first?.NewID ?? first?.Newid ?? first?.newId
+    return idVal !== undefined && idVal !== null ? String(idVal) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export interface InsertPolicyFaqsOutcome {
+  success: boolean
+  error?: string // auth-level error — nothing was pushed
+  results: { question: string; success: boolean; error?: string; faqId?: string }[]
+}
+
+export async function insertPolicyFaqs(
+  policyId: string,
+  faqs: { question: string; answer: string }[],
+): Promise<InsertPolicyFaqsOutcome> {
+  const apiKey = process.env.KITES_INSERT_FAQ_API_KEY
+  const username = process.env.KITES_INSERT_FAQ_USERNAME
+  const password = process.env.KITES_INSERT_FAQ_PASSWORD
+  const role = process.env.KITES_INSERT_FAQ_ROLE
+  // A known-good accessToken/deviceToken pair, used as-is with no GetToken
+  // call at all — GetToken itself is what's been intermittently rejecting
+  // this account. Falls back to GetToken (with the retry/cache logic above)
+  // only if these aren't set, or if this static pair stops working.
+  const staticAccessToken = process.env.KITES_INSERT_FAQ_ACCESS_TOKEN
+  const staticDeviceToken = process.env.KITES_INSERT_FAQ_DEVICE_TOKEN
+
+  if (!apiKey) {
+    return { success: false, error: 'Insert PolicyFAQs API key not configured', results: [] }
+  }
+
+  let accessToken: string, deviceToken: string
+  if (staticAccessToken && staticDeviceToken) {
+    accessToken = staticAccessToken
+    deviceToken = staticDeviceToken
+  } else if (username && password && role) {
+    try {
+      const tokens = await getKitesToken(username, password, role)
+      accessToken = tokens.accessToken
+      deviceToken = tokens.deviceToken
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : 'Failed to get Kites token', results: [] }
+    }
+  } else {
+    return { success: false, error: 'Insert PolicyFAQs API credentials not configured', results: [] }
+  }
+
+  const results: { question: string; success: boolean; error?: string; faqId?: string }[] = []
+
+  for (const faq of faqs) {
+    try {
+      const faqId = await callInsertFaqApi(accessToken, deviceToken, apiKey, {
+        Type: 1,
+        PolicyId: policyId,
+        Question: faq.question,
+        Answer: faq.answer,
+      })
+      results.push({ question: faq.question, success: true, faqId })
+    } catch (err) {
+      results.push({ question: faq.question, success: false, error: err instanceof Error ? err.message : 'Unknown error' })
+    }
+  }
+  return { success: true, results }
 }
 
 export function buildResponsesHtml(
