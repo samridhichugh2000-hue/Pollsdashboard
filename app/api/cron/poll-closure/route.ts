@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse, getPollAttachments } from '@/lib/db/queries'
 import { sendEmail, forwardMessageWithHtml, standardCC, getFormResponses } from '@/lib/graph'
 import { buildResultsEmailHtml, toISTDateStr, istMinutesOfDay, isISTWeekend } from '@/lib/utils'
-import { autoPublishResultsToRms } from '@/lib/kites-api'
 import * as XLSX from 'xlsx'
 
 const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000
@@ -164,24 +163,15 @@ export async function GET(req: Request) {
       await updatePollStatus(poll.id, 'RESULTS_SHARED', { results_uploaded_at: new Date().toISOString() })
       await createAuditLog(poll.id, 'RESULTS_SHARED', 'cron')
 
-      // Best-effort: auto-push to RMS and upload results, same as the manual
-      // Push to RMS / Upload to Koenig News actions — a failure here never
-      // undoes RESULTS_SHARED above, just leaves it for manual retry.
-      try {
-        const autoResult = await autoPublishResultsToRms(poll, entries)
-        if (autoResult.uploaded && autoResult.newsId) {
-          await updatePollStatus(poll.id, 'RESULTS_UPLOADED', { rms_news_id: autoResult.newsId, results_uploaded_at: new Date().toISOString() })
-          await createAuditLog(poll.id, 'RESULTS_UPLOADED', 'cron', { newsId: autoResult.newsId, via: 'auto' })
-        } else if (autoResult.pushed && autoResult.newsId) {
-          await updatePollStatus(poll.id, 'RMS_PUBLISHED', { rms_news_id: autoResult.newsId })
-          await createAuditLog(poll.id, 'PUSHED_TO_RMS', 'cron', { newsId: autoResult.newsId, via: 'auto' })
-          await createAuditLog(poll.id, 'RESULTS_UPLOAD_FAILED', 'cron', { error: autoResult.error, step: autoResult.step })
-        } else if (autoResult.error) {
-          await createAuditLog(poll.id, 'RMS_PUSH_FAILED', 'cron', { error: autoResult.error, step: autoResult.step })
-        }
-      } catch (err) {
-        await createAuditLog(poll.id, 'RMS_PUSH_FAILED', 'cron', { error: err instanceof Error ? err.message : String(err) })
-      }
+      // RMS push/upload deliberately does NOT run here — it used to, inline,
+      // but a single poll's RMS push+upload can take 60–90s+ (observed during
+      // a manual backfill), and this loop can process several overdue polls
+      // in one run. That risked the whole invocation running long enough to
+      // hit the function's execution limit mid-loop, silently starving
+      // whichever polls hadn't been reached yet (no audit log at all, since
+      // the process never got there — indistinguishable from the cron not
+      // firing). RMS publishing now runs on its own schedule, decoupled from
+      // closing, in the rms-retry cron.
     } catch (err) {
       console.error(`Poll ${poll.id} closed but failed to send results:`, err)
       try {
