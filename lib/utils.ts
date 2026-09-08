@@ -634,8 +634,7 @@ export function buildReplyToRespondentHtml(params: {
     </table>
     <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.7;">
       Regards,<br>
-      <strong style="color:#374151;">Priya</strong><br>
-      Poll Dashboard
+      <strong style="color:#374151;">Poll Dashboard</strong>
     </p>
   </div>
 </div>`
