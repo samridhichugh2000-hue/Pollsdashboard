@@ -9,7 +9,14 @@ const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
 // from the dashboard, so both the shared mailbox and whoever is currently
 // acting as it stay visibly in the loop on every outbound thread.
 export function standardCC(): string[] {
-  return [...new Set([process.env.POLLS_MAILBOX, process.env.PRIYA_EMAIL].filter(Boolean))] as string[]
+  // 'polls@koenig-solutions.com' is hardcoded, not just read from
+  // POLLS_MAILBOX, so it's always CC'd even if that env var is unset or
+  // ever points somewhere else.
+  return [...new Set([
+    'polls@koenig-solutions.com',
+    process.env.POLLS_MAILBOX,
+    process.env.PRIYA_EMAIL,
+  ].filter(Boolean))] as string[]
 }
 
 async function getAppAccessToken(): Promise<string> {
