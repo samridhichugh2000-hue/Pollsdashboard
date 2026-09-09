@@ -21,10 +21,6 @@
       "schedule": "30 11 * * *"
     },
     {
-      "path": "/api/cron/poll-closure",
-      "schedule": "29 18 * * *"
-    },
-    {
       "path": "/api/cron/rms-retry",
       "schedule": "0 22 * * *"
     },
