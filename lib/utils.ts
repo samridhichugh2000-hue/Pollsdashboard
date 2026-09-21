@@ -147,17 +147,48 @@ function rollToWorkingDay(date: Date): Date {
   return d
 }
 
+// Quarterly/bi-annual cadence polls anchor to calendar quarters/halves
+// (Jan/Apr/Jul/Oct, Jan/Jul) rather than to whatever month the template
+// happened to be created or last run in — otherwise a poll created in
+// September with a 3-month cadence would land on Dec/Mar/Jun/Sep instead of
+// the calendar-quarter months the "quarterly" label implies.
+const CALENDAR_ANCHOR_MONTHS: Record<string, number[]> = {
+  quarterly: [0, 3, 6, 9],
+  'bi-annual': [0, 6],
+}
+
+function nextCalendarAnchorMonth(fromYear: number, fromMonth: number, anchors: number[]): { year: number; month: number } {
+  const next = anchors.find(m => m > fromMonth)
+  if (next !== undefined) return { year: fromYear, month: next }
+  return { year: fromYear + 1, month: anchors[0] }
+}
+
 export function computeNextRunDate(frequency: string, scheduledDay: number, from: Date = new Date()): string {
   const today = new Date(from)
   today.setHours(0, 0, 0, 0)
+  const anchors = CALENDAR_ANCHOR_MONTHS[frequency]
+  if (anchors) {
+    const thisAnchorTarget = anchors.includes(today.getMonth())
+      ? clampToMonth(today.getFullYear(), today.getMonth(), scheduledDay)
+      : null
+    if (thisAnchorTarget && thisAnchorTarget >= today) return rollToWorkingDay(thisAnchorTarget).toISOString().split('T')[0]
+    const { year, month } = nextCalendarAnchorMonth(today.getFullYear(), today.getMonth(), anchors)
+    return rollToWorkingDay(clampToMonth(year, month, scheduledDay)).toISOString().split('T')[0]
+  }
   const thisMonthTarget = clampToMonth(today.getFullYear(), today.getMonth(), scheduledDay)
   if (thisMonthTarget >= today) return rollToWorkingDay(thisMonthTarget).toISOString().split('T')[0]
-  const months = frequency === 'quarterly' ? 3 : frequency === 'bi-annual' ? 6 : frequency === 'annual' ? 12 : 1
+  const months = frequency === 'annual' ? 12 : 1
   return rollToWorkingDay(addMonthsClamped(thisMonthTarget, months)).toISOString().split('T')[0]
 }
 
 export function advanceNextRunDate(current: string, frequency: string): string {
-  const months = frequency === 'quarterly' ? 3 : frequency === 'bi-annual' ? 6 : frequency === 'annual' ? 12 : 1
+  const anchors = CALENDAR_ANCHOR_MONTHS[frequency]
+  if (anchors) {
+    const cur = new Date(current)
+    const { year, month } = nextCalendarAnchorMonth(cur.getFullYear(), cur.getMonth(), anchors)
+    return rollToWorkingDay(clampToMonth(year, month, cur.getDate())).toISOString().split('T')[0]
+  }
+  const months = frequency === 'annual' ? 12 : 1
   return rollToWorkingDay(addMonthsClamped(new Date(current), months)).toISOString().split('T')[0]
 }
 
