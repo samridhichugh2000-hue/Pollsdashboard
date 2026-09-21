@@ -20,9 +20,11 @@ export async function POST() {
 
   await runMigrations()
   const priyaEmail = process.env.PRIYA_EMAIL!
-  // Poll-request emails can land in either the primary mailbox or the HR
-  // alias — both get scanned so a request sent to HR@ isn't silently missed.
-  const mailboxes = [priyaEmail, process.env.HR_MAILBOX ?? 'HR@koenig-solutions.com']
+  // HR@koenig-solutions.com is a distribution group, not a mailbox — Graph
+  // has no inbox to read for it. Mail sent there fans out into each member's
+  // own mailbox instead, so we scan the member's personal inbox (this HR
+  // admin's) rather than the group address itself.
+  const mailboxes = [priyaEmail, process.env.HR_MAILBOX ?? 'samridhi.chugh@koenig-solutions.com']
   let processed = 0
   let skipped = 0
 
