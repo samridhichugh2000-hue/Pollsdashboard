@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { getInboxMessages, getRecentPollEmails, markEmailAsRead, isSystemNotificationEmail } from '@/lib/graph'
+import { getInboxMessages, getRecentPollEmailsFromMailboxes, markEmailAsRead, isSystemNotificationEmail } from '@/lib/graph'
 import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog, getProcessedMessageIds, markMessageProcessed } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { runMigrations } from '@/lib/db/schema'
@@ -20,6 +20,9 @@ export async function POST() {
 
   await runMigrations()
   const priyaEmail = process.env.PRIYA_EMAIL!
+  // Poll-request emails can land in either the primary mailbox or the HR
+  // alias — both get scanned so a request sent to HR@ isn't silently missed.
+  const mailboxes = [priyaEmail, process.env.HR_MAILBOX ?? 'HR@koenig-solutions.com']
   let processed = 0
   let skipped = 0
 
@@ -27,11 +30,13 @@ export async function POST() {
     const AUTHORIZED_EMAILS = await getAuthorizedEmails()
 
     // First pass: mark all RMS system notification emails as read so they disappear from Outlook
-    const allUnread = await getInboxMessages(priyaEmail, 'isRead eq false')
-    for (const msg of allUnread) {
-      if (isSystemNotificationEmail(msg.subject)) {
-        await markEmailAsRead(priyaEmail, msg.id)
-        skipped++
+    for (const mailbox of mailboxes) {
+      const allUnread = await getInboxMessages(mailbox, 'isRead eq false')
+      for (const msg of allUnread) {
+        if (isSystemNotificationEmail(msg.subject)) {
+          await markEmailAsRead(mailbox, msg.id)
+          skipped++
+        }
       }
     }
 
@@ -47,7 +52,7 @@ export async function POST() {
     `)
 
     // Second pass: process actual poll emails
-    const candidates = await getRecentPollEmails(priyaEmail)
+    const candidates = await getRecentPollEmailsFromMailboxes(mailboxes)
     const processedIds = await getProcessedMessageIds('poll', candidates.map(m => m.id))
     const messages = candidates.filter(m => !processedIds.has(m.id))
 
@@ -58,7 +63,7 @@ export async function POST() {
       if (!AUTHORIZED_EMAILS.has(senderEmail)) { skipped++; continue }
 
       const alreadyProcessed = await pollEmailAlreadyProcessed(msg.conversationId)
-      if (alreadyProcessed) { skipped++; await markMessageProcessed('poll', msg.id); await markEmailAsRead(priyaEmail, msg.id); continue }
+      if (alreadyProcessed) { skipped++; await markMessageProcessed('poll', msg.id); await markEmailAsRead(msg.mailbox, msg.id); continue }
 
       const emailText = msg.body.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
       const deptMatch = emailText.match(/(?:department|team|audience)[:\s]+([A-Za-z\s&]+?)(?:\.|,|\n|$)/i)
@@ -66,7 +71,7 @@ export async function POST() {
       const topic = msg.subject.replace(/^(fw|fwd|re|tr):\s*/gi, '').replace(/^(fw|fwd|re|tr):\s*/gi, '').trim()
 
       // Dedup by topic — catches forwarded duplicates with a different conversationId
-      if (await pollTopicAlreadyExists(topic)) { skipped++; await markMessageProcessed('poll', msg.id); await markEmailAsRead(priyaEmail, msg.id); continue }
+      if (await pollTopicAlreadyExists(topic)) { skipped++; await markMessageProcessed('poll', msg.id); await markEmailAsRead(msg.mailbox, msg.id); continue }
 
       const poll = await createPoll({
         topic, department,
@@ -91,7 +96,7 @@ export async function POST() {
       })
 
       await markMessageProcessed('poll', msg.id)
-      await markEmailAsRead(priyaEmail, msg.id)
+      await markEmailAsRead(msg.mailbox, msg.id)
       await createAuditLog(poll.id, 'DETECTED_FROM_INBOX', 'manual-sync', {
         sender: senderEmail, subject: msg.subject,
       })

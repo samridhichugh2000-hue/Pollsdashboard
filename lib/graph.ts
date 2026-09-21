@@ -142,6 +142,21 @@ export async function getRecentPollEmails(userEmail: string): Promise<GraphMessa
   })
 }
 
+export interface MailboxMessage extends GraphMessage {
+  mailbox: string
+}
+
+// Poll-request emails can land in more than one shared inbox (e.g. the HR
+// alias as well as the dashboard's primary mailbox) — scan every configured
+// mailbox and tag each message with which one it came from, so callers know
+// where to mark it read.
+export async function getRecentPollEmailsFromMailboxes(mailboxes: string[]): Promise<MailboxMessage[]> {
+  const results = await Promise.all(
+    mailboxes.map(async (mailbox) => (await getRecentPollEmails(mailbox)).map((m) => ({ ...m, mailbox })))
+  )
+  return results.flat()
+}
+
 // KGT (knowledge/ownership transfer) requests come from a small named list of
 // people — any recent mail from an authorized requester is a candidate, since
 // they don't always spell out "KGT" in the subject. Kept unfiltered by

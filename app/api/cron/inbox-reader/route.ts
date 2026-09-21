@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getRecentPollEmails, markEmailAsRead } from '@/lib/graph'
+import { getRecentPollEmailsFromMailboxes, markEmailAsRead } from '@/lib/graph'
 import { createPoll, updatePoll, pollEmailAlreadyProcessed, pollTopicAlreadyExists, createAuditLog, getProcessedMessageIds, markMessageProcessed } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/client'
 import { runMigrations } from '@/lib/db/schema'
@@ -21,12 +21,15 @@ export async function GET(req: Request) {
 
   await runMigrations()
   const priyaEmail = process.env.PRIYA_EMAIL!
+  // Poll-request emails can land in either the primary mailbox or the HR
+  // alias — both get scanned so a request sent to HR@ isn't silently missed.
+  const mailboxes = [priyaEmail, process.env.HR_MAILBOX ?? 'HR@koenig-solutions.com']
   let processed = 0
   let skipped = 0
 
   try {
     const AUTHORIZED_EMAILS = await getAuthorizedEmails()
-    const candidates = await getRecentPollEmails(priyaEmail)
+    const candidates = await getRecentPollEmailsFromMailboxes(mailboxes)
     const processedIds = await getProcessedMessageIds('poll', candidates.map(m => m.id))
     const messages = candidates.filter(m => !processedIds.has(m.id))
 
@@ -45,7 +48,7 @@ export async function GET(req: Request) {
       if (alreadyProcessed) {
         skipped++
         await markMessageProcessed('poll', msg.id)
-        await markEmailAsRead(priyaEmail, msg.id)
+        await markEmailAsRead(msg.mailbox, msg.id)
         continue
       }
 
@@ -63,7 +66,7 @@ export async function GET(req: Request) {
       if (await pollTopicAlreadyExists(topic)) {
         skipped++
         await markMessageProcessed('poll', msg.id)
-        await markEmailAsRead(priyaEmail, msg.id)
+        await markEmailAsRead(msg.mailbox, msg.id)
         continue
       }
 
@@ -98,7 +101,7 @@ export async function GET(req: Request) {
       })
 
       await markMessageProcessed('poll', msg.id)
-      await markEmailAsRead(priyaEmail, msg.id)
+      await markEmailAsRead(msg.mailbox, msg.id)
 
       await createAuditLog(poll.id, 'DETECTED_FROM_INBOX', 'cron', {
         sender: senderEmail,
