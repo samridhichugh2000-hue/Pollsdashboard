@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db/client'
+import { deriveAudienceLabel, buildHuntGroupEmailMap } from '@/lib/utils'
 
 // Public, API-key-gated lookup: given an employee's email, return how many
 // polls they've responded to, plus the topic/department of each one.
@@ -38,6 +39,8 @@ interface PollResponseRow {
   poll_id: string
   topic: string
   department: string
+  recipient_email: string | null
+  release_emails: string | null
   response_data: string | null
 }
 
@@ -60,12 +63,16 @@ export async function GET(req: NextRequest) {
   try {
     const db = getDb()
 
-    const responsesResult = await db.execute(`
-      SELECT pr.poll_id, p.topic, p.department, pr.response_data
-      FROM poll_responses pr
-      JOIN polls p ON p.id = pr.poll_id
-      WHERE pr.response_data IS NOT NULL
-    `)
+    const [responsesResult, huntGroupsResult] = await Promise.all([
+      db.execute(`
+        SELECT pr.poll_id, p.topic, p.department, p.recipient_email, p.release_emails, pr.response_data
+        FROM poll_responses pr
+        JOIN polls p ON p.id = pr.poll_id
+        WHERE pr.response_data IS NOT NULL
+      `),
+      db.execute('SELECT name, email FROM hunt_groups'),
+    ])
+    const huntGroupsByEmail = buildHuntGroupEmailMap(huntGroupsResult.rows as unknown as { name: string; email: string }[])
 
     let matchedRespondentName: string | null = null
     const pollsParticipatedList: { poll_id: string; topic: string; department: string; submitted_at: string | null }[] = []
@@ -79,7 +86,7 @@ export async function GET(req: NextRequest) {
           pollsParticipatedList.push({
             poll_id: row.poll_id,
             topic: row.topic,
-            department: row.department,
+            department: deriveAudienceLabel(row, huntGroupsByEmail),
             submitted_at: match.submitted_at ?? null,
           })
         }
