@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const poll = await getPollById(id)
   if (!poll) return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
 
-  if (CLOSED_STATUSES.includes(poll.status)) {
+  if (CLOSED_STATUSES.includes(poll.status) && !poll.keep_open) {
     return NextResponse.json({ error: poll.closed_message || 'This poll is no longer accepting responses.' }, { status: 410 })
   }
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const poll = await getPollById(id)
   if (!poll) return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
 
-  if (CLOSED_STATUSES.includes(poll.status)) {
+  if (CLOSED_STATUSES.includes(poll.status) && !poll.keep_open) {
     return NextResponse.json({ error: poll.closed_message || 'This poll is no longer accepting responses.' }, { status: 410 })
   }
 

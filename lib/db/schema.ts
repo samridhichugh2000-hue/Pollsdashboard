@@ -310,6 +310,12 @@ export async function runMigrations() {
     await db.execute(`ALTER TABLE polls ADD COLUMN has_faq INTEGER DEFAULT 0`)
   } catch { /* already exists */ }
 
+  // Lets the public response form keep accepting submissions even though the
+  // poll's status is a closed one (e.g. RESULTS_UPLOADED). Status is untouched.
+  try {
+    await db.execute(`ALTER TABLE polls ADD COLUMN keep_open INTEGER DEFAULT 0`)
+  } catch { /* already exists */ }
+
   // FAQs are independent of poll lifecycle — they can be added, edited, and
   // announced whether the poll itself is still a draft, active, or already
   // closed/expired. status: DRAFT (not yet announced) | ANNOUNCED.

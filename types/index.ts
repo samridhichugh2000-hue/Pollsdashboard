@@ -64,6 +64,7 @@ export interface Poll {
   archived_from_status?: PollStatus | null
   request_type: RequestType
   has_faq?: number | null // 1 or 0 (SQLite boolean) — whether the FAQ section is enabled for this poll
+  keep_open?: number | null // 1 = response form stays open regardless of status (status is not changed)
   faq_count?: number | null // count of poll_faqs rows for this poll, any status — only present on getAllPolls() results
   created_at: string
   updated_at: string
