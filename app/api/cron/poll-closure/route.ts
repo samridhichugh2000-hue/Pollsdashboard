@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getPollsByStatus, updatePollStatus, createAuditLog, upsertPollResponse, getPollResponse, getPollAttachments } from '@/lib/db/queries'
-import { sendEmail, forwardMessageWithHtml, standardCC, getFormResponses } from '@/lib/graph'
+import { sendEmail, forwardMessageWithHtml, resultsEmailRecipients, getFormResponses } from '@/lib/graph'
 import { buildResultsEmailHtml, toISTDateStr, istMinutesOfDay, isISTWeekend } from '@/lib/utils'
 import * as XLSX from 'xlsx'
 
@@ -125,7 +125,7 @@ export async function GET(req: Request) {
         attachments = [{ name: filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', contentBytes: xlsxBase64 }]
       }
 
-      // Send results to EA — forward the last reminder sent for this poll
+      // Send results to the poll requester (EA and Polls CC'd) — forward the last reminder sent for this poll
       // (falling back to the original release email, then to a plain new
       // email for older polls with no stored thread at all) so EA sees the
       // full poll context, not just a bare results notice. Attach whatever
@@ -136,21 +136,21 @@ export async function GET(req: Request) {
         ? (JSON.parse(poll.questions) as Array<string | { text: string }>).map(q => typeof q === 'string' ? q : q.text)
         : []
       const htmlBody = buildResultsEmailHtml(poll.topic, attachments.length > 0, pollQuestions)
-      const resultsRecipient = process.env.RESULTS_RECIPIENT_EMAIL ?? 'ea@koenig-solutions.com'
+      const { to: resultsTo, cc: resultsCc } = resultsEmailRecipients(poll.requested_by)
       const forwardSourceId = poll.last_reminder_message_id ?? poll.release_message_id
       if (forwardSourceId) {
         const releaseAttachments = await getPollAttachments(poll.id)
         await forwardMessageWithHtml(process.env.PRIYA_EMAIL!, forwardSourceId, {
           htmlBody,
-          to: [resultsRecipient],
-          cc: standardCC(),
+          to: resultsTo,
+          cc: resultsCc,
           attachments: [...attachments, ...releaseAttachments],
         })
       } else {
         await sendEmail({
           from: process.env.PRIYA_EMAIL!,
-          to: resultsRecipient,
-          cc: standardCC(),
+          to: resultsTo,
+          cc: resultsCc,
           subject: `Poll Results: ${poll.topic}`,
           htmlBody,
           ...(attachments.length > 0 && { attachments }),

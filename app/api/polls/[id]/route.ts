@@ -20,7 +20,7 @@ import {
   CLOSED_POLL_STATUSES,
 } from '@/lib/db/queries'
 import type { PollAttachment } from '@/lib/db/queries'
-import { sendEmail, replyToMessageWithHtml, forwardMessageWithHtml, standardCC } from '@/lib/graph'
+import { sendEmail, replyToMessageWithHtml, forwardMessageWithHtml, standardCC, resultsEmailRecipients } from '@/lib/graph'
 import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, buildNoActionTakenHtml, formatDate, toISTDateStr } from '@/lib/utils'
 import { releasePollNow } from '@/lib/poll-release'
 import { generatePollDraft } from '@/lib/draft-generator'
@@ -643,9 +643,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!CLOSED_POLL_STATUSES.includes(poll.status)) {
           return NextResponse.json({ error: `Cannot share results for a poll in ${poll.status} status — it must be closed first.` }, { status: 409 })
         }
+        const defaultResults = resultsEmailRecipients(poll.requested_by)
         const shareRecipients = Array.isArray(body.recipients) && (body.recipients as string[]).length > 0
           ? (body.recipients as string[])
-          : [process.env.RESULTS_RECIPIENT_EMAIL ?? 'ea@koenig-solutions.com']
+          : defaultResults.to
 
         const pollResponse = await getPollResponse(id)
 
@@ -705,7 +706,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await forwardMessageWithHtml(process.env.PRIYA_EMAIL!, forwardSourceId, {
           htmlBody: emailHtml,
           to: shareRecipients,
-          cc: standardCC(),
+          cc: defaultResults.cc,
           attachments: [...(resultAttachment ? [resultAttachment] : []), ...releaseAttachments],
         })
 

@@ -19,6 +19,20 @@ export function standardCC(): string[] {
   ].filter(Boolean))] as string[]
 }
 
+// Recipients for the "results shared" email: the poll requester (To), with EA
+// and Polls CC'd. Polls with no usable requester email (blank, or a marker
+// like "Regular Poll (Auto)") go to Rohit Aggarwal instead.
+export function resultsEmailRecipients(requestedBy: string | null | undefined): { to: string[]; cc: string[] } {
+  const raw = requestedBy?.trim() ?? ''
+  const angle = raw.match(/<([^>]+)>/)
+  const candidate = (angle ? angle[1] : raw).trim()
+  const requesterEmail = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(candidate) ? candidate : null
+  return {
+    to: [requesterEmail ?? 'Rohit.Aggarwal@koenig-solutions.com'],
+    cc: ['ea@koenig-solutions.com', 'polls@koenig-solutions.com'],
+  }
+}
+
 async function getAppAccessToken(): Promise<string> {
   const tenantId = process.env.AZURE_AD_TENANT_ID!
   const clientId = process.env.AZURE_AD_CLIENT_ID!
