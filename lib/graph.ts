@@ -19,16 +19,30 @@ export function standardCC(): string[] {
   ].filter(Boolean))] as string[]
 }
 
+const RESULTS_FALLBACK_TO = 'rohit.a@koenig-solutions.com'
+
+// Requesters whose polls are really Rohit Aggarwal's: results go to him, not them.
+const RESULTS_REDIRECT_TO_ROHIT = new Set([
+  'ea@koenig-solutions.com',
+  'nupur.munjal@koenig-solutions.com',
+  'nabila.fatima@koenig-solutions.com',
+  RESULTS_FALLBACK_TO,
+])
+
 // Recipients for the "results shared" email: the poll requester (To), with EA
-// and Polls CC'd. Polls with no usable requester email (blank, or a marker
-// like "Regular Poll (Auto)") go to Rohit Aggarwal instead.
+// and Polls CC'd. Requests from EA, Nupur, Nabila or Rohit, and polls with no
+// usable requester email (blank, or a marker like "Regular Poll (Auto)" or
+// "EA Team"), go to Rohit Aggarwal instead.
 export function resultsEmailRecipients(requestedBy: string | null | undefined): { to: string[]; cc: string[] } {
   const raw = requestedBy?.trim() ?? ''
   const angle = raw.match(/<([^>]+)>/)
   const candidate = (angle ? angle[1] : raw).trim()
   const requesterEmail = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(candidate) ? candidate : null
+  const to = requesterEmail && !RESULTS_REDIRECT_TO_ROHIT.has(requesterEmail.toLowerCase())
+    ? requesterEmail
+    : RESULTS_FALLBACK_TO
   return {
-    to: [requesterEmail ?? 'Rohit.Aggarwal@koenig-solutions.com'],
+    to: [to],
     cc: ['ea@koenig-solutions.com', 'polls@koenig-solutions.com'],
   }
 }
@@ -415,7 +429,14 @@ export async function forwardMessageWithHtml(
 
   await graphRequest(`/users/${foundInMailbox}/messages/${draft.id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ body: { contentType: 'HTML', content: options.htmlBody + (draft.body?.content ?? '') } }),
+    // createForward only reliably honours toRecipients, so To/CC/BCC are set
+    // explicitly on the draft too — otherwise CC is silently dropped.
+    body: JSON.stringify({
+      body: { contentType: 'HTML', content: options.htmlBody + (draft.body?.content ?? '') },
+      toRecipients,
+      ...(ccRecipients && { ccRecipients }),
+      ...(bccRecipients && { bccRecipients }),
+    }),
   })
 
   if (options.attachments?.length) {
