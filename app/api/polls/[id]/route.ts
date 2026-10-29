@@ -540,6 +540,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         entries[entryIndex] = {
           ...entries[entryIndex],
           actionable,
+          // Stamp when an entry is marked Finalised/Actionable (kept if already set,
+          // cleared if the decision is changed away) — exposed by the KGT public API.
+          finalised_at: actionable === true ? (entries[entryIndex].finalised_at ?? new Date().toISOString()) : null,
           ...(remarks !== undefined ? { remarks } : {}),
           ...(classification !== undefined ? { classification } : {}),
           ...(status !== undefined ? { status } : {}),

@@ -25,6 +25,7 @@ interface ResponseEntry {
   email?: string
   respondent?: string
   actionable?: boolean | null
+  finalised_at?: string | null
 }
 
 interface KgtRow {
@@ -69,13 +70,31 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // Entries finalised before finalised_at existed: fall back to the audit log —
+    // the latest decision for each entry index, if it was "actionable".
+    const auditResult = await db.execute(`
+      SELECT poll_id, metadata, created_at FROM audit_logs
+      WHERE action = 'ENTRY_ACTIONABLE_UPDATED' ORDER BY created_at ASC
+    `)
+    const auditFinalised = new Map<string, string | null>() // `${poll_id}:${entryIndex}` -> date, null if last decision wasn't finalised
+    for (const a of auditResult.rows as unknown as { poll_id: string; metadata: string | null; created_at: string }[]) {
+      try {
+        const m = JSON.parse(a.metadata ?? '{}') as { entryIndex?: number; actionable?: boolean | null }
+        if (typeof m.entryIndex !== 'number') continue
+        const key = `${a.poll_id}:${m.entryIndex}`
+        // keep the first date of a continuous "finalised" run, reset on any other decision
+        if (m.actionable === true) { if (!auditFinalised.get(key)) auditFinalised.set(key, a.created_at.includes('T') ? a.created_at : `${a.created_at.replace(' ', 'T')}Z`) }
+        else auditFinalised.set(key, null)
+      } catch { /* skip */ }
+    }
+
     const seenPollIds = new Set<string>()
     const kgts: {
       kgt_id: string
       kgt_name: string
       department: string
       finalised_count: number
-      finalised_employees: { emp_id: string | null; name: string | null; email: string | null }[]
+      finalised_employees: { emp_id: string | null; name: string | null; email: string | null; finalised_on: string | null }[]
     }[] = []
 
     for (const row of kgtResult.rows as unknown as KgtRow[]) {
@@ -85,14 +104,16 @@ export async function GET(req: NextRequest) {
       try {
         const entries = JSON.parse(row.response_data) as ResponseEntry[]
         const finalised = entries
-          .filter(e => e.actionable === true)
-          .map(e => {
+          .map((e, i) => ({ e, i }))
+          .filter(({ e }) => e.actionable === true)
+          .map(({ e, i }) => {
             const email = e.email?.toLowerCase() ?? null
             const emp = email ? employeesByEmail.get(email) : undefined
             return {
               emp_id: emp?.emp_code ?? null,
               name: emp?.name ?? e.respondent ?? null,
               email,
+              finalised_on: e.finalised_at ?? auditFinalised.get(`${row.poll_id}:${i}`) ?? null,
             }
           })
 
