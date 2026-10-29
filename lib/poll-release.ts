@@ -1,7 +1,8 @@
 import { updatePoll, updatePollStatus, createAuditLog, replacePollAttachments } from './db/queries'
 import type { PollAttachment } from './db/queries'
 import { sendEmailGetId } from './graph'
-import { buildPollEmailHtml, formatDate } from './utils'
+import { getDb } from './db/client'
+import { buildPollEmailHtml, formatDate, deriveAudienceLabel, buildHuntGroupEmailMap } from './utils'
 import type { Poll } from '@/types'
 
 // Matches the fallback used when a poll is first drafted with no explicit
@@ -64,4 +65,19 @@ export async function releasePollNow(
     release_message_id: releaseMessageId,
   })
   await createAuditLog(id, 'POLL_RELEASED', performedBy, { emails: allEmails })
+
+  // `department` is only a creation-time default ("All Departments") — now that
+  // the real audience is known, store it so every screen/API shows the hunt
+  // groups (or emails) the poll actually went to. Best-effort: the poll has
+  // already been sent, so a failure here must not fail the release.
+  try {
+    const groups = await getDb().execute('SELECT name, email FROM hunt_groups')
+    const label = deriveAudienceLabel(
+      { release_emails: JSON.stringify(allEmails), department: poll.department },
+      buildHuntGroupEmailMap(groups.rows as unknown as { name: string; email: string }[])
+    )
+    if (label && label !== '—') await updatePoll(id, { department: label })
+  } catch (err) {
+    console.error(`Failed to set audience as department for poll ${id}:`, err)
+  }
 }
