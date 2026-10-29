@@ -21,7 +21,7 @@ import {
 } from '@/lib/db/queries'
 import type { PollAttachment } from '@/lib/db/queries'
 import { sendEmail, replyToMessageWithHtml, forwardMessageWithHtml, standardCC, resultsEmailRecipients } from '@/lib/graph'
-import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, buildNoActionTakenHtml, formatDate, toISTDateStr } from '@/lib/utils'
+import { buildApprovalEmailHtml, buildPollEmailHtml, buildResultsEmailHtml, buildDeadlineExtensionAudienceHtml, buildDeadlineExtensionRequesterHtml, buildReplyToRespondentHtml, buildNoActionTakenHtml, formatDate, toISTDateStr, getPendingRecipients } from '@/lib/utils'
 import { releasePollNow } from '@/lib/poll-release'
 import { generatePollDraft } from '@/lib/draft-generator'
 import { generateDraftWithGemini } from '@/lib/gemini'
@@ -980,7 +980,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await createAuditLog(id, 'DEADLINE_EXTENDED', userEmail, { new_deadline: newDeadlineStr })
 
         // Notify audience if the poll has already been released
-        const releaseEmails: string[] = poll.release_emails ? JSON.parse(poll.release_emails) : []
+        // Only people who haven't submitted yet need to know about the new deadline.
+        const releaseEmails = getPendingRecipients(poll.release_emails, (await getPollResponse(id))?.response_data)
         if (releaseEmails.length > 0 && poll.ms_form_link && process.env.PRIYA_EMAIL) {
           const audienceHtml = buildDeadlineExtensionAudienceHtml({
             topic: poll.topic,
@@ -1039,6 +1040,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (!manualReleaseEmails.length) {
           return NextResponse.json({ error: 'No release recipients found.' }, { status: 400 })
         }
+        // Only remind people who haven't submitted yet.
+        const manualPendingEmails = getPendingRecipients(poll.release_emails, (await getPollResponse(id))?.response_data)
+        if (!manualPendingEmails.length) {
+          return NextResponse.json({ error: 'Everyone has already responded — no reminder needed.' }, { status: 400 })
+        }
         const manualReminderHtml = buildPollEmailHtml({
           emailBody: `<p>This is a friendly reminder to participate in our poll: <strong>${poll.topic}</strong></p>`,
           msFormLink: poll.ms_form_link,
@@ -1047,10 +1053,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const manualReminderMessageId = await forwardMessageWithHtml(process.env.PRIYA_EMAIL!, poll.release_message_id, {
           htmlBody: manualReminderHtml,
           to: [process.env.POLLS_MAILBOX ?? process.env.PRIYA_EMAIL!],
-          bcc: manualReleaseEmails,
+          bcc: manualPendingEmails,
         })
         await updatePoll(id, { last_reminder_message_id: manualReminderMessageId })
-        await createAuditLog(id, 'MANUAL_REMINDER_SENT', userEmail, { emails: manualReleaseEmails })
+        await createAuditLog(id, 'MANUAL_REMINDER_SENT', userEmail, { emails: manualPendingEmails })
         break
       }
 

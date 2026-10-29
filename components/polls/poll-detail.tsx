@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { StatusBadge } from './status-badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { formatDate, formatDateTime, formatRelative, isApprovalOverdue, normalizeBodyForEditor, sanitizeWordHtml, getErrorMessage, deriveAudienceLabel, buildHuntGroupEmailMap } from '@/lib/utils'
+import { formatDate, formatDateTime, formatRelative, isApprovalOverdue, normalizeBodyForEditor, sanitizeWordHtml, getErrorMessage, deriveAudienceLabel, buildHuntGroupEmailMap, getPendingRecipients } from '@/lib/utils'
 import { sanitizeHtml } from '@/lib/sanitize-html'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import type { Poll, PollApproval, AuditLog, PollResponse } from '@/types'
@@ -1158,6 +1158,9 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
         }
         const entries: EntryType[] = response?.response_data ? JSON.parse(response.response_data) as EntryType[] : []
 
+        const pendingRecipients = getPendingRecipients(poll.release_emails, response?.response_data)
+        const totalRecipients = (() => { try { return poll.release_emails ? (JSON.parse(poll.release_emails) as string[]).length : 0 } catch { return 0 } })()
+
         const stats = {
           total: entries.length,
           actionable: entries.filter(e => e.actionable === true).length,
@@ -1236,6 +1239,21 @@ export function PollDetail({ poll: initialPoll, approvals, auditLogs, response: 
                     ))}
                   </div>
                 </div>
+              )}
+
+              {totalRecipients > 0 && (
+                <details className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
+                  <summary className="cursor-pointer text-sm font-semibold text-amber-800 dark:text-amber-300">
+                    Yet to respond: {pendingRecipients.length} of {totalRecipients}
+                  </summary>
+                  {pendingRecipients.length === 0 ? (
+                    <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">Everyone has responded.</p>
+                  ) : (
+                    <ul className="mt-2 grid gap-x-6 gap-y-1 text-xs text-gray-700 dark:text-slate-300 sm:grid-cols-2">
+                      {pendingRecipients.map(e => <li key={e}>{e}</li>)}
+                    </ul>
+                  )}
+                </details>
               )}
 
               {entries.length === 0 ? (

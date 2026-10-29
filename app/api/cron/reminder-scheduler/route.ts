@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { getPollsByStatus, claimReminderSent, claimPollColumn, createAuditLog, updatePoll } from '@/lib/db/queries'
+import { getPollsByStatus, getPollResponse, claimReminderSent, claimPollColumn, createAuditLog, updatePoll } from '@/lib/db/queries'
 import { forwardMessageWithHtml } from '@/lib/graph'
-import { buildPollEmailHtml, formatDate, getNextWorkingDay, toISTDateStr, isISTWeekend } from '@/lib/utils'
+import { buildPollEmailHtml, formatDate, getNextWorkingDay, toISTDateStr, isISTWeekend, getPendingRecipients } from '@/lib/utils'
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
@@ -45,6 +45,10 @@ export async function GET(req: Request) {
         continue
       }
 
+      // Only remind people who haven't submitted yet.
+      const pendingEmails = getPendingRecipients(poll.release_emails, (await getPollResponse(poll.id))?.response_data)
+      if (!pendingEmails.length) continue
+
       if (!poll.release_message_id) {
         console.warn(`Poll ${poll.id} has no release_message_id — skipping 1st reminder (cannot thread)`)
         continue
@@ -68,11 +72,11 @@ export async function GET(req: Request) {
         const newMessageId = await forwardMessageWithHtml(priyaEmail, poll.release_message_id, {
           htmlBody,
           to: [process.env.POLLS_MAILBOX ?? priyaEmail],
-          bcc: releaseEmails,
+          bcc: pendingEmails,
         })
         await updatePoll(poll.id, { last_reminder_message_id: newMessageId })
 
-        await createAuditLog(poll.id, 'REMINDER_SENT', 'cron', { emails: releaseEmails })
+        await createAuditLog(poll.id, 'REMINDER_SENT', 'cron', { emails: pendingEmails })
         sent++
       } catch (err) {
         console.error(`Failed to send 1st reminder for poll ${poll.id}:`, err)
@@ -97,6 +101,10 @@ export async function GET(req: Request) {
       continue
     }
 
+    // Only remind people who haven't submitted yet.
+    const pendingEmails2 = getPendingRecipients(poll.release_emails, (await getPollResponse(poll.id))?.response_data)
+    if (!pendingEmails2.length) continue
+
     // Atomically claim before sending — see 1st-reminder block above.
     const claimed = await claimPollColumn(poll.id, 'second_reminder_sent_at', new Date().toISOString())
     if (!claimed) continue
@@ -112,11 +120,11 @@ export async function GET(req: Request) {
       const newMessageId2 = await forwardMessageWithHtml(priyaEmail2, poll.release_message_id, {
         htmlBody,
         to: [process.env.POLLS_MAILBOX ?? priyaEmail2],
-        bcc: releaseEmails,
+        bcc: pendingEmails2,
       })
       await updatePoll(poll.id, { last_reminder_message_id: newMessageId2 })
 
-      await createAuditLog(poll.id, 'SECOND_REMINDER_SENT', 'cron', { emails: releaseEmails })
+      await createAuditLog(poll.id, 'SECOND_REMINDER_SENT', 'cron', { emails: pendingEmails2 })
       sent++
     } catch (err) {
       console.error(`Failed to send 2nd reminder for poll ${poll.id}:`, err)

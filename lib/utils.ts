@@ -718,3 +718,22 @@ export function truncate(str: string, maxLength: number): string {
   if (str.length <= maxLength) return str
   return str.slice(0, maxLength) + '...'
 }
+
+// Recipients (from the stored release_emails JSON) who have not yet submitted a
+// response, compared case-insensitively on email. Responses are keyed by the
+// email the respondent typed, so a different address still counts as pending.
+export function getPendingRecipients(releaseEmailsJson?: string | null, responseDataJson?: string | null): string[] {
+  let recipients: string[] = []
+  let responded: Array<{ email?: string }> = []
+  try { if (releaseEmailsJson) recipients = JSON.parse(releaseEmailsJson) as string[] } catch { /* ignore */ }
+  try { if (responseDataJson) responded = JSON.parse(responseDataJson) as Array<{ email?: string }> } catch { /* ignore */ }
+
+  const submitted = new Set(responded.map(r => r.email?.trim().toLowerCase()).filter(Boolean))
+  const seen = new Set<string>()
+  return recipients.filter(e => {
+    const key = e.trim().toLowerCase()
+    if (!key || submitted.has(key) || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
